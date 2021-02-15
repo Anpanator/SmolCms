@@ -1,10 +1,11 @@
 <?php
 declare(strict_types=1);
 
-use SmolCms\TestClasses\TestClass;
+use SmolCms\Config\RoutingConfiguration;
 
 require_once '../vendor/autoload.php';
 
-$testClass = new TestClass();
 
-echo $testClass->naice();
+
+$routeConfig = new RoutingConfiguration();
+var_dump($routeConfig->getRoutes());
