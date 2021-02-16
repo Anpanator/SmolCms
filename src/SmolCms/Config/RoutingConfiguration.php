@@ -12,16 +12,25 @@ use SmolCms\Data\Constant\HttpMethod;
 class RoutingConfiguration
 {
     /**
-     * @return Route[]
+     * RoutingConfiguration constructor.
+     * @param Route[] $routes
      */
-    public function getRoutes(): array
-    {
-        return [
+    public function __construct(
+        private array $routes = [
             new Route(
                 path: '/example',
                 method: HttpMethod::GET,
                 controller: BaseController::class
             )
-        ];
+        ]
+    )
+    {}
+
+    /**
+     * @return Route[]
+     */
+    public function getRoutes(): array
+    {
+        return $this->routes;
     }
 }
