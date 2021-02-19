@@ -12,6 +12,7 @@ use InvalidArgumentException;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionNamedType;
+use SmolCms\Exception\AutowireException;
 
 class ServiceBuilder
 {
@@ -36,13 +37,18 @@ class ServiceBuilder
 
         $constructorParams = $refConstructor->getParameters();
         $builtParameters = [];
-        foreach ($constructorParams as $param) {
-            $paramType = $param->getType();
+        foreach ($constructorParams as $refParam) {
+            $paramType = $refParam->getType();
             if (!($paramType instanceof ReflectionNamedType)) {
-                throw new Exception("Unknown case when trying to build service");
+                throw new AutowireException("Cannot autowire untyped parameter class: $class");
             }
             /** @var ReflectionNamedType $paramType */
-            $builtParameters[$param->getPosition()] = $this->build($paramType->getName());
+            if ($paramType->isBuiltin()) {
+                throw new AutowireException(
+                    "Cannot autowire builtin type: {$paramType->getName()} on class: $class"
+                );
+            }
+            $builtParameters[$refParam->getPosition()] = $this->build($paramType->getName());
         }
         ksort($builtParameters);
         return new $class(...$builtParameters);
