@@ -18,6 +18,12 @@ class ServiceBuilderTest extends TestCase
         self::assertInstanceOf(TestClass::class, $result);
     }
 
+    public function testBuild_nonExistingClassThrowsException()
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->serviceBuilder->build('I AM NOT A CLASS');
+    }
+
     public function testBuild_throwsAutowireExceptionWithScalarDependencyAndNoManualConfig()
     {
         $this->expectException(AutowireException::class);
