@@ -1,0 +1,4 @@
+= SmolCms
+
+Yeah I know, creative AF. Anyways, this is a learning project for me using PHP8. Since I haven't decided on a license yet, I don't accept contributions at the moment.
+If you want to use any code you'll have to ask for permission for the same reason.
