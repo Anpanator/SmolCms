@@ -4,13 +4,24 @@ declare(strict_types=1);
 
 namespace SmolCms\Test\Unit\Service\Core;
 
-use PHPUnit\Framework\TestCase;
+use InvalidArgumentException;
+use SmolCms\Config\ServiceConfiguration;
 use SmolCms\Exception\AutowireException;
 use SmolCms\Service\Core\ServiceBuilder;
+use SmolCms\TestUtils\Attributes\Mock;
+use SmolCms\TestUtils\SimpleTestCase;
 
-class ServiceBuilderTest extends TestCase
+class ServiceBuilderTest extends SimpleTestCase
 {
     private ServiceBuilder $serviceBuilder;
+    #[Mock]
+    private ServiceConfiguration $serviceConfiguration;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->serviceBuilder = new ServiceBuilder($this->serviceConfiguration);
+    }
 
     public function testBuild_success()
     {
@@ -20,7 +31,7 @@ class ServiceBuilderTest extends TestCase
 
     public function testBuild_nonExistingClassThrowsException()
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->serviceBuilder->build('I AM NOT A CLASS');
     }
 
@@ -34,11 +45,6 @@ class ServiceBuilderTest extends TestCase
     {
         $this->expectException(AutowireException::class);
         $this->serviceBuilder->build(TestClassWithUntypedDependencies::class);
-    }
-
-    protected function setUp(): void
-    {
-        $this->serviceBuilder = new ServiceBuilder();
     }
 }
 

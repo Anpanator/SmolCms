@@ -7,20 +7,29 @@ namespace SmolCms\Service\Core;
 //TODO: Use optional configuration to build service
 //TODO: Handle scalar/mixed types in constructor. Require configuration?
 //TODO: Register services somewhere and reuse instances
-use Exception;
 use InvalidArgumentException;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionNamedType;
+use SmolCms\Config\ServiceConfiguration;
 use SmolCms\Exception\AutowireException;
 
 class ServiceBuilder
 {
     /**
+     * ServiceBuilder constructor.
+     * @param ServiceConfiguration $serviceConfiguration
+     */
+    public function __construct(
+        private ServiceConfiguration $serviceConfiguration
+    ) {
+    }
+
+    /**
      * @param string $class
      * @return object
      * @throws ReflectionException
-     * @throws Exception
+     * @throws InvalidArgumentException
      */
     public function build(string $class): object
     {
@@ -40,7 +49,7 @@ class ServiceBuilder
         foreach ($constructorParams as $refParam) {
             $paramType = $refParam->getType();
             if (!($paramType instanceof ReflectionNamedType)) {
-                throw new AutowireException("Cannot autowire untyped parameter class: $class");
+                throw new AutowireException("Cannot autowire untyped parameter on class: $class");
             }
             /** @var ReflectionNamedType $paramType */
             if ($paramType->isBuiltin()) {

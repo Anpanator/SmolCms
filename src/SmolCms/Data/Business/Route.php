@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SmolCms\Data\Business\Routing;
+namespace SmolCms\Data\Business;
 
 
 class Route

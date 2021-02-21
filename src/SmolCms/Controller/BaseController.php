@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace SmolCms\Controller\Interfaces;
+namespace SmolCms\Controller;
 
 
+use SmolCms\Controller\Interfaces\Routable;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 

@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-namespace SmolCms\Data\Business\Routing;
+namespace SmolCms\Test\Unit\Data\Business\Routing;
 
 use Exception;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use SmolCms\Data\Business\Service;
 
 class ServiceTest extends TestCase
 {

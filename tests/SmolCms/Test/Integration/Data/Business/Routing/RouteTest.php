@@ -6,12 +6,12 @@ namespace SmolCms\Test\Integration\Data\Business\Routing;
 
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
-use SmolCms\Data\Business\Routing\Route;
+use SmolCms\Data\Business\Route;
 use SmolCms\Data\Constant\HttpMethod;
 
 class RouteTest extends TestCase
 {
-    public function testGetHandler_handlerPropertyNullReturnsCorrectDefault(): void
+    public function testGetHandler_handlerPropertyNullReturnsCorrectDefaultFromHttpMethod(): void
     {
         $defaultHandlerNames = $this->getDefaultHandlerNames();
 
@@ -32,6 +32,11 @@ class RouteTest extends TestCase
         self::assertSame($expectedHandler, $result);
     }
 
+    /**
+     * @return string[]
+     *
+     * Returns all default handler names, i.e. every HTTP Method defined in the HttpMethod class.
+     */
     private function getDefaultHandlerNames(): array
     {
         $reflector = new ReflectionClass(HttpMethod::class);

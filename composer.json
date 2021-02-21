@@ -6,7 +6,8 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "SmolCms\\Test\\": "tests/SmolCms"
+      "SmolCms\\Test\\": "tests/SmolCms/Test",
+      "SmolCms\\TestUtils\\": "tests/SmolCms/TestUtils"
     }
   },
   "require-dev": {
