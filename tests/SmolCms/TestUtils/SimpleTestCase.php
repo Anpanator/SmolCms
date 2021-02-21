@@ -6,9 +6,7 @@ namespace SmolCms\TestUtils;
 
 
 use PHPUnit\Framework\TestCase;
-use ReflectionNamedType;
 use ReflectionObject;
-use RuntimeException;
 use SmolCms\TestUtils\Attributes\Mock;
 
 class SimpleTestCase extends TestCase
@@ -31,11 +29,9 @@ class SimpleTestCase extends TestCase
             if (!$attributes) {
                 continue;
             }
-            $reflectionType = $reflectionProperty->getType();
-            if (!($reflectionType instanceof ReflectionNamedType) || $reflectionType->isBuiltin()) {
-                throw new RuntimeException('Cannot mock untyped or scalar property');
-            }
-            $mock = $this->getMockBuilder($reflectionType->getName())
+            /** @var Mock $mockAttribute */
+            $mockAttribute = reset($attributes)->newInstance();
+            $mock = $this->getMockBuilder($mockAttribute->getClassName())
                 ->disallowMockingUnknownTypes()
                 ->disableOriginalConstructor()
                 ->getMock();

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SmolCms\Test\Unit\Service\Core;
 
 use InvalidArgumentException;
+use PHPUnit\Framework\MockObject\MockObject;
 use SmolCms\Config\ServiceConfiguration;
 use SmolCms\Exception\AutowireException;
 use SmolCms\Service\Core\ServiceBuilder;
@@ -14,14 +15,8 @@ use SmolCms\TestUtils\SimpleTestCase;
 class ServiceBuilderTest extends SimpleTestCase
 {
     private ServiceBuilder $serviceBuilder;
-    #[Mock]
-    private ServiceConfiguration $serviceConfiguration;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->serviceBuilder = new ServiceBuilder($this->serviceConfiguration);
-    }
+    #[Mock(ServiceConfiguration::class)]
+    private ServiceConfiguration|MockObject $serviceConfiguration;
 
     public function testBuild_success()
     {
@@ -45,6 +40,12 @@ class ServiceBuilderTest extends SimpleTestCase
     {
         $this->expectException(AutowireException::class);
         $this->serviceBuilder->build(TestClassWithUntypedDependencies::class);
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->serviceBuilder = new ServiceBuilder($this->serviceConfiguration);
     }
 }
 
