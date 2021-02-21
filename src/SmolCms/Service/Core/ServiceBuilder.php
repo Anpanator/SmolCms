@@ -12,6 +12,7 @@ use ReflectionClass;
 use ReflectionException;
 use ReflectionNamedType;
 use SmolCms\Config\ServiceConfiguration;
+use SmolCms\Data\Business\Service;
 use SmolCms\Exception\AutowireException;
 
 class ServiceBuilder
@@ -26,12 +27,57 @@ class ServiceBuilder
     }
 
     /**
+     * @param string $serviceName
+     * @return object
+     * @throws ReflectionException
+     * @throws InvalidArgumentException
+     * @throws AutowireException
+     */
+    public function build(string $serviceName): object
+    {
+        if ($service = $this->serviceConfiguration->getServiceByIdentifier($serviceName)) {
+            return $this->buildServiceFromConfiguration($service);
+        }
+        return $this->autowireService($serviceName);
+    }
+
+    /**
+     * @param Service $service
+     * @return object
+     * @throws ReflectionException
+     */
+    private function buildServiceFromConfiguration(Service $service): object
+    {
+        $class = $service->getClass();
+        $builtParameters = array_values($service->getParameters());
+
+        $reflector = new ReflectionClass($class);
+        $refConstructor = $reflector->getConstructor();
+
+        if (!$refConstructor || $refConstructor->getNumberOfParameters() === 0) {
+            return new $class();
+        }
+
+        foreach ($refConstructor->getParameters() as $refParam) {
+            $paramType = $refParam->getType();
+            if (!($paramType instanceof ReflectionNamedType) || $paramType->isBuiltin()) {
+                //In this case we can just take what we have in $builtParameters already
+                continue;
+            }
+            // The constructor parameter is a custom class, so we need to build it
+            $builtParameters[$refParam->getPosition()] = $this->build($builtParameters[$refParam->getPosition()]);
+        }
+        return new $class(...$builtParameters);
+    }
+
+    /**
      * @param string $class
      * @return object
      * @throws ReflectionException
      * @throws InvalidArgumentException
+     * @throws AutowireException
      */
-    public function build(string $class): object
+    private function autowireService(string $class): object
     {
         if (!class_exists($class)) {
             throw new InvalidArgumentException('Cannot find class to build');
@@ -44,9 +90,8 @@ class ServiceBuilder
             return new $class();
         }
 
-        $constructorParams = $refConstructor->getParameters();
         $builtParameters = [];
-        foreach ($constructorParams as $refParam) {
+        foreach ($refConstructor->getParameters() as $refParam) {
             $paramType = $refParam->getType();
             if (!($paramType instanceof ReflectionNamedType)) {
                 throw new AutowireException("Cannot autowire untyped parameter on class: $class");

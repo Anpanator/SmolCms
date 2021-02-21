@@ -7,6 +7,7 @@ namespace SmolCms\Test\Unit\Service\Core;
 use InvalidArgumentException;
 use PHPUnit\Framework\MockObject\MockObject;
 use SmolCms\Config\ServiceConfiguration;
+use SmolCms\Data\Business\Service;
 use SmolCms\Exception\AutowireException;
 use SmolCms\Service\Core\ServiceBuilder;
 use SmolCms\TestUtils\Attributes\Mock;
@@ -42,6 +43,54 @@ class ServiceBuilderTest extends SimpleTestCase
         $this->serviceBuilder->build(TestClassWithUntypedDependencies::class);
     }
 
+
+    public function testBuild_successWithConfiguration()
+    {
+        $serviceId = 'testService';
+        $service = new Service(
+            identifier: $serviceId,
+            class: TestClassWithOnlyScalarDependencies::class,
+            parameters: [1234, 'I am a String']
+        );
+        $this->serviceConfiguration
+            ->method('getServiceByIdentifier')
+            ->with($serviceId)
+            ->willReturn($service);
+
+        $result = $this->serviceBuilder->build($serviceId);
+        self::assertInstanceOf(TestClassWithOnlyScalarDependencies::class, $result);
+    }
+
+    public function testBuild_successWithNestedDependenciesAndConfiguration()
+    {
+        $serviceId = 'TestClassWithScalarDependenciesService';
+        $service = new Service(
+            identifier: $serviceId,
+            class: TestClassWithScalarDependencies::class,
+            parameters: ['TestClassService', 1234, 'plainString']
+        );
+        $serviceId2 = 'TestClassService';
+        $service2 = new Service(
+            identifier: $serviceId2,
+            class: TestClass::class,
+            // Note this parameter needs to be autowired, as we didn't configure it
+            parameters: [AnotherTestClass::class]
+        );
+        $this->serviceConfiguration
+            ->method('getServiceByIdentifier')
+            ->will(
+                self::returnValueMap(
+                    [
+                        [$serviceId, $service],
+                        [$serviceId2, $service2]
+                    ]
+                )
+            );
+
+        $result = $this->serviceBuilder->build($serviceId);
+        self::assertInstanceOf(TestClassWithScalarDependencies::class, $result);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -63,7 +112,7 @@ final class AnotherTestClass
 
 final class TestClassWithScalarDependencies
 {
-    public function __construct(private AnotherTestClass $anotherTestClass, private int $intVal)
+    public function __construct(private TestClass $testClass, private int $intVal, private string $stringVal)
     {
     }
 }
@@ -72,6 +121,13 @@ final class TestClassWithUntypedDependencies
 {
 
     public function __construct(private AnotherTestClass $anotherTestClass, private $untypedValue)
+    {
+    }
+}
+
+final class TestClassWithOnlyScalarDependencies
+{
+    public function __construct(private int $someInt, private string $someString)
     {
     }
 }
