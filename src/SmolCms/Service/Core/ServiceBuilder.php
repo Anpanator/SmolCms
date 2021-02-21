@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace SmolCms\Service\Core;
 
-//TODO: Use optional configuration to build service
-//TODO: Handle scalar/mixed types in constructor. Require configuration?
 //TODO: Register services somewhere and reuse instances
 use InvalidArgumentException;
 use ReflectionClass;
