@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace SmolCms\Service\Core;
 
-//TODO: Register services somewhere and reuse instances
 use InvalidArgumentException;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionNamedType;
 use SmolCms\Config\ServiceConfiguration;
 use SmolCms\Data\Business\Service;
+use SmolCms\Data\Business\ServiceRegistry;
 use SmolCms\Exception\AutowireException;
 
 class ServiceBuilder
@@ -18,10 +18,14 @@ class ServiceBuilder
     /**
      * ServiceBuilder constructor.
      * @param ServiceConfiguration $serviceConfiguration
+     * @param ServiceRegistry $serviceRegistry
      */
     public function __construct(
-        private ServiceConfiguration $serviceConfiguration
+        private ServiceConfiguration $serviceConfiguration,
+        private ServiceRegistry $serviceRegistry
     ) {
+        $this->serviceRegistry->addService(get_class($this->serviceRegistry), $this->serviceRegistry);
+        $this->serviceRegistry->addService(get_class($this->serviceConfiguration), $this->serviceConfiguration);
     }
 
     /**
@@ -31,12 +35,18 @@ class ServiceBuilder
      * @throws InvalidArgumentException
      * @throws AutowireException
      */
-    public function build(string $serviceName): object
+    public function getService(string $serviceName): object
     {
-        if ($service = $this->serviceConfiguration->getServiceByIdentifier($serviceName)) {
-            return $this->buildServiceFromConfiguration($service);
+        if ($service = $this->serviceRegistry->getService($serviceName)) {
+            return $service;
         }
-        return $this->autowireService($serviceName);
+        if ($serviceConfig = $this->serviceConfiguration->getServiceByIdentifier($serviceName)) {
+            $service = $this->buildServiceFromConfiguration($serviceConfig);
+        } else {
+            $service = $this->autowireService($serviceName);
+        }
+        $this->serviceRegistry->addService($serviceName, $service);
+        return $service;
     }
 
     /**
@@ -59,11 +69,11 @@ class ServiceBuilder
         foreach ($refConstructor->getParameters() as $refParam) {
             $paramType = $refParam->getType();
             if (!($paramType instanceof ReflectionNamedType) || $paramType->isBuiltin()) {
-                //In this case we can just take what we have in $builtParameters already
+                // In this case we can just take what we have in $builtParameters already
                 continue;
             }
             // The constructor parameter is a custom class, so we need to build it
-            $builtParameters[$refParam->getPosition()] = $this->build($builtParameters[$refParam->getPosition()]);
+            $builtParameters[$refParam->getPosition()] = $this->getService($builtParameters[$refParam->getPosition()]);
         }
         return new $class(...$builtParameters);
     }
@@ -100,7 +110,7 @@ class ServiceBuilder
                     "Cannot autowire builtin type: {$paramType->getName()} on class: $class"
                 );
             }
-            $builtParameters[$refParam->getPosition()] = $this->build($paramType->getName());
+            $builtParameters[$refParam->getPosition()] = $this->getService($paramType->getName());
         }
         ksort($builtParameters);
         return new $class(...$builtParameters);
