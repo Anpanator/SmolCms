@@ -12,7 +12,7 @@ use SmolCms\TestUtils\SimpleTestCase;
 class ServiceBuilderTest extends SimpleTestCase
 {
 
-    public function test__construct_willRegisterOwnServiceRegistry()
+    public function test__construct_willRegisterOwnServiceRegistryAndConfig()
     {
         $serviceConfiguration = new ServiceConfiguration();
         $serviceRegistry = new ServiceRegistry();
