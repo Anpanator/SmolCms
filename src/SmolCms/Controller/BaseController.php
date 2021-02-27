@@ -6,33 +6,34 @@ namespace SmolCms\Controller;
 
 
 use SmolCms\Controller\Interfaces\Routable;
+use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 
-abstract class BaseController implements Routable
+class BaseController implements Routable
 {
     public function getAction(Request $request): Response
     {
-        // TODO: Implement getAction() method.
+        return new Response(HttpStatus::NOT_FOUND);
     }
 
     public function postAction(Request $request): Response
     {
-        // TODO: Implement postAction() method.
+        return new Response(HttpStatus::NOT_FOUND);
     }
 
     public function putAction(Request $request): Response
     {
-        // TODO: Implement putAction() method.
+        return new Response(HttpStatus::NOT_FOUND);
     }
 
     public function deleteAction(Request $request): Response
     {
-        // TODO: Implement deleteAction() method.
+        return new Response(HttpStatus::NOT_FOUND);
     }
 
     public function optionsAction(Request $request): Response
     {
-        // TODO: Implement optionsAction() method.
+        return new Response(HttpStatus::NOT_FOUND);
     }
 }
