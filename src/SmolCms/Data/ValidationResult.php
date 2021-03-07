@@ -34,4 +34,12 @@ class ValidationResult
     {
         return $this->messages;
     }
+
+    /**
+     * @return string
+     */
+    public function getMessagesAsString(): string
+    {
+        return print_r($this->messages, true);
+    }
 }
