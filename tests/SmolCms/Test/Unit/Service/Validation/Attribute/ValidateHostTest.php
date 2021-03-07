@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace SmolCms\Test\Unit\Service\Validation\Attribute;
 
 use SmolCms\Service\Validation\Attribute\ValidateHost;
-use SmolCms\TestUtils\SimpleTestCase;
 
-class ValidateHostTest extends SimpleTestCase
+class ValidateHostTest extends PropertyValidationAttributeTest
 {
     public function testValidate_successIPV4AllowAll()
     {
@@ -49,6 +48,12 @@ class ValidateHostTest extends SimpleTestCase
     {
         $validateHost = new ValidateHost(ValidateHost::IPV6);
         self::assertFalse($validateHost->validate('example.com'));
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->propertyValidationAttribute = new ValidateHost();
     }
 
 }

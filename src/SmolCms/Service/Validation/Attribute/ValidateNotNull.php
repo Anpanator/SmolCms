@@ -12,7 +12,7 @@ class ValidateNotNull implements PropertyValidationAttribute
     /**
      * @inheritDoc
      */
-    public function validate(mixed $value): bool
+    public function validate(mixed $value, bool $nullable = false): bool
     {
         return $value !== null;
     }

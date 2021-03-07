@@ -18,9 +18,12 @@ class ValidateAllowList implements PropertyValidationAttribute
     ) {
     }
 
-    public function validate(mixed $value): bool
+    /**
+     * @inheritDoc
+     */
+    public function validate(mixed $value, bool $nullable = false): bool
     {
-        return in_array($value, $this->allowValues, true);
+        return ($value === null && $nullable) || ($value !== null && in_array($value, $this->allowValues, true));
     }
 
 }

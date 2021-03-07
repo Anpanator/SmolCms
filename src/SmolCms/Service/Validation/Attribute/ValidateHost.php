@@ -30,8 +30,12 @@ class ValidateHost implements PropertyValidationAttribute
     ) {
     }
 
-    public function validate(mixed $value): bool
+    public function validate(mixed $value, bool $nullable = false): bool
     {
+        if ($nullable && $value === null) {
+            return true;
+        }
+
         $isValid = false;
         if (($this->type & self::IPV4) === self::IPV4) {
             $isValid = $isValid || filter_var($value, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4);

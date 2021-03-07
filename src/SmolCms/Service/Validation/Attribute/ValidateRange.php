@@ -29,8 +29,12 @@ class ValidateRange implements PropertyValidationAttribute
     /**
      * @inheritDoc
      */
-    public function validate(mixed $value): bool
+    public function validate(mixed $value, bool $nullable = false): bool
     {
+        if ($nullable && $value === null) {
+            return true;
+        }
+
         if (!is_int($value) && !is_float($value)) {
             return false;
         }

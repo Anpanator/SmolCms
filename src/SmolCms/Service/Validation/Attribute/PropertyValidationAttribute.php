@@ -15,7 +15,8 @@ interface PropertyValidationAttribute extends ValidationAttribute
 {
     /**
      * @param mixed $value The value to validate
+     * @param bool $nullable
      * @return bool
      */
-    public function validate(mixed $value): bool;
+    public function validate(mixed $value, bool $nullable = false): bool;
 }

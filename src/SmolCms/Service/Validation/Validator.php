@@ -42,7 +42,10 @@ class Validator
                         $messages[$reflectionProperty->getName()] = $nestedValidationResult->getMessages();
                     }
                 } elseif ($attribute instanceof PropertyValidationAttribute) {
-                    $isPropertyValid = $attribute->validate($propertyValue);
+                    $isPropertyValid = $attribute->validate(
+                        value: $propertyValue,
+                        nullable: $reflectionProperty->getType()?->allowsNull() ?? false
+                    );
                     $isValid = $isValid && $isPropertyValid;
                     if (!$isPropertyValid) {
                         $messages[$reflectionProperty->getName()] =

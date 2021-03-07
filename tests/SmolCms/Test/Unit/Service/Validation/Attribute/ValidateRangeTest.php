@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace SmolCms\Test\Unit\Service\Validation\Attribute;
 
 use SmolCms\Service\Validation\Attribute\ValidateRange;
-use SmolCms\TestUtils\SimpleTestCase;
 
-class ValidateRangeTest extends SimpleTestCase
+class ValidateRangeTest extends PropertyValidationAttributeTest
 {
     public function testValidate_successValueInRange()
     {
@@ -19,5 +18,11 @@ class ValidateRangeTest extends SimpleTestCase
     {
         $validateRange = new ValidateRange(min: PHP_FLOAT_MIN, max: 0);
         self::assertFalse($validateRange->validate(1));
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->propertyValidationAttribute = new ValidateRange(0, 0);
     }
 }
