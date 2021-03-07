@@ -7,35 +7,32 @@ namespace SmolCms\Service\Core;
 
 use SmolCms\Config\RoutingConfiguration;
 use SmolCms\Data\Business\Route;
+use SmolCms\Data\Business\Url;
 
 class Router
 {
 
     /**
      * Router constructor.
+     * @param RoutingConfiguration $routingConfiguration
      */
     public function __construct(private RoutingConfiguration $routingConfiguration)
     {
     }
 
     /**
-     * @param string $url
+     * @param Url $url
      * @param string $method
      * @return Route|null
      */
-    public function getRouteByUrlAndMethod(string $url, string $method): ?Route
+    public function getRouteByUrlAndMethod(Url $url, string $method): ?Route
     {
-        $urlParts = parse_url($url);
-        if (!is_array($urlParts)) {
-            return null;
-        }
-        $path = $urlParts['path'] ?? null;
-        if (!$path) {
+        if (!$url->getPath()) {
             return null;
         }
 
         foreach ($this->routingConfiguration->getRoutes() as $route) {
-            if ($route->getPath() === $path && $route->getMethod() === $method) {
+            if ($route->getPath() === $url->getPath() && $route->getMethod() === $method) {
                 return $route;
             }
         }

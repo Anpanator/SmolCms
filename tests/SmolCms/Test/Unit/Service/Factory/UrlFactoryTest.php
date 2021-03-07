@@ -20,7 +20,10 @@ class UrlFactoryTest extends SimpleTestCase
 
     public function testCreateUrlFromUrlString_success()
     {
-        $this->validator->method('validate')->willReturn(new ValidationResult(true));
+        $this->validator
+            ->expects(self::atLeastOnce())
+            ->method('validate')
+            ->willReturn(new ValidationResult(true));
         $urlString = 'https://example.com:80/some/fancy/path?queryParam1=test';
         $url = $this->urlFactory->createUrlFromUrlString($urlString);
         self::assertSame('https', $url->getProtocol());
@@ -33,7 +36,10 @@ class UrlFactoryTest extends SimpleTestCase
     public function testCreateUrlFromUrlString_failureValidationThrowsInvalidArgumentException()
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->validator->method('validate')->willReturn(new ValidationResult(false));
+        $this->validator
+            ->expects(self::atLeastOnce())
+            ->method('validate')
+            ->willReturn(new ValidationResult(true));
         $urlString = 'https://example.com:80/some/fancy/path?queryParam1=test';
         $this->urlFactory->createUrlFromUrlString($urlString);
     }

@@ -8,6 +8,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use SmolCms\Config\RoutingConfiguration;
 use SmolCms\Controller\BaseController;
 use SmolCms\Data\Business\Route;
+use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Service\Core\Router;
 use SmolCms\TestUtils\Attributes\Mock;
@@ -21,8 +22,12 @@ class RouterTest extends SimpleTestCase
 
     public function testGetRouteByUrlAndMethod_successSimpleUrl()
     {
-        $url = 'https://example.com/example';
         $path = '/example';
+        $url = new Url(
+            protocol: 'https',
+            host: 'example.com',
+            path: $path,
+        );
         $this->routingConfiguration
             ->method('getRoutes')
             ->willReturn(

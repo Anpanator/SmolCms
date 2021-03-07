@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SmolCms\Config;
 
 
-use SmolCms\Controller\BaseController;
+use SmolCms\Controller\IndexController;
 use SmolCms\Data\Business\Route;
 use SmolCms\Data\Constant\HttpMethod;
 
@@ -17,12 +17,13 @@ class RoutingConfiguration
     /**
      * RoutingConfiguration constructor.
      */
-    public function __construct() {
+    public function __construct()
+    {
         $this->routes = [
             'RouteName' => new Route(
-                path: '/example',
+                path: '/',
                 method: HttpMethod::GET,
-                controller: BaseController::class
+                controller: IndexController::class
             )
         ];
     }

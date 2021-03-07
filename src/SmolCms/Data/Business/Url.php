@@ -26,9 +26,9 @@ class Url
         #[ValidateHost(ValidateHost::IPV4 | ValidateHost::IPV6 | ValidateHost::DOMAIN)]
         private string $host,
         #[ValidateRange(min: 1, max: 65535)]
-        private ?int $port,
-        private ?string $path,
-        private ?string $query,
+        private ?int $port = null,
+        private ?string $path = null,
+        private ?string $query = null,
     ) {
     }
 
