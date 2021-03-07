@@ -12,6 +12,7 @@ use SmolCms\Service\Validation\Attribute\PropertyValidationAttribute;
 use SmolCms\Service\Validation\Attribute\ValidateObject;
 use SmolCms\Service\Validation\Attribute\ValidationAttribute;
 
+#@refactor!
 class Validator
 {
     public function validate(object $objectToValidate): ValidationResult
@@ -20,15 +21,20 @@ class Validator
         $messages = [];
         $refObject = new ReflectionObject($objectToValidate);
         foreach ($refObject->getProperties() as $reflectionProperty) {
+            $reflectionProperty->setAccessible(true);
+            $propertyValue = $reflectionProperty->getValue($objectToValidate);
+
             $reflectionAttributes = $reflectionProperty->getAttributes(
                 name: ValidationAttribute::class,
                 flags: ReflectionAttribute::IS_INSTANCEOF
             );
+
             foreach ($reflectionAttributes as $reflectionAttribute) {
                 $attribute = $reflectionAttribute->newInstance();
-                $reflectionProperty->setAccessible(true);
-                $propertyValue = $reflectionProperty->getValue($objectToValidate);
                 if ($attribute instanceof ValidateObject) {
+                    if ($propertyValue === null) {
+                        $messages[$reflectionProperty->getName()] = 'Cannot run nested validation on null';
+                    }
                     $nestedValidationResult = $this->validate($propertyValue);
                     $isPropertyValid = $nestedValidationResult->isValid();
                     $isValid = $isValid && $isPropertyValid;
