@@ -5,33 +5,37 @@ declare(strict_types=1);
 namespace SmolCms\Service\Core;
 
 
+use ReflectionException;
 use SmolCms\Data\Constant\HttpStatus;
-use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
-use SmolCms\Service\Factory\UrlFactory;
+use SmolCms\Service\Factory\RequestFactory;
 
 class ApplicationCore
 {
     private ServiceBuilder $serviceBuilder;
     private Router $router;
-    private UrlFactory $urlFactory;
+    private RequestFactory $requestFactory;
 
     /**
      * ApplicationCore constructor.
      * @param ServiceBuilder $serviceBuilder
+     * @throws ReflectionException
      */
     public function __construct(ServiceBuilder $serviceBuilder)
     {
         $this->serviceBuilder = $serviceBuilder;
         $this->router = $this->serviceBuilder->getService(Router::class);
-        $this->urlFactory = $this->serviceBuilder->getService(UrlFactory::class);
+        $this->requestFactory = $this->serviceBuilder->getService(RequestFactory::class);
     }
 
     public function run(): void
     {
-        $url = $this->urlFactory->createUrlFromUrlString($this->getRequestUrl());
-        $requestMethod = $_SERVER['REQUEST_METHOD'];
-        $route = $this->router->getRouteByUrlAndMethod($url, $requestMethod);
+        if (PHP_SAPI === 'cli') {
+            // TODO: Support cli mode
+            return;
+        }
+        $request = $this->requestFactory->buildRequestFromGlobals();
+        $route = $this->router->getRouteByUrlAndMethod($request->getUrl(), $request->getMethod());
         $response = null;
         if (!$route) {
             $response = $this->generateDefaultResponse();
@@ -39,18 +43,12 @@ class ApplicationCore
             return;
         } else {
             $controller = $this->serviceBuilder->getService($route->getController());
-            $response = $controller?->{$route->getHandler()}(new Request());
+            $response = $controller?->{$route->getHandler()}($request);
             if (!$response) {
                 $response = $this->generateDefaultResponse();
             }
         }
         $this->output($response);
-    }
-
-    private function getRequestUrl(): string
-    {
-        return ($_SERVER['HTTPS'] ?? '' === 'on' ? "https" : "http")
-            . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
     }
 
     private function generateDefaultResponse(): Response

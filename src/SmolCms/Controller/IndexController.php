@@ -12,7 +12,12 @@ class IndexController extends BaseController
 {
     public function getAction(Request $request): Response
     {
-        return new Response(status: 200, content: 'Fancy content');
+        return new Response(status: 200, content: print_r($request, true));
+    }
+
+    public function postAction(Request $request): Response
+    {
+        return new Response(status: 200, content: print_r($request, true));
     }
 
 }

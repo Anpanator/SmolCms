@@ -20,11 +20,16 @@ class RoutingConfiguration
     public function __construct()
     {
         $this->routes = [
-            'RouteName' => new Route(
+            'IndexGetRoute' => new Route(
                 path: '/',
                 method: HttpMethod::GET,
                 controller: IndexController::class
-            )
+            ),
+            'IndexPostRoute' => new Route(
+                path: '/',
+                method: HttpMethod::POST,
+                controller: IndexController::class
+            ),
         ];
     }
 
