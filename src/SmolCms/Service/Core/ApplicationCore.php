@@ -7,6 +7,7 @@ namespace SmolCms\Service\Core;
 
 use ReflectionException;
 use SmolCms\Data\Constant\HttpStatus;
+use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Factory\RequestFactory;
 
@@ -35,12 +36,30 @@ class ApplicationCore
             return;
         }
         $request = $this->requestFactory->buildRequestFromGlobals();
+        $response = $this->handleRequest($request);
+        $this->output($response);
+    }
+
+    /**
+     * @param Request $request
+     * @return Response
+     */
+    public function simulateRequest(Request $request): Response
+    {
+        return $this->handleRequest($request);
+    }
+
+    /**
+     * @param Request $request
+     * @return Response
+     * @throws ReflectionException
+     */
+    private function handleRequest(Request $request): Response
+    {
         $route = $this->router->getRouteByUrlAndMethod($request->getUrl(), $request->getMethod());
         $response = null;
         if (!$route) {
-            $response = $this->generateDefaultResponse();
-            $this->output($response);
-            return;
+            return $this->generateDefaultResponse();
         } else {
             $controller = $this->serviceBuilder->getService($route->getController());
             $response = $controller?->{$route->getHandler()}($request);
@@ -48,7 +67,7 @@ class ApplicationCore
                 $response = $this->generateDefaultResponse();
             }
         }
-        $this->output($response);
+        return $response;
     }
 
     private function generateDefaultResponse(): Response
