@@ -29,6 +29,9 @@ class ApplicationCore
         $this->requestFactory = $this->serviceBuilder->getService(RequestFactory::class);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     public function run(): void
     {
         if (PHP_SAPI === 'cli') {
@@ -43,6 +46,7 @@ class ApplicationCore
     /**
      * @param Request $request
      * @return Response
+     * @throws ReflectionException
      */
     public function simulateRequest(Request $request): Response
     {
@@ -75,7 +79,7 @@ class ApplicationCore
         return new Response(HttpStatus::NOT_FOUND);
     }
 
-    private function output(Response $response)
+    private function output(Response $response): void
     {
         http_response_code($response->getStatus());
         echo $response->getContent();
