@@ -16,9 +16,16 @@ If you manually configure a service, and it depends on another service that does
 If you have a service definition, you can set the identifier of the service you want to inject.
 The `parameters` array needs to have the same order as the constructor parameters.
 
+The `class` parameter can be omitted if the identifier is the fully qualified class name.
+
 == Routing
 
 You can define routes in the `RoutingConfiguration` class, similar to the service configuration.
+
+Controllers are treated like services.
+So in the simplest case, you use the fully qualified classname for the controller, e.g. `MyController::class`.
+Alternatively, you can use the controllers service identifier.
+
 Routes can contain path parameters in the form of `/some/path/with/{parameter}`.
 Every path parameter must exist in the handler function with the same name (either untyped, mixed or type string, which is recommended).
 
