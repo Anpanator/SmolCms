@@ -38,3 +38,66 @@ class SomeController {
 }
 ----
 
+== Validation
+
+For validation on object properties, the generic `Validator` service can be used.
+The object to validate is simply passed into its `validate()` method.
+For validation to work, you will need to add attributes implementing the `PropertyValidationAttribute` interface on the object properties (multiple are supported).
+If you want to have nested object validation, simply add the `ValidateObject` attribute to the property.
+
+Usage:
+
+[source,php]
+----
+class Foo {
+    public function __construct(
+    #[ValidateRange(min: 10, max: 100)]
+    private float $floatVal,
+    #[ValidateRange(min: -10, max: 0)]
+    private int $intVal,
+    #[ValidateAllowList(['ALLOWED', 1, true])]
+    private mixed $mixedAllow,
+    #[ValidateDenyList(['DENIED', 'ALSO_DENIED'])]
+    private string $stringDeny,
+) {
+}
+}
+
+$foo = new Foo(
+    floatVal: 15.0,
+    intVal: -1,
+    mixedAllow: 'ALLOWED',
+    stringDeny: 'Not denied'
+);
+$result = $validator->validate($foo);
+var_dump($result);
+----
+
+To support a new validation attribute, you only need to create it and have it implement the `PropertyValidationAttribute` interface.
+The validator will then use it automatically.
+
+== Testing
+
+For ease of testing, the `Mock` attribute, `SimpleTestCase` and `FunctionalTestCase` classes have been introduced.
+
+The `setUp()` method will automatically put an unconfigured test double into the property you use the `Mock` attribute on.
+
+Usage:
+
+[source,php]
+----
+class ServiceBuilderTest extends SimpleTestCase
+{
+    private ServiceBuilder $serviceBuilder;
+    #[Mock(ServiceConfiguration::class)]
+    private ServiceConfiguration|MockObject $serviceConfiguration;
+    #[Mock(ServiceRegistry::class)]
+    private ServiceRegistry|MockObject $serviceRegistry;
+//...
+}
+----
+
+Note: The property type hinting is not necessary and just used for convenient auto completion.
+
+Additionally, the `FunctionalTestCase` class will provide an `ApplicationCore` that will allow you to simulate requests even without a web server.
+This is useful when you want to create automated tests for JSON api endpoints for instance.
