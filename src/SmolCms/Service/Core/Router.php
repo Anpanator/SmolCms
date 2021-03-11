@@ -55,7 +55,7 @@ class Router
     }
 
     /**
-     * Array indices MUST be numeric
+     * Array indices MUST be numeric and in the same order
      *
      * @param array $actualUrlParts
      * @param array $routeParts

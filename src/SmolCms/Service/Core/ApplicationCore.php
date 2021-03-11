@@ -10,12 +10,14 @@ use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Factory\RequestFactory;
+use SmolCms\Service\Url\PathParamMappingService;
 
 class ApplicationCore
 {
     private ServiceBuilder $serviceBuilder;
     private Router $router;
     private RequestFactory $requestFactory;
+    private PathParamMappingService $pathParamMappingService;
 
     /**
      * ApplicationCore constructor.
@@ -27,6 +29,7 @@ class ApplicationCore
         $this->serviceBuilder = $serviceBuilder;
         $this->router = $this->serviceBuilder->getService(Router::class);
         $this->requestFactory = $this->serviceBuilder->getService(RequestFactory::class);
+        $this->pathParamMappingService = $this->serviceBuilder->getService(PathParamMappingService::class);
     }
 
     /**
@@ -66,7 +69,12 @@ class ApplicationCore
             return $this->generateDefaultResponse();
         } else {
             $controller = $this->serviceBuilder->getService($route->getController());
-            $response = $controller?->{$route->getHandler()}($request);
+            $handlerArguments = $this->pathParamMappingService->getPathParamsByUrlPathAndRoutePattern(
+                urlPath: $request->getUrl()->getPath(),
+                routePattern: $route->getPath()
+            );
+            $handlerArguments['request'] = $request;
+            $response = $controller?->{$route->getHandler()}(...$handlerArguments);
             if (!$response) {
                 $response = $this->generateDefaultResponse();
             }

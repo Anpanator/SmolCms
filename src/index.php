@@ -21,9 +21,9 @@ $applicationCore = new ApplicationCore(
 
 $response = $applicationCore->simulateRequest(
     new Request(
-        url: new Url(protocol: 'https', host: 'localhost', path: '/'),
-        method: HttpMethod::GET
+        url: new Url(protocol: 'https', host: 'localhost', path: '/coolParam/fancyParam'),
+        method: HttpMethod::POST
     )
 );
 
-var_dump($response);
+print_r($response);

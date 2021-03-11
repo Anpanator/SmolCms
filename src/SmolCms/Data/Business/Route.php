@@ -12,7 +12,6 @@ class Route
         private string $method,
         private string $controller,
         private ?string $handler = null,
-        private array $defaults = []
     ) {
     }
 
@@ -46,13 +45,5 @@ class Route
     public function getHandler(): string
     {
         return $this->handler ?? strtolower($this->method) . 'Action';
-    }
-
-    /**
-     * @return array
-     */
-    public function getDefaults(): array
-    {
-        return $this->defaults;
     }
 }

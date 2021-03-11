@@ -1,4 +1,40 @@
 = SmolCms
 
-Yeah I know, creative AF. Anyways, this is a learning project for me using PHP8. Since I haven't decided on a license yet, I don't accept contributions at the moment.
+This is a learning project for me using PHP8. Since I haven't decided on a license yet, I don't accept contributions at the moment.
 If you want to use any code you'll have to ask for permission for the same reason.
+
+== Configuring services
+
+Check the `ServiceConfiguration` class.
+For now, it's just hard-coded in the constructor.
+Configuration of a new service is only necessary if:
+
+* You need multiple instances
+* You have scalar dependencies
+
+If you manually configure a service, and it depends on another service that does *not* have a service configuration, you can set the fully qualified classname of the service instead (e.g. `MyService::class`).
+If you have a service definition, you can set the identifier of the service you want to inject.
+The `parameters` array needs to have the same order as the constructor parameters.
+
+== Routing
+
+You can define routes in the `RoutingConfiguration` class, similar to the service configuration.
+Routes can contain path parameters in the form of `/some/path/with/{parameter}`.
+Every path parameter must exist in the handler function with the same name (either untyped, mixed or type string, which is recommended).
+
+A handler *must* also have a `$request` argument.
+The order of all these parameters is irrelevant.
+If the handler configuration is omitted, the handler name is assumed to be `HTTP Method + 'Action'`, e.g. `getAction`, `postAction`, etc.
+
+So with the example path above and a POST request, you'd need a handler method like this:
+
+[source,php]
+----
+class SomeController {
+    public function postAction(Request $request, string $parameter): Response
+    {
+        // ...
+    }
+}
+----
+

@@ -63,18 +63,18 @@ class Request
 
     /**
      * @param string $key
-     * @return mixed
+     * @return string|null
      */
-    public function getQueryParam(string $key): mixed
+    public function getQueryParam(string $key): ?string
     {
         return $this->getParams[$key] ?? null;
     }
 
     /**
      * @param string $key
-     * @return mixed
+     * @return string|null
      */
-    public function getPostParam(string $key): mixed
+    public function getPostParam(string $key): ?string
     {
         return $this->getParams[$key] ?? null;
     }

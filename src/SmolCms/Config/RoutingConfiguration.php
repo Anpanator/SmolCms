@@ -30,6 +30,12 @@ class RoutingConfiguration
                 method: HttpMethod::POST,
                 controller: IndexController::class
             ),
+            'IndexPathParamRoute' => new Route(
+                path: '/{coolParam}/{fancyParam}',
+                method: HttpMethod::POST,
+                controller: IndexController::class,
+                handler: 'pathParamAction'
+            ),
         ];
     }
 

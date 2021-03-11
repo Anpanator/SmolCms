@@ -20,4 +20,9 @@ class IndexController
         return new Response(status: 200, content: print_r($request, true));
     }
 
+    public function pathParamAction(Request $request, string $fancyParam, string $coolParam): Response
+    {
+        return new Response(status: 200, content: print_r([$request, $fancyParam, $coolParam], true));
+    }
+
 }
