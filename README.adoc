@@ -22,7 +22,7 @@ You can define routes in the `RoutingConfiguration` class, similar to the servic
 Routes can contain path parameters in the form of `/some/path/with/{parameter}`.
 Every path parameter must exist in the handler function with the same name (either untyped, mixed or type string, which is recommended).
 
-A handler *must* also have a `$request` argument.
+A handler *must* also have a `$request` parameter.
 The order of all these parameters is irrelevant.
 If the handler configuration is omitted, the handler name is assumed to be `HTTP Method + 'Action'`, e.g. `getAction`, `postAction`, etc.
 
