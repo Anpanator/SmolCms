@@ -8,7 +8,7 @@ namespace SmolCms\Controller;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 
-class IndexController extends BaseController
+class IndexController
 {
     public function getAction(Request $request): Response
     {

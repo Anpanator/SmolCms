@@ -6,7 +6,7 @@ namespace SmolCms\Test\Unit\Service\Core;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use SmolCms\Config\RoutingConfiguration;
-use SmolCms\Controller\BaseController;
+use SmolCms\Controller\IndexController;
 use SmolCms\Data\Business\Route;
 use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\HttpMethod;
@@ -32,9 +32,9 @@ class RouterTest extends SimpleTestCase
             ->method('getRoutes')
             ->willReturn(
                 [
-                    new Route(path: $path, method: HttpMethod::GET, controller: BaseController::class),
-                    $postRoute = new Route(path: $path, method: HttpMethod::POST, controller: BaseController::class),
-                    new Route(path: $path, method: HttpMethod::PUT, controller: BaseController::class),
+                    new Route(path: $path, method: HttpMethod::GET, controller: IndexController::class),
+                    $postRoute = new Route(path: $path, method: HttpMethod::POST, controller: IndexController::class),
+                    new Route(path: $path, method: HttpMethod::PUT, controller: IndexController::class),
                 ]
             );
         $result = $this->router->getRouteByUrlAndMethod($url, HttpMethod::POST);
@@ -56,13 +56,13 @@ class RouterTest extends SimpleTestCase
             ->method('getRoutes')
             ->willReturn(
                 [
-                    new Route(path: $simplePath, method: HttpMethod::GET, controller: BaseController::class),
-                    new Route(path: $simplePath, method: HttpMethod::POST, controller: BaseController::class),
-                    new Route(path: $simplePath, method: HttpMethod::PUT, controller: BaseController::class),
+                    new Route(path: $simplePath, method: HttpMethod::GET, controller: IndexController::class),
+                    new Route(path: $simplePath, method: HttpMethod::POST, controller: IndexController::class),
+                    new Route(path: $simplePath, method: HttpMethod::PUT, controller: IndexController::class),
                     $complexRoute = new Route(
                         path: $pathWithParams,
                         method: HttpMethod::POST,
-                        controller: BaseController::class,
+                        controller: IndexController::class,
                         handler: 'pathParamAction'
                     )
                 ]

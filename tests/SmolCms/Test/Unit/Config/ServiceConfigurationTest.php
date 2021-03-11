@@ -6,7 +6,7 @@ namespace SmolCms\Test\Unit\Config;
 
 use PHPUnit\Framework\TestCase;
 use SmolCms\Config\ServiceConfiguration;
-use SmolCms\Controller\BaseController;
+use SmolCms\Controller\IndexController;
 use SmolCms\Data\Business\Service;
 use SmolCms\Exception\ServiceConflictException;
 use SmolCms\Service\Core\Router;
@@ -18,7 +18,7 @@ class ServiceConfigurationTest extends TestCase
     public function testAddService_successForNewService()
     {
         $serviceId = 'serviceId';
-        $service = new Service(identifier: $serviceId, class: BaseController::class);
+        $service = new Service(identifier: $serviceId, class: IndexController::class);
         $this->serviceConfiguration->addService($service);
         self::assertSame($serviceId, $this->serviceConfiguration->getServiceByIdentifier($serviceId)?->getIdentifier());
     }
@@ -26,7 +26,7 @@ class ServiceConfigurationTest extends TestCase
     public function testAddService_successExistingServiceAndReplacementFlagSet()
     {
         $serviceId = 'serviceId123';
-        $service = new Service(identifier: $serviceId, class: BaseController::class);
+        $service = new Service(identifier: $serviceId, class: IndexController::class);
         $anotherServiceWithSameId = new Service(identifier: $serviceId, class: Router::class);
         $this->serviceConfiguration->addService($service);
         $this->serviceConfiguration->addService($anotherServiceWithSameId, true);
@@ -41,7 +41,7 @@ class ServiceConfigurationTest extends TestCase
     public function testAddService_throwsExceptionWithDuplicateServiceIdAndNoReplacementFlag()
     {
         $serviceId = 'serviceId';
-        $service = new Service(identifier: $serviceId, class: BaseController::class);
+        $service = new Service(identifier: $serviceId, class: IndexController::class);
         $anotherServiceWithSameId = new Service(identifier: $serviceId, class: Router::class);
         $this->serviceConfiguration->addService($service);
 

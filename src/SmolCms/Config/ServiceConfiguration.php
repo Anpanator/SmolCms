@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SmolCms\Config;
 
 
-use SmolCms\Controller\BaseController;
+use SmolCms\Controller\IndexController;
 use SmolCms\Data\Business\Service;
 use SmolCms\Exception\ServiceConflictException;
 
@@ -21,7 +21,7 @@ class ServiceConfiguration
     {
         $services = [
             new Service(
-                identifier: BaseController::class,
+                identifier: IndexController::class,
                 class: null,
                 parameters: []
             )

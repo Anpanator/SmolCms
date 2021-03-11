@@ -39,7 +39,7 @@ class UrlFactoryTest extends SimpleTestCase
         $this->validator
             ->expects(self::atLeastOnce())
             ->method('validate')
-            ->willReturn(new ValidationResult(true));
+            ->willReturn(new ValidationResult(false));
         $urlString = 'https://example.com:80/some/fancy/path?queryParam1=test';
         $this->urlFactory->createUrlFromUrlString($urlString);
     }
