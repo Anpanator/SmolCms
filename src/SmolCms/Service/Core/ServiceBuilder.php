@@ -24,8 +24,9 @@ class ServiceBuilder
         private ServiceConfiguration $serviceConfiguration,
         private ServiceRegistry $serviceRegistry
     ) {
-        $this->serviceRegistry->addService(get_class($this->serviceRegistry), $this->serviceRegistry);
-        $this->serviceRegistry->addService(get_class($this->serviceConfiguration), $this->serviceConfiguration);
+        $this->serviceRegistry->addService($this::class, $this);
+        $this->serviceRegistry->addService($this->serviceRegistry::class, $this->serviceRegistry);
+        $this->serviceRegistry->addService($this->serviceConfiguration::class, $this->serviceConfiguration);
     }
 
     /**
@@ -88,7 +89,7 @@ class ServiceBuilder
     private function autowireService(string $class): object
     {
         if (!class_exists($class)) {
-            throw new InvalidArgumentException('Cannot find class to build');
+            throw new InvalidArgumentException("Cannot find class to build: $class");
         }
 
         $reflector = new ReflectionClass($class);

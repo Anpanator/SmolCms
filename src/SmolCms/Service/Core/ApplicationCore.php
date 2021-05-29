@@ -67,17 +67,16 @@ class ApplicationCore
         $response = null;
         if (!$route) {
             return $this->generateDefaultResponse();
-        } else {
-            $controller = $this->serviceBuilder->getService($route->getController());
-            $handlerArguments = $this->pathParamMappingService->getPathParamsByUrlPathAndRoutePattern(
-                urlPath: $request->getUrl()->getPath(),
-                routePattern: $route->getPath()
-            );
-            $handlerArguments['request'] = $request;
-            $response = $controller?->{$route->getHandler()}(...$handlerArguments);
-            if (!$response) {
-                $response = $this->generateDefaultResponse();
-            }
+        }
+        $controller = $this->serviceBuilder->getService($route->getController());
+        $handlerArguments = $this->pathParamMappingService->getPathParamsByUrlPathAndRoutePattern(
+            urlPath: $request->getUrl()->getPath(),
+            routePattern: $route->getPath()
+        );
+        $handlerArguments['request'] = $request;
+        $response = $controller?->{$route->getHandler()}(...$handlerArguments);
+        if (!$response) {
+            $response = $this->generateDefaultResponse();
         }
         return $response;
     }

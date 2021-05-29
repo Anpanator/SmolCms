@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace SmolCms\Config;
 
 
-use SmolCms\Controller\IndexController;
 use SmolCms\Data\Business\Service;
 use SmolCms\Exception\ServiceConflictException;
 
@@ -20,11 +19,13 @@ class ServiceConfiguration
     public function __construct()
     {
         $services = [
+            /*
             new Service(
                 identifier: IndexController::class,
                 class: null,
                 parameters: []
             )
+            */
         ];
 
         foreach ($services as $service) {

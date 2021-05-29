@@ -10,7 +10,9 @@ For now, it's just hard-coded in the constructor.
 Configuration of a new service is only necessary if:
 
 * You need multiple instances
-* You have scalar dependencies
+* You have scalar/array type dependencies
+
+Everything else will be autowired.
 
 If you manually configure a service, and it depends on another service that does *not* have a service configuration, you can set the fully qualified classname of the service instead (e.g. `MyService::class`).
 If you have a service definition, you can set the identifier of the service you want to inject.
