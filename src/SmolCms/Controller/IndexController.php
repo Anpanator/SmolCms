@@ -8,7 +8,7 @@ namespace SmolCms\Controller;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\TemplateService;
-use SmolCms\Template\ArticleHtmlTemplate;
+use SmolCms\Template\BaseTemplate;
 
 class IndexController
 {
@@ -26,19 +26,17 @@ class IndexController
 
     public function getAction(Request $request): Response
     {
-        return new Response(status: 200, content: print_r($request, true));
+        return $this->templateService->generateResponse(BaseTemplate::class,
+            [
+                'pageTitle' => 'Nice Boat',
+                'articleContent' => $request->getUrl(),
+                'pageLanguage' => 'en',
+            ]
+        );
     }
 
     public function postAction(Request $request): Response
     {
         return new Response(status: 200, content: print_r($request, true));
     }
-
-    public function pathParamAction(Request $request, string $fancyParam, string $coolParam): Response
-    {
-        return $this->templateService->generateResponse(ArticleHtmlTemplate::class,
-            ['content' => $request->getUrl()]
-        );
-    }
-
 }
