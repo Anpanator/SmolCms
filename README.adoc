@@ -108,6 +108,9 @@ It is highly recommended to have this method return the names of all variables u
 
 If there are variables missing in the `$data` array passed to the service, an exception will be thrown telling you about the missing keys.
 
+IMPORTANT: Given that PHP will pass arrays by reference internally *unless* it is written to (`copy-on-write`), it is strongly discouraged to modify the `$data` array inside templates.
+It should be considered read-only inside templates.
+
 == Validation
 
 For validation on object properties, the generic `Validator` service can be used.
