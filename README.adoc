@@ -47,6 +47,67 @@ class SomeController {
 }
 ----
 
+== Templates
+
+If you want to generate responses from templates, you can do so by using the `TemplateService` in the controller action like this:
+
+[source,php]
+----
+public function getAction(Request $request): Response
+{
+    return $this->templateService->generateResponse(BaseTemplate::class,
+        [
+            'pageTitle' => 'Nice Boat',
+            'articleContent' => $request->getUrl(),
+            'pageLanguage' => 'en',
+        ]
+    );
+}
+----
+
+Your actual templates can be composed of sub-templates, which are passed to the main template constructor, so they can be reused.
+Every template needs to implement the `Template` interface.
+[source,php]
+----
+class BaseTemplate implements Template
+{
+    private const VAR_LANG = 'pageLanguage';
+    /**
+     * BaseTemplate constructor.
+     */
+    public function __construct(
+        private HeadComponent $head,
+        private ArticleComponent $article,
+    )
+    {
+    }
+
+    public function render(array $data): string
+    {
+        return <<<HTML
+        <html lang="{$data[self::VAR_LANG]}">
+            <head>
+                {$this->head->render($data)}
+            </head>
+            <body>
+                {$this->article->render($data)}
+            </body>
+        </html>
+        HTML;
+    }
+
+    public static function getTemplateVars(): array
+    {
+        return [self::VAR_LANG];
+    }
+}
+----
+
+The `getTemplateVars()` method is critical as it allows the `TemplateService` to collect all needed template variables.
+It is highly recommended to have this method return the names of all variables used in the template.
+
+If there are variables missing in the `$data` array passed to the service, an exception will be thrown telling you about the missing keys.
+
 == Validation
 
 For validation on object properties, the generic `Validator` service can be used.
