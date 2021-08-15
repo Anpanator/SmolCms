@@ -23,4 +23,12 @@ class CaseConverterTest extends SimpleTestCase
         $result = $this->caseConverter->snakeCaseToCamelCase($testString);
         self::assertSame($expectedString, $result);
     }
+
+    public function testCamelCaseToSnakeCase_success(): void
+    {
+        $testString = 'thisIsCamelCaseWithPOWAAAA';
+        $expectedString = 'this_is_camel_case_with_p_o_w_a_a_a_a';
+        $result = $this->caseConverter->camelCaseToSnakeCase($testString);
+        self::assertSame($expectedString, $result);
+    }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace SmolCms\Service\DB;
 
 
+use PDO;
+use PDOStatement;
 use ReflectionClass;
 use ReflectionException;
 use SmolCms\Service\Core\CaseConverter;
@@ -14,9 +16,29 @@ abstract class EntityService
      * EntityService constructor.
      */
     public function __construct(
-        protected CaseConverter $caseConverter
+        private PDO             $pdo,
+        protected CaseConverter $caseConverter,
+        private QueryBuilder $queryBuilder,
     )
     {
+    }
+
+    /**
+     * Use this if you want to run a particular query multiple times with different values.
+     * You'll get a PDOStatement where you can update the parameters manually or simply re-execute it if needed.
+     *
+     * @param QueryCriteria $qc
+     * @return PDOStatement
+     */
+    protected function prepare(QueryCriteria $qc): PDOStatement
+    {
+        $query = $this->queryBuilder->buildQuery($qc);
+        return $this->pdo->prepare($query);
+    }
+
+    protected function execute(QueryCriteria $qc): object
+    {
+        //TODO
     }
 
     /**

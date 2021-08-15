@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SmolCms\Config;
 
 
+use PDO;
 use SmolCms\Data\Business\Service;
 use SmolCms\Exception\ServiceConflictException;
 
@@ -19,13 +20,15 @@ class ServiceConfiguration
     public function __construct()
     {
         $services = [
-            /*
             new Service(
-                identifier: IndexController::class,
+                identifier: PDO::class,
                 class: null,
-                parameters: []
+                parameters: [
+                    'mysql:host=localhost;port=3306;dbname=smolcms;charset=utf8mb4"',
+                    'testuser',
+                    'testpw',
+                ]
             )
-            */
         ];
 
         foreach ($services as $service) {

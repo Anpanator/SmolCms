@@ -3,9 +3,11 @@ declare(strict_types=1);
 
 namespace SmolCms\Test\Unit\Service\DB;
 
+use PDO;
 use PHPUnit\Framework\MockObject\MockObject;
 use SmolCms\Service\Core\CaseConverter;
 use SmolCms\Service\DB\EntityService;
+use SmolCms\Service\DB\QueryBuilder;
 use SmolCms\TestUtils\Attributes\Mock;
 use SmolCms\TestUtils\SimpleTestCase;
 
@@ -13,14 +15,18 @@ class EntityServiceTest extends SimpleTestCase
 {
     private EntityService $entityService;
 
+    #[Mock(PDO::class)]
+    private PDO|MockObject $pdo;
     #[Mock(CaseConverter::class)]
     private CaseConverter|MockObject $caseConverter;
+    #[Mock(QueryBuilder::class)]
+    private QueryBuilder|MockObject $queryBuilder;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->entityService = new class($this->caseConverter) extends EntityService {};
+        $this->entityService = new class($this->pdo, $this->caseConverter, $this->queryBuilder) extends EntityService {};
     }
 
     public function testMapResultToEntity_success() {
