@@ -36,15 +36,17 @@ class QueryBuilder
 
         $queryParts[] = $table;
 
-        $queryParts[] = 'WHERE 1';
+        $queryParts[] = 'WHERE';
+        $firstCondition = true;
         foreach ($qc->getWhereConditions() as $condition) {
             if (isset($condition[QueryCriteria::KEY_AND])) {
-                $queryParts[] = 'AND';
+                if (!$firstCondition) $queryParts[] = 'AND';
                 $queryParts[] = $condition[QueryCriteria::KEY_AND];
             } else if (isset($condition[QueryCriteria::KEY_OR])) {
-                $queryParts[] = 'OR';
+                if (!$firstCondition) $queryParts[] = 'OR';
                 $queryParts[] = $condition[QueryCriteria::KEY_OR];
             }
+            $firstCondition = false;
         }
 
 

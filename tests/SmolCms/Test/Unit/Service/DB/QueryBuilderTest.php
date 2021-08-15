@@ -33,16 +33,30 @@ class QueryBuilderTest extends SimpleTestCase
             );
     }
 
-
     public function testBuildQuery_successWithSelectQueryCriteria(): void
     {
-        $expectedQuery = 'select id, test_field from test_table where 1 and id = :id limit 33, 200';
+        $expectedQuery = 'select id, test_field from test_table where id = :id limit 33, 200';
         $queryCriteria = new QueryCriteria();
         $queryCriteria
             ->select(TestEntity::class)
             ->andWhere('id = :id')
             ->skipResults(33)
             ->maxResults(200);
+
+        $result = $this->queryBuilder->buildQuery($queryCriteria);
+        self::assertSame($expectedQuery, strtolower($result));
+    }
+
+    public function testBuildQuery_successWithSelectQueryCriteriaMultipleConditions(): void
+    {
+        $expectedQuery = 'select id, test_field from test_table where id < :id and id > :id limit 22, 111';
+        $queryCriteria = new QueryCriteria();
+        $queryCriteria
+            ->select(TestEntity::class)
+            ->orWhere('id < :id')
+            ->andWhere('id > :id')
+            ->skipResults(22)
+            ->maxResults(111);
 
         $result = $this->queryBuilder->buildQuery($queryCriteria);
         self::assertSame($expectedQuery, strtolower($result));
