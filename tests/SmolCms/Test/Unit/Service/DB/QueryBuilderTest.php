@@ -72,14 +72,4 @@ class TestEntity {
     )
     {
     }
-
-    public function getId(): int
-    {
-        return $this->id;
-    }
-
-    public function getTestField(): string
-    {
-        return $this->testField;
-    }
 }

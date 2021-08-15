@@ -36,9 +36,28 @@ abstract class EntityService
         return $this->pdo->prepare($query);
     }
 
-    protected function execute(QueryCriteria $qc): object
+    /**
+     * @param QueryCriteria $qc
+     * @return array<object>
+     */
+    protected function execute(QueryCriteria $qc): array
     {
-        //TODO
+        $stmt = $this->prepare($qc);
+        return $this->fetchResults($stmt, $qc->getParameters(), $qc->getMainEntity());
+    }
+
+    protected function fetchResults(PDOStatement $stmt, array $parameters, string $mappingClass): array
+    {
+        $hasResults = $stmt->execute($parameters);
+        $result = [];
+        if (!$hasResults) {
+            return $result;
+        }
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $result[] = $this->mapResultToEntity($row, $mappingClass);
+        }
+
+        return $result;
     }
 
     /**
