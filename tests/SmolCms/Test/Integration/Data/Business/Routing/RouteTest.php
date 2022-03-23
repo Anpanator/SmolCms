@@ -16,17 +16,17 @@ class RouteTest extends TestCase
 
         foreach ($defaultHandlerNames as $method => $expectedHandlerName) {
             $route = new Route('/', HttpMethod::from($method), 'SomeController');
-            $result = $route->getHandler();
+            $result = $route->getHandlerOrDefault();
 
             self::assertSame($expectedHandlerName, $result);
         }
     }
 
-    public function testGetHandler_handlerPropertySetReturnsItsValue(): void
+    public function testGetHandler_handlerPropertySetReturnsItsValueOverDefault(): void
     {
         $expectedHandler = 'specialHandler';
         $route = new Route('/', HttpMethod::GET, 'SomeController', $expectedHandler);
-        $result = $route->getHandler();
+        $result = $route->getHandlerOrDefault();
 
         self::assertSame($expectedHandler, $result);
     }

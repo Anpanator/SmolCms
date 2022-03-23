@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace SmolCms\Service\Core;
 
 
-use ReflectionException;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
@@ -19,11 +18,6 @@ class ApplicationCore
     private RequestFactory $requestFactory;
     private PathParamMappingService $pathParamMappingService;
 
-    /**
-     * ApplicationCore constructor.
-     * @param ServiceBuilder $serviceBuilder
-     * @throws ReflectionException
-     */
     public function __construct(ServiceBuilder $serviceBuilder)
     {
         $this->serviceBuilder = $serviceBuilder;
@@ -32,9 +26,6 @@ class ApplicationCore
         $this->pathParamMappingService = $this->serviceBuilder->getService(PathParamMappingService::class);
     }
 
-    /**
-     * @throws ReflectionException
-     */
     public function run(): void
     {
         if (PHP_SAPI === 'cli') {
@@ -46,21 +37,11 @@ class ApplicationCore
         $this->output($response);
     }
 
-    /**
-     * @param Request $request
-     * @return Response
-     * @throws ReflectionException
-     */
     public function simulateRequest(Request $request): Response
     {
         return $this->handleRequest($request);
     }
 
-    /**
-     * @param Request $request
-     * @return Response
-     * @throws ReflectionException
-     */
     private function handleRequest(Request $request): Response
     {
         $route = $this->router->getRouteByUrlAndMethod($request->getUrl(), $request->getMethod());
@@ -68,13 +49,13 @@ class ApplicationCore
         if (!$route) {
             return $this->generateDefaultResponse();
         }
-        $controller = $this->serviceBuilder->getService($route->getController());
+        $controller = $this->serviceBuilder->getService($route->controller);
         $handlerArguments = $this->pathParamMappingService->getPathParamsByUrlPathAndRoutePattern(
             urlPath: $request->getUrl()->getPath(),
-            routePattern: $route->getPath()
+            routePattern: $route->path
         );
         $handlerArguments['request'] = $request;
-        $response = $controller?->{$route->getHandler()}(...$handlerArguments);
+        $response = $controller?->{$route->getHandlerOrDefault()}(...$handlerArguments);
         if (!$response) {
             $response = $this->generateDefaultResponse();
         }

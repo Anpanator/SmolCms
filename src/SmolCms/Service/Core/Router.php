@@ -32,12 +32,13 @@ class Router
             return null;
         }
         $actualUrlPartsCnt = count($actualUrlParts);
+        /** @var Route $route */
         foreach ($this->routingConfiguration->getRoutes() as $route) {
-            if ($route->getMethod() !== $method) {
+            if ($route->method !== $method) {
                 continue;
             }
 
-            $routeParts = explode('/', rtrim($route->getPath(), self::TRAILING_URL_CHARS_TO_REMOVE));
+            $routeParts = explode('/', rtrim($route->path, self::TRAILING_URL_CHARS_TO_REMOVE));
             if (!$routeParts || $actualUrlPartsCnt !== count($routeParts)) {
                 continue;
             }

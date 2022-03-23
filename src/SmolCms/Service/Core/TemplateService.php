@@ -36,7 +36,7 @@ class TemplateService
             $template = $this->serviceBuilder->getService($templateClass);
             $requiredDataKeys = $this->getRequiredDataKeys($templateClass);
         } catch (ReflectionException $e) {
-            throw new TemplateException("Error while processing template $templateClass", $e);
+            throw new TemplateException(message: "Error while processing template $templateClass", previous: $e);
         }
         $missingDataKeys = $this->getMissingDataKeys($requiredDataKeys, $data);
         if (!empty($missingDataKeys)) {

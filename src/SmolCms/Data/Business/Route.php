@@ -10,32 +10,14 @@ use SmolCms\Data\Constant\HttpMethod;
 class Route
 {
     public function __construct(
-        private string $path,
-        private HttpMethod $method,
-        private string $controller,
-        private ?string $handler = null,
+        public readonly string $path,
+        public readonly HttpMethod $method,
+        public readonly string $controller,
+        public readonly ?string $handler = null,
     ) {
     }
 
-    public function getPath(): string
-    {
-        return $this->path;
-    }
-
-    public function getMethod(): HttpMethod
-    {
-        return $this->method;
-    }
-
-    public function getController(): string
-    {
-        return $this->controller;
-    }
-
-    /**
-     * @return string
-     */
-    public function getHandler(): string
+    public function getHandlerOrDefault(): string
     {
         return $this->handler ?? strtolower($this->method->value) . 'Action';
     }
