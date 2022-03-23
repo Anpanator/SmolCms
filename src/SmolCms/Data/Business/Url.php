@@ -22,59 +22,16 @@ class Url
      */
     public function __construct(
         #[ValidateAllowList(['http', 'https'])]
-        private string $protocol,
+        public readonly string $protocol,
         #[ValidateHost(ValidateHost::IPV4 | ValidateHost::IPV6 | ValidateHost::DOMAIN)]
-        private string $host,
+        public readonly  string $host,
         #[ValidateRange(min: 1, max: 65535)]
-        private ?int $port = null,
-        private ?string $path = null,
-        private ?string $query = null,
+        public readonly ?int $port = null,
+        public readonly ?string $path = null,
+        public readonly ?string $query = null,
     ) {
     }
 
-    /**
-     * @return string
-     */
-    public function getProtocol(): string
-    {
-        return $this->protocol;
-    }
-
-    /**
-     * @return string
-     */
-    public function getHost(): string
-    {
-        return $this->host;
-    }
-
-    /**
-     * @return int|null
-     */
-    public function getPort(): ?int
-    {
-        return $this->port;
-    }
-
-    /**
-     * @return string|null
-     */
-    public function getPath(): ?string
-    {
-        return $this->path;
-    }
-
-    /**
-     * @return string|null
-     */
-    public function getQuery(): ?string
-    {
-        return $this->query;
-    }
-
-    /**
-     * @return string
-     */
     public function __toString(): string
     {
         $url = $this->protocol ? "{$this->protocol}://" : '';

@@ -44,14 +44,14 @@ class ApplicationCore
 
     private function handleRequest(Request $request): Response
     {
-        $route = $this->router->getRouteByUrlAndMethod($request->getUrl(), $request->getMethod());
+        $route = $this->router->getRouteByUrlAndMethod($request->url, $request->method);
         $response = null;
         if (!$route) {
             return $this->generateDefaultResponse();
         }
         $controller = $this->serviceBuilder->getService($route->controller);
         $handlerArguments = $this->pathParamMappingService->getPathParamsByUrlPathAndRoutePattern(
-            urlPath: $request->getUrl()->getPath(),
+            urlPath: $request->url->path,
             routePattern: $route->path
         );
         $handlerArguments['request'] = $request;

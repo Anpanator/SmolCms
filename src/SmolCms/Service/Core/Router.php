@@ -24,10 +24,10 @@ class Router
 
     public function getRouteByUrlAndMethod(Url $url, HttpMethod $method): ?Route
     {
-        if (!$url->getPath()) {
+        if (!$url->path) {
             return null;
         }
-        $actualUrlParts = explode('/', rtrim($url->getPath(), self::TRAILING_URL_CHARS_TO_REMOVE));
+        $actualUrlParts = explode('/', rtrim($url->path, self::TRAILING_URL_CHARS_TO_REMOVE));
         if (!$actualUrlParts) {
             return null;
         }

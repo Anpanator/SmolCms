@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SmolCms\Controller;
 
 
+use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\TemplateService;
@@ -27,7 +28,7 @@ class IndexController
         return $this->templateService->generateResponse(BaseTemplate::class,
             [
                 'pageTitle' => 'Nice Boat',
-                'articleContent' => $request->getUrl(),
+                'articleContent' => $request->url,
                 'pageLanguage' => 'en',
             ]
         );
@@ -35,6 +36,6 @@ class IndexController
 
     public function postAction(Request $request): Response
     {
-        return new Response(status: 200, content: print_r($request, true));
+        return new Response(status: HttpStatus::OK, content: print_r($request, true));
     }
 }

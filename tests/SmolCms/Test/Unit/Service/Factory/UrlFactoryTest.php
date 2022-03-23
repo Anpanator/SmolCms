@@ -26,11 +26,11 @@ class UrlFactoryTest extends SimpleTestCase
             ->willReturn(new ValidationResult(true));
         $urlString = 'https://example.com:80/some/fancy/path?queryParam1=test';
         $url = $this->urlFactory->createUrlFromUrlString($urlString);
-        self::assertSame('https', $url->getProtocol());
-        self::assertSame('example.com', $url->getHost());
-        self::assertSame(80, $url->getPort());
-        self::assertSame('/some/fancy/path', $url->getPath());
-        self::assertSame('queryParam1=test', $url->getQuery());
+        self::assertSame('https', $url->protocol);
+        self::assertSame('example.com', $url->host);
+        self::assertSame(80, $url->port);
+        self::assertSame('/some/fancy/path', $url->path);
+        self::assertSame('queryParam1=test', $url->query);
     }
 
     public function testCreateUrlFromUrlString_failureValidationThrowsInvalidArgumentException()
