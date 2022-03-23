@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace SmolCms\Data\Constant;
 
 
-final class HttpStatus
+enum HttpStatus: int
 {
-    public const OK = 200;
-    public const CREATED = 201;
-    public const ACCEPTED = 202;
-    public const NO_CONTENT = 204;
+    case OK = 200;
+    case CREATED = 201;
+    case ACCEPTED = 202;
+    case NO_CONTENT = 204;
 
-    public const NOT_FOUND = 404;
+    case NOT_FOUND = 404;
 }

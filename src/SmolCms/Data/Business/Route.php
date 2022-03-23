@@ -5,35 +5,28 @@ declare(strict_types=1);
 namespace SmolCms\Data\Business;
 
 
+use SmolCms\Data\Constant\HttpMethod;
+
 class Route
 {
     public function __construct(
         private string $path,
-        private string $method,
+        private HttpMethod $method,
         private string $controller,
         private ?string $handler = null,
     ) {
     }
 
-    /**
-     * @return string
-     */
     public function getPath(): string
     {
         return $this->path;
     }
 
-    /**
-     * @return string
-     */
-    public function getMethod(): string
+    public function getMethod(): HttpMethod
     {
         return $this->method;
     }
 
-    /**
-     * @return string
-     */
     public function getController(): string
     {
         return $this->controller;
@@ -44,6 +37,6 @@ class Route
      */
     public function getHandler(): string
     {
-        return $this->handler ?? strtolower($this->method) . 'Action';
+        return $this->handler ?? strtolower($this->method->value) . 'Action';
     }
 }

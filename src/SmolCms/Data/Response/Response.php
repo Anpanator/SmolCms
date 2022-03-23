@@ -14,38 +14,26 @@ class Response
      * Response constructor.
      */
     public function __construct(
-        private int $status = HttpStatus::OK,
-        private ?string $content = null,
+        private HttpStatus $status = HttpStatus::OK,
+        private ?string    $content = null,
     ) {
     }
 
-    /**
-     * @return int
-     */
-    public function getStatus(): int
+    public function getStatus(): HttpStatus
     {
         return $this->status;
     }
 
-    /**
-     * @param int $status
-     */
-    public function setStatus(int $status): void
+    public function setStatus(HttpStatus $status): void
     {
         $this->status = $status;
     }
 
-    /**
-     * @return string|null
-     */
     public function getContent(): ?string
     {
         return $this->content;
     }
 
-    /**
-     * @param string|null $content
-     */
     public function setContent(?string $content): void
     {
         $this->content = $content;

@@ -8,6 +8,7 @@ namespace SmolCms\Service\Core;
 use SmolCms\Config\RoutingConfiguration;
 use SmolCms\Data\Business\Route;
 use SmolCms\Data\Business\Url;
+use SmolCms\Data\Constant\HttpMethod;
 
 class Router
 {
@@ -21,12 +22,7 @@ class Router
     {
     }
 
-    /**
-     * @param Url $url
-     * @param string $method
-     * @return Route|null
-     */
-    public function getRouteByUrlAndMethod(Url $url, string $method): ?Route
+    public function getRouteByUrlAndMethod(Url $url, HttpMethod $method): ?Route
     {
         if (!$url->getPath()) {
             return null;

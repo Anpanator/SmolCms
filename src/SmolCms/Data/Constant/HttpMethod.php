@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace SmolCms\Data\Constant;
 
 
-abstract class HttpMethod
+enum HttpMethod: string
 {
-    public const GET = 'GET';
-    public const POST = 'POST';
-    public const PUT = 'PUT';
-    public const DELETE = 'DELETE';
-    public const OPTIONS = 'OPTIONS';
+    case GET = 'GET';
+    case POST = 'POST';
+    case PUT = 'PUT';
+    case DELETE = 'DELETE';
+    case OPTIONS = 'OPTIONS';
 }

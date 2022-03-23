@@ -88,7 +88,7 @@ class ApplicationCore
 
     private function output(Response $response): void
     {
-        http_response_code($response->getStatus());
+        http_response_code($response->getStatus()->value);
         echo $response->getContent();
     }
 }
