@@ -3,15 +3,16 @@ declare(strict_types=1);
 
 namespace SmolCms\Test\Unit\Service\DB;
 
+use DateTime;
 use PDO;
 use PDOStatement;
 use PHPUnit\Framework\MockObject\MockObject;
 use SmolCms\Service\Core\CaseConverter;
-use SmolCms\Service\DB\Attribute\Id;
 use SmolCms\Service\DB\EntityAttributeProcessor;
 use SmolCms\Service\DB\EntityService;
 use SmolCms\Service\DB\QueryBuilder;
 use SmolCms\TestUtils\Attributes\Mock;
+use SmolCms\TestUtils\Helper\Capture;
 use SmolCms\TestUtils\SimpleTestCase;
 
 class EntityServiceTest extends SimpleTestCase
@@ -38,10 +39,12 @@ class EntityServiceTest extends SimpleTestCase
             $this->caseConverter,
             $this->queryBuilder,
             $this->entityAttributeProcessor
-        ) extends EntityService {};
+        ) extends EntityService {
+        };
     }
 
-    public function testMapResultToEntity_success() {
+    public function testMapResultToEntity_success()
+    {
         $testData = ['test_field_one' => '!!!', 'test_field_number_two' => 100, 'irrelevant' => 10.1];
 
         $this->caseConverter
@@ -62,7 +65,8 @@ class EntityServiceTest extends SimpleTestCase
         self::assertNull($result->optional);
     }
 
-    public function testSaveAsNew_success() {
+    public function testSaveAsNew_success()
+    {
         $this->caseConverter
             ->method('camelCaseToSnakeCase')
             ->willReturnMap(
@@ -79,13 +83,59 @@ class EntityServiceTest extends SimpleTestCase
         $this->entityService->saveAsNew($entity);
         self::assertSame(123456, $entity->testFieldNumberTwo);
     }
+
+    public function testSaveAsNew_successWithDateTimeFields()
+    {
+        $dateFieldName = 'dateTime';
+        $dbFieldName = 'date_time';
+        $expectedDateStr = '2000-01-01 12:00:00';
+        $expectedDate = new DateTime($expectedDateStr);
+        $capturedParams = null;
+
+        $entity = new TestEntityWithDateField($expectedDate);
+        $this->caseConverter
+            ->method('camelCaseToSnakeCase')
+            ->willReturnMap(
+                [
+                    [$dateFieldName, $dbFieldName],
+                ]
+            );
+        $this->pdo->method('prepare')->willReturn($this->PDOStatement);
+        $this->pdo->expects(self::never())->method('lastInsertId');
+        $this->entityAttributeProcessor->method('getEntityIdFieldName')->willReturn(null);
+        $this->PDOStatement->method('execute')->with(Capture::arg($capturedParams));
+
+        $this->entityService->saveAsNew($entity);
+
+        self::assertSame($expectedDateStr, $capturedParams[$dbFieldName]);
+    }
 }
 
-class TestData {
+class TestEntityWithDateField
+{
+
     public function __construct(
-        public string $testFieldOne,
-        #[Id]
-        public ?int $testFieldNumberTwo,
+        private DateTime $dateTime
+    )
+    {
+    }
+
+    public function getDateTime(): DateTime
+    {
+        return $this->dateTime;
+    }
+
+    public function setDateTime(DateTime $dateTime): void
+    {
+        $this->dateTime = $dateTime;
+    }
+}
+
+class TestData
+{
+    public function __construct(
+        public string  $testFieldOne,
+        public ?int    $testFieldNumberTwo,
         public ?string $optional
     )
     {

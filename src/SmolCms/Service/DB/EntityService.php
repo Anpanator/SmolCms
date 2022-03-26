@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace SmolCms\Service\DB;
 
 
+use DateTime;
 use PDO;
 use PDOStatement;
 use ReflectionClass;
@@ -49,7 +50,6 @@ abstract class EntityService
             $mappedData[$camelCaseField] = &$value;
         }
 
-
         foreach ($this->getEntityPropertyNames($entityClass) as $propName) {
             $entityProps[$propName] = $mappedData[$propName] ?? null;
         }
@@ -70,7 +70,11 @@ abstract class EntityService
         $propertyNames = $this->getEntityPropertyNames($entity::class);
         foreach ($propertyNames as $propName) {
             $dbField = $this->caseConverter->camelCaseToSnakeCase($propName);
-            $data[$dbField] = $entity->{'get' . $propName}();
+            $propVal = $entity->{'get' . $propName}();
+            if ($propVal instanceof DateTime) {
+                $propVal = $propVal->format('Y-m-d H:i:s');
+            }
+            $data[$dbField] = $propVal;
         }
         $insertQuery = $this->queryBuilder->buildInsertQuery($entity::class, ...array_keys($data));
         $stmt = $this->pdo->prepare($insertQuery);
