@@ -24,7 +24,7 @@ class ServiceConfiguration
                 identifier: PDO::class,
                 class: null,
                 parameters: [
-                    'mysql:host=localhost;port=3306;dbname=smolcms;charset=utf8mb4"',
+                    'mysql:host=localhost;port=3306;dbname=smolcms;charset=utf8mb4',
                     'testuser',
                     'testpw',
                 ]

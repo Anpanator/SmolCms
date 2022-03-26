@@ -18,8 +18,8 @@ class Article
         private string $title,
         private string $state,
         private string $content,
-        private ?DateTime $created = null,
-        private ?DateTime $updated = null,
+        private DateTime $created = new DateTime(),
+        private DateTime $updated = new DateTime(),
     )
     {
     }
@@ -74,22 +74,22 @@ class Article
         $this->content = $content;
     }
 
-    public function getCreated(): ?DateTime
+    public function getCreated(): DateTime
     {
         return $this->created;
     }
 
-    public function setCreated(?DateTime $created): void
+    public function setCreated(DateTime $created): void
     {
         $this->created = $created;
     }
 
-    public function getUpdated(): ?DateTime
+    public function getUpdated(): DateTime
     {
         return $this->updated;
     }
 
-    public function setUpdated(?DateTime $updated): void
+    public function setUpdated(DateTime $updated): void
     {
         $this->updated = $updated;
     }
