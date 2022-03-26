@@ -5,7 +5,6 @@ namespace SmolCms\Service\DB;
 
 use ReflectionClass;
 use SmolCms\Service\Core\CaseConverter;
-use SmolCms\Service\DB\Attribute\Entity;
 
 class QueryBuilder
 {
@@ -13,7 +12,8 @@ class QueryBuilder
     private const NO_LIMIT_NUM = PHP_INT_MAX;
 
     public function __construct(
-        private CaseConverter $caseConverter
+        private readonly CaseConverter $caseConverter,
+        private readonly EntityAttributeProcessor $entityAttributeProcessor
     )
     {
     }
@@ -21,7 +21,7 @@ class QueryBuilder
     public function buildQuery(QueryCriteria $qc): string
     {
         $mainEntity = $qc->getMainEntity();
-        $table = $this->getEntityTableName($mainEntity);
+        $table = $this->entityAttributeProcessor->getEntityTableName($mainEntity);
 
         $queryParts = [$qc->getType()];
 
@@ -29,11 +29,7 @@ class QueryBuilder
         if ($qc->getType() === QueryCriteria::TYPE_SELECT) {
             $queryParts[] = implode(', ', $this->getEntityFields($mainEntity));
         }
-
-        if ($qc->getType() !== QueryCriteria::TYPE_UPDATE) {
-            $queryParts[] = 'FROM';
-        }
-
+        $queryParts[] = 'FROM';
         $queryParts[] = $table;
 
         $queryParts[] = 'WHERE';
@@ -49,7 +45,6 @@ class QueryBuilder
             $firstCondition = false;
         }
 
-
         if ($qc->getLimit() !== null || $qc->getOffset() !== null) {
             $queryParts[] = 'LIMIT';
             $queryParts[] = $qc->getOffset() ? $qc->getOffset() . ',' : '';
@@ -59,13 +54,14 @@ class QueryBuilder
         return implode(' ', $queryParts);
     }
 
-    private function getEntityTableName(string $entityClass): string
+    public function buildInsertQuery(string $entityClass, string ...$orderedDataKeys): string
     {
-        $refEntity = new ReflectionClass($entityClass);
-        $refAttribute = $refEntity->getAttributes(Entity::class)[0];
-        /** @var Entity $attribute */
-        $attribute = $refAttribute->newInstance();
-        return $attribute->getTable();
+        $tableName = $this->entityAttributeProcessor->getEntityTableName($entityClass);
+        $query = "INSERT INTO $tableName ("
+            . implode(', ', $orderedDataKeys) . ') VALUES (:' . implode(', :', $orderedDataKeys)
+            . ')';
+
+        return $query;
     }
 
     private function getEntityFields(string $entityClass): array

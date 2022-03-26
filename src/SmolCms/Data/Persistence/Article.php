@@ -6,85 +6,91 @@ namespace SmolCms\Data\Persistence;
 
 use DateTime;
 use SmolCms\Service\DB\Attribute\Entity;
+use SmolCms\Service\DB\Attribute\Id;
 
 #[Entity(table: 'article')]
 class Article
 {
-    /**
-     * ArticleEntity constructor.
-     * @param int $id
-     * @param string $slug
-     * @param string $title
-     * @param string $state
-     * @param string $content
-     * @param DateTime $created
-     * @param DateTime $updated
-     */
     public function __construct(
-        private int $id,
+        #[Id]
+        private ?int $id,
         private string $slug,
         private string $title,
         private string $state,
         private string $content,
-        private DateTime $created,
-        private DateTime $updated,
+        private ?DateTime $created = null,
+        private ?DateTime $updated = null,
     )
     {
     }
 
-    /**
-     * @return int
-     */
-    public function getId(): int
+    public function getId(): ?int
     {
         return $this->id;
     }
 
-    /**
-     * @return string
-     */
+    public function setId(?int $id): void
+    {
+        $this->id = $id;
+    }
+
     public function getSlug(): string
     {
         return $this->slug;
     }
 
-    /**
-     * @return string
-     */
+    public function setSlug(string $slug): void
+    {
+        $this->slug = $slug;
+    }
+
     public function getTitle(): string
     {
         return $this->title;
     }
 
-    /**
-     * @return string
-     */
+    public function setTitle(string $title): void
+    {
+        $this->title = $title;
+    }
+
     public function getState(): string
     {
         return $this->state;
     }
 
-    /**
-     * @return string
-     */
+    public function setState(string $state): void
+    {
+        $this->state = $state;
+    }
+
     public function getContent(): string
     {
         return $this->content;
     }
 
-    /**
-     * @return DateTime
-     */
-    public function getCreated(): DateTime
+    public function setContent(string $content): void
+    {
+        $this->content = $content;
+    }
+
+    public function getCreated(): ?DateTime
     {
         return $this->created;
     }
 
-    /**
-     * @return DateTime
-     */
-    public function getUpdated(): DateTime
+    public function setCreated(?DateTime $created): void
+    {
+        $this->created = $created;
+    }
+
+    public function getUpdated(): ?DateTime
     {
         return $this->updated;
+    }
+
+    public function setUpdated(?DateTime $updated): void
+    {
+        $this->updated = $updated;
     }
 }

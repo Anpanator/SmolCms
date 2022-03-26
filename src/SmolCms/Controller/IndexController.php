@@ -13,10 +13,6 @@ use SmolCms\Template\BaseTemplate;
 
 class IndexController
 {
-    /**
-     * IndexController constructor.
-     * @param TemplateService $templateService
-     */
     public function __construct(
         private TemplateService $templateService
     )

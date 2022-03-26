@@ -8,7 +8,6 @@ use RuntimeException;
 class QueryCriteria
 {
     public const TYPE_SELECT = 'SELECT';
-    public const TYPE_UPDATE = 'UPDATE';
     public const TYPE_DELETE = 'DELETE';
     public const KEY_AND = 'A';
     public const KEY_OR = 'O';
@@ -34,14 +33,6 @@ class QueryCriteria
         $this->checkQueryTypeSet();
         $this->mainEntity = $entityClass;
         $this->type = self::TYPE_DELETE;
-        return $this;
-    }
-
-    public function update(string $entityClass): static
-    {
-        $this->checkQueryTypeSet();
-        $this->mainEntity = $entityClass;
-        $this->type = self::TYPE_UPDATE;
         return $this;
     }
 

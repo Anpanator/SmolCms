@@ -7,7 +7,7 @@ namespace SmolCms\Service\DB;
 use PDO;
 use PDOStatement;
 use ReflectionClass;
-use ReflectionException;
+use ReflectionProperty;
 use SmolCms\Service\Core\CaseConverter;
 
 abstract class EntityService
@@ -16,12 +16,72 @@ abstract class EntityService
      * EntityService constructor.
      */
     public function __construct(
-        private PDO             $pdo,
-        protected CaseConverter $caseConverter,
-        private QueryBuilder $queryBuilder,
+        private   readonly PDO $pdo,
+        protected readonly CaseConverter $caseConverter,
+        private   readonly QueryBuilder $queryBuilder,
+        protected readonly EntityAttributeProcessor $entityAttributeProcessor
     )
     {
     }
+
+    /**
+     * Maps a result from the DB to an Entity object. Unknown fields are dropped and
+     * fields in the entity that don't exist in $data are initialized with null.
+     *
+     * Note that the entity will be created through its constructor, so all fields
+     * must exist in the constructor.
+     *
+     * DB fields are expected to be snake case and constructor parameters are expected
+     * to be camel case.
+     *
+     * TODO: Cache reflection result
+     *
+     * @param array<string, mixed> $data
+     * @param string $entityClass
+     * @return object
+     */
+    public function mapResultToEntity(array $data, string $entityClass): object
+    {
+        $entityProps = [];
+        $mappedData = [];
+        foreach ($data as $field => &$value) {
+            $camelCaseField = $this->caseConverter->snakeCaseToCamelCase($field);
+            $mappedData[$camelCaseField] = &$value;
+        }
+
+
+        foreach ($this->getEntityPropertyNames($entityClass) as $propName) {
+            $entityProps[$propName] = $mappedData[$propName] ?? null;
+        }
+
+        return new $entityClass(...$entityProps);
+    }
+
+    /**
+     * @param object $entity
+     * @return void
+     *
+     * Currently requires getters and setters for all entity fields.
+     * TODO: Handle values set by database. Refresh if special attribute is set on any property of entity class?
+     */
+    public function saveAsNew(object $entity): void
+    {
+        $data = [];
+        $propertyNames = $this->getEntityPropertyNames($entity::class);
+        foreach ($propertyNames as $propName) {
+            $dbField = $this->caseConverter->camelCaseToSnakeCase($propName);
+            $data[$dbField] = $entity->{'get' . $propName}();
+        }
+        $insertQuery = $this->queryBuilder->buildInsertQuery($entity::class, ...array_keys($data));
+        $stmt = $this->pdo->prepare($insertQuery);
+        $stmt->execute($data);
+        $idField = $this->entityAttributeProcessor->getEntityIdFieldName($entity::class);
+        if ($idField && $idVal = $this->pdo->lastInsertId()) {
+            $entity->{'set' . $idField}((int)$idVal);
+        }
+    }
+
+    // TODO: Create entity update method
 
     /**
      * Use this if you want to run a particular query multiple times with different values.
@@ -60,39 +120,9 @@ abstract class EntityService
         return $result;
     }
 
-    /**
-     * Maps a result from the DB to an Entity object. Unknown fields are dropped and
-     * fields in the entity that don't exist in $data are initialized with null.
-     *
-     * Note that the entity will be created through its constructor, so all fields
-     * must exist in the constructor.
-     *
-     * DB fields are expected to be snake case and constructor parameters are expected
-     * to be camel case.
-     *
-     * TODO: Cache reflection result
-     *
-     * @param array<string, mixed> $data
-     * @param string $entityClass
-     * @return object
-     * @throws ReflectionException
-     */
-    public function mapResultToEntity(array $data, string $entityClass): object
+    private function getEntityPropertyNames(string $entityClass): array
     {
-        $entityProps = [];
-        $mappedData = [];
-        foreach ($data as $field => &$value) {
-            $camelCaseField = $this->caseConverter->snakeCaseToCamelCase($field);
-            $mappedData[$camelCaseField] = &$value;
-        }
-
         $refClass = new ReflectionClass($entityClass);
-        $refProps = $refClass->getProperties();
-        foreach ($refProps as $refProp) {
-            $propName = $refProp->getName();
-            $entityProps[$propName] = $mappedData[$propName] ?? null;
-        }
-
-        return new $entityClass(...$entityProps);
+        return array_map(fn(ReflectionProperty $refProp): string => $refProp->getName(), $refClass->getProperties());
     }
 }

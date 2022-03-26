@@ -5,7 +5,7 @@ namespace SmolCms\Test\Unit\Service\DB;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use SmolCms\Service\Core\CaseConverter;
-use SmolCms\Service\DB\Attribute\Entity;
+use SmolCms\Service\DB\EntityAttributeProcessor;
 use SmolCms\Service\DB\QueryBuilder;
 use SmolCms\Service\DB\QueryCriteria;
 use SmolCms\TestUtils\Attributes\Mock;
@@ -17,12 +17,14 @@ class QueryBuilderTest extends SimpleTestCase
 
     #[Mock(CaseConverter::class)]
     private CaseConverter|MockObject $caseConverter;
+    #[Mock(EntityAttributeProcessor::class)]
+    private EntityAttributeProcessor|MockObject $entityAttributeProcessor;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->queryBuilder = new QueryBuilder($this->caseConverter);
-
+        $this->queryBuilder = new QueryBuilder($this->caseConverter, $this->entityAttributeProcessor);
+        $this->entityAttributeProcessor->method('getEntityTableName')->willReturn('test_table');
         $this->caseConverter
             ->method('camelCaseToSnakeCase')
             ->willReturnMap(
@@ -61,9 +63,17 @@ class QueryBuilderTest extends SimpleTestCase
         $result = $this->queryBuilder->buildQuery($queryCriteria);
         self::assertSame($expectedQuery, strtolower($result));
     }
+
+    public function testBuildInsertQuery_success()
+    {
+        $expectedQuery = 'insert into test_table (id, test_field) values (:id, :test_field)';
+        $resultQuery = $this->queryBuilder->buildInsertQuery(TestEntity::class, 'id', 'test_field');
+        self::assertSame($expectedQuery, strtolower($resultQuery));
+    }
+
+
 }
 
-#[Entity(table: 'test_table')]
 class TestEntity {
 
     public function __construct(
