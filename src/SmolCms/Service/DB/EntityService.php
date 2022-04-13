@@ -9,7 +9,9 @@ use PDO;
 use PDOStatement;
 use ReflectionClass;
 use ReflectionProperty;
+use SmolCms\Exception\PersistenceException;
 use SmolCms\Service\Core\CaseConverter;
+use Throwable;
 
 abstract class EntityService
 {
@@ -36,6 +38,7 @@ abstract class EntityService
      * to be camel case.
      *
      * TODO: Cache reflection result
+     * TODO: Support DateTime fields
      *
      * @param array<string, mixed> $data
      * @param string $entityClass
@@ -62,30 +65,41 @@ abstract class EntityService
      * @return void
      *
      * Currently requires getters and setters for all entity fields.
-     * TODO: Handle values set by database. Refresh if special attribute is set on any property of entity class?
+     * TODO: Handle values set by database. Refresh if attribute for that is set on any property of entity class?
      */
     public function saveAsNew(object $entity): void
     {
-        $data = [];
-        $propertyNames = $this->getEntityPropertyNames($entity::class);
-        foreach ($propertyNames as $propName) {
-            $dbField = $this->caseConverter->camelCaseToSnakeCase($propName);
-            $propVal = $entity->{'get' . $propName}();
-            if ($propVal instanceof DateTime) {
-                $propVal = $propVal->format('Y-m-d H:i:s');
+        try {
+            $data = $this->getFieldValueMap($entity);
+            $insertQuery = $this->queryBuilder->buildInsertQuery($entity::class);
+            $stmt = $this->pdo->prepare($insertQuery);
+            $stmt->execute($data);
+            $idField = $this->entityAttributeProcessor->getEntityIdFieldName($entity::class);
+            if ($idField && $idVal = $this->pdo->lastInsertId()) {
+                $entity->{"set$idField"}((int)$idVal);
             }
-            $data[$dbField] = $propVal;
-        }
-        $insertQuery = $this->queryBuilder->buildInsertQuery($entity::class, ...array_keys($data));
-        $stmt = $this->pdo->prepare($insertQuery);
-        $stmt->execute($data);
-        $idField = $this->entityAttributeProcessor->getEntityIdFieldName($entity::class);
-        if ($idField && $idVal = $this->pdo->lastInsertId()) {
-            $entity->{'set' . $idField}((int)$idVal);
+        } catch (Throwable $t) {
+            throw new PersistenceException('Failed to save new entity: ' . $entity::class, $t);
         }
     }
 
-    // TODO: Create entity update method
+    public function update(object $entity): void
+    {
+        try {
+            $idField = $this->entityAttributeProcessor->getEntityIdFieldName($entity::class);
+            $data = $this->getFieldValueMap($entity);
+
+            if ($entity->{"get$idField"}() === null) {
+                throw new PersistenceException('Cannot update entity without id set');
+            }
+            $query = $this->queryBuilder->buildUpdateQuery($entity::class);
+            $stmt = $this->pdo->prepare($query);
+            $stmt->execute($data);
+            // potential re-sync with db for db-generated values?
+        } catch (Throwable $t) {
+            throw new PersistenceException('Failed to update entity: ' . $entity::class, $t);
+        }
+    }
 
     /**
      * Use this if you want to run a particular query multiple times with different values.
@@ -128,5 +142,21 @@ abstract class EntityService
     {
         $refClass = new ReflectionClass($entityClass);
         return array_map(fn(ReflectionProperty $refProp): string => $refProp->getName(), $refClass->getProperties());
+    }
+
+    private function getFieldValueMap(object $entity): array
+    {
+        $data = [];
+        $propertyNames = $this->getEntityPropertyNames($entity::class);
+        foreach ($propertyNames as $propName) {
+            $dbField = $this->caseConverter->camelCaseToSnakeCase($propName);
+            $propVal = $entity->{"get$propName"}();
+            //Should probably make this reusable
+            if ($propVal instanceof DateTime) {
+                $propVal = $propVal->format('Y-m-d H:i:s');
+            }
+            $data[$dbField] = $propVal;
+        }
+        return $data;
     }
 }

@@ -7,6 +7,7 @@ use DateTime;
 use PDO;
 use PDOStatement;
 use PHPUnit\Framework\MockObject\MockObject;
+use SmolCms\Exception\PersistenceException;
 use SmolCms\Service\Core\CaseConverter;
 use SmolCms\Service\DB\EntityAttributeProcessor;
 use SmolCms\Service\DB\EntityService;
@@ -108,6 +109,26 @@ class EntityServiceTest extends SimpleTestCase
         $this->entityService->saveAsNew($entity);
 
         self::assertSame($expectedDateStr, $capturedParams[$dbFieldName]);
+    }
+
+    public function testUpdate_failureWithoutIdInEntity()
+    {
+        self::expectException(PersistenceException::class);
+        $this->caseConverter
+            ->method('camelCaseToSnakeCase')
+            ->willReturnMap(
+                [
+                    ['testFieldOne', 'test_field_one'],
+                    ['testFieldNumberTwo', 'test_field_number_two'],
+                    ['optional', 'optional'],
+                ]
+            );
+        $testEntity = new TestData('', null, null);
+        $this->entityAttributeProcessor
+            ->method('getEntityIdFieldName')
+            ->willReturn('testFieldNumberTwo');
+
+        $this->entityService->update($testEntity);
     }
 }
 

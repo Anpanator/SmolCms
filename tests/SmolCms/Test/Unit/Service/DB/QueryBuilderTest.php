@@ -25,6 +25,7 @@ class QueryBuilderTest extends SimpleTestCase
         parent::setUp();
         $this->queryBuilder = new QueryBuilder($this->caseConverter, $this->entityAttributeProcessor);
         $this->entityAttributeProcessor->method('getEntityTableName')->willReturn('test_table');
+        $this->entityAttributeProcessor->method('getEntityTableName')->willReturn('test_table');
         $this->caseConverter
             ->method('camelCaseToSnakeCase')
             ->willReturnMap(
@@ -67,7 +68,14 @@ class QueryBuilderTest extends SimpleTestCase
     public function testBuildInsertQuery_success()
     {
         $expectedQuery = 'insert into test_table (id, test_field) values (:id, :test_field)';
-        $resultQuery = $this->queryBuilder->buildInsertQuery(TestEntity::class, 'id', 'test_field');
+        $resultQuery = $this->queryBuilder->buildInsertQuery(TestEntity::class);
+        self::assertSame($expectedQuery, strtolower($resultQuery));
+    }
+
+    public function testBuildUpdateQuery_success()
+    {
+        $expectedQuery = 'update test_table set id = :id, test_field = :test_field';
+        $resultQuery = $this->queryBuilder->buildUpdateQuery(TestEntity::class);
         self::assertSame($expectedQuery, strtolower($resultQuery));
     }
 

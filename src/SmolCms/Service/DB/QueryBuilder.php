@@ -54,13 +54,27 @@ class QueryBuilder
         return implode(' ', $queryParts);
     }
 
-    public function buildInsertQuery(string $entityClass, string ...$orderedDataKeys): string
+    public function buildInsertQuery(string $entityClass): string
     {
         $tableName = $this->entityAttributeProcessor->getEntityTableName($entityClass);
+        $fields = $this->getEntityFields($entityClass);
         $query = "INSERT INTO $tableName ("
-            . implode(', ', $orderedDataKeys) . ') VALUES (:' . implode(', :', $orderedDataKeys)
+            . implode(', ', $fields) . ') VALUES (:' . implode(', :', $fields)
             . ')';
 
+        return $query;
+    }
+
+    public function buildUpdateQuery(string $entityClass): string
+    {
+        $tableName = $this->entityAttributeProcessor->getEntityTableName($entityClass);
+        $fields = $this->getEntityFields($entityClass);
+        $query = "UPDATE $tableName SET";
+        $fieldPart = [];
+        foreach ($fields as $field) {
+            $fieldPart[] = " $field = :$field";
+        }
+        $query .= implode(',', $fieldPart);
         return $query;
     }
 
