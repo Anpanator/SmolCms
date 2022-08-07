@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SmolCms\Service\Factory;
 
 
+use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Request\Request;
 
 class RequestFactory
@@ -16,7 +17,9 @@ class RequestFactory
      */
     public function __construct(
         private UrlFactory $urlFactory
-    )    {    }
+    )
+    {
+    }
 
     public function buildRequestFromGlobals(): Request
     {
@@ -25,11 +28,11 @@ class RequestFactory
         $url = $this->urlFactory->createUrlFromUrlString($urlString);
         return new Request(
             url: $url,
-            method: $_SERVER['REQUEST_METHOD'],
+            method: HttpMethod::from($_SERVER['REQUEST_METHOD']),
             headers: getallheaders() ?: null,
             rawBody: file_get_contents('php://input') ?: null,
-            postParams:  $_POST ?: null,
-            getParams:  $_GET ?: null
+            postParams: $_POST ?: null,
+            getParams: $_GET ?: null
         );
     }
 
