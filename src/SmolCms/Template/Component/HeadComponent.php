@@ -8,18 +8,21 @@ use SmolCms\Template\Template;
 
 class HeadComponent implements Template
 {
-    private const VAR_TITLE = 'pageTitle';
 
-    public function render(array $data): string
+
+    public function __construct(
+        private readonly string $pageTitle
+    )
     {
-        return <<<HTML
-            <title>{$data[self::VAR_TITLE]}</title>
-            <link type="text/css" rel="stylesheet" href="/public/css/main.css">
-        HTML;
     }
 
-    public static function getTemplateVars(): array
+    public function render(): string
     {
-        return [self::VAR_TITLE];
+        return <<<HTML
+        <head>
+            <title>$this->pageTitle</title>
+            <link type="text/css" rel="stylesheet" href="/public/css/main.css">
+        </head>
+        HTML;
     }
 }

@@ -16,6 +16,7 @@ class Article
         private ?int $id,
         private string $slug,
         private string $title,
+        // TODO: Enum
         private string $state,
         private string $content,
         private DateTime $created = new DateTime(),

@@ -36,11 +36,6 @@ class ServiceConfiguration
         }
     }
 
-    public function getServices(): array
-    {
-        return $this->services;
-    }
-
     public function getServiceByIdentifier(string $identifier): ?Service
     {
         return $this->services[$identifier] ?? null;
