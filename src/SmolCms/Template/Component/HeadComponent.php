@@ -6,12 +6,11 @@ namespace SmolCms\Template\Component;
 
 use SmolCms\Template\Template;
 
-class HeadComponent implements Template
+readonly class HeadComponent implements Template
 {
 
-
     public function __construct(
-        private readonly string $pageTitle
+        private string $pageTitle
     )
     {
     }

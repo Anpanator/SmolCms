@@ -105,7 +105,6 @@ class ServiceBuilder
             if (!($paramType instanceof ReflectionNamedType)) {
                 throw new AutowireException("Cannot autowire untyped parameter on class: $class");
             }
-            /** @var ReflectionNamedType $paramType */
             if ($paramType->isBuiltin()) {
                 throw new AutowireException(
                     "Cannot autowire builtin type: {$paramType->getName()} on class: $class"

@@ -7,13 +7,13 @@ use SmolCms\Template\Component\ArticleComponent;
 use SmolCms\Template\Component\HeadComponent;
 use SmolCms\Template\HtmlTemplate;
 
-class ArticleTemplateConfig implements TemplateConfig
+readonly class ArticleTemplateConfig implements TemplateConfig
 {
 
     public function __construct(
-        private readonly string $language,
-        private readonly string $pageTitle,
-        private readonly string $articleContent
+        private string $language,
+        private string $pageTitle,
+        private string $articleContent
     )
     {
     }

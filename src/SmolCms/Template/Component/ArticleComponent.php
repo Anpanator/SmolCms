@@ -5,10 +5,10 @@ namespace SmolCms\Template\Component;
 
 use SmolCms\Template\Template;
 
-class ArticleComponent implements Template
+readonly class ArticleComponent implements Template
 {
     public function __construct(
-        private readonly string $contentSlot
+        private string $contentSlot
     )
     {
     }

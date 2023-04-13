@@ -1,10 +1,11 @@
 <?php
 declare(strict_types=1);
 
-namespace SmolCms\Service\DB;
+namespace SmolCms\Test\Unit\Service\DB;
 
 use SmolCms\Service\DB\Attribute\Entity;
 use SmolCms\Service\DB\Attribute\Id;
+use SmolCms\Service\DB\EntityAttributeProcessor;
 use SmolCms\TestUtils\SimpleTestCase;
 
 class EntityAttributeProcessorTest extends SimpleTestCase

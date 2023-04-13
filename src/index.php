@@ -25,5 +25,5 @@ $response = $applicationCore->simulateRequest(
         method: HttpMethod::GET
     )
 );
-
 print_r($response);
+$applicationCore->run();

@@ -5,28 +5,28 @@ declare(strict_types=1);
 namespace SmolCms\Controller;
 
 
+use SmolCms\Config\Templates\ArticleTemplateConfig;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\TemplateService;
-use SmolCms\Template\BaseTemplate;
 
 class IndexController
 {
     public function __construct(
-        private TemplateService $templateService
+        private readonly TemplateService $templateService,
     )
     {
     }
 
     public function getAction(Request $request): Response
     {
-        return $this->templateService->generateResponse(BaseTemplate::class,
-            [
-                'pageTitle' => 'Nice Boat',
-                'articleContent' => $request->url,
-                'pageLanguage' => 'en',
-            ]
+        return $this->templateService->generateResponse(
+            new ArticleTemplateConfig(
+                language: "en",
+                pageTitle: "Nice Boat",
+                articleContent: "Fancy ass content"
+            )
         );
     }
 

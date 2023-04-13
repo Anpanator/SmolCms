@@ -4,9 +4,7 @@ declare(strict_types=1);
 namespace SmolCms\Service\Core;
 
 
-use ReflectionClass;
-use ReflectionException;
-use ReflectionNamedType;
+use SmolCms\Config\Templates\TemplateConfig;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Response\Response;
 use SmolCms\Exception\TemplateException;
@@ -25,87 +23,39 @@ class TemplateService
     {
     }
 
-    /**
-     * @param string $templateClass
-     * @param array $data
-     * @return Response
-     */
-    public function generateResponse(string $templateClass, array $data): Response
+    public function generateResponse(TemplateConfig $config): Response
     {
-        try {
-            $template = $this->serviceBuilder->getService($templateClass);
-            $requiredDataKeys = $this->getRequiredDataKeys($templateClass);
-        } catch (ReflectionException $e) {
-            throw new TemplateException(message: "Error while processing template $templateClass", previous: $e);
-        }
-        $missingDataKeys = $this->getMissingDataKeys($requiredDataKeys, $data);
-        if (!empty($missingDataKeys)) {
-            throw new TemplateException(
-                "Missing data for the template $templateClass! Please add this data: " . implode(',', $missingDataKeys)
-            );
-        }
-        return new Response(HttpStatus::OK, $template->render($data));
+        /** Expected config structure:
+         * [
+         * Template Class (key) => [parameter list]
+         * ]
+         *
+         * The parameter list itself can either contain scalar values
+         * or another template class reference as a key => value pair like above
+         */
+
+        $templateConfig = $config->getConfig();
+        $templateClass = array_key_first($templateConfig);
+        $template = $this->buildTemplateFromConfig($templateClass, $templateConfig[$templateClass]);
+        return new Response(HttpStatus::OK, $template->render());
     }
 
-    /**
-     * @param string[] $required
-     * @param array<string, mixed> $data
-     * @return string[]
-     */
-    private function getMissingDataKeys(array $required, array $data): array
+    private function buildTemplateFromConfig(string $templateClass, array $config): Template
     {
-        $missingKeys = [];
-        foreach ($required as $key) {
-            if (!array_key_exists($key, $data)) {
-                $missingKeys[] = $key;
-            }
-        }
-        return $missingKeys;
-    }
-
-    /**
-     * @param string $templateClass
-     * @return string[]
-     * @throws ReflectionException
-     */
-    private function getRequiredDataKeys(string $templateClass): array
-    {
-        // Use array keys for near-constant time conflict lookup
-        $refTemplate = new ReflectionClass($templateClass);
-        if (!$refTemplate->implementsInterface(Template::class)) {
-            throw new TemplateException(
-                "$templateClass is not a template class! Make sure it implements the Template interface."
-            );
-        }
-
-        $requiredDataKeys = array_fill_keys($templateClass::getTemplateVars(), null);
-        $refConstructor = $refTemplate->getConstructor();
-        if ($refConstructor === null) {
-            return array_keys($requiredDataKeys);
-        }
-        foreach ($refConstructor->getParameters() as $refParam) {
-            $paramType = $refParam->getType();
-            if (!($paramType instanceof ReflectionNamedType)) {
-                // Skip constructor params that aren't type hinted
-                continue;
-            }
-            /** @var ReflectionNamedType $paramType */
-            $nestedTemplateClass = $paramType->getName();
-            // Skip constructor params that aren't a template
-            $refClassOfParameter = new ReflectionClass($nestedTemplateClass);
-            if (!$refClassOfParameter->implementsInterface(Template::class)) {
-                continue;
-            }
-
-            foreach ($this->getRequiredDataKeys($nestedTemplateClass) as $templateVar) {
-                if (array_key_exists($templateVar, $requiredDataKeys)) {
-                    // TODO: Log warning/debug message if the same variable name is used multiple times
+        $constructorParams = [];
+        foreach ($config as $key => $value) {
+            if (is_string($key) && class_exists($key)) {
+                // $key is a class, hence its value must be an array of parameters.
+                if (!is_array($value)) {
+                    throw new TemplateException("Found $key in template structure, but associated value is not an array of parameters.");
                 }
-
-                $requiredDataKeys[$templateVar] = null;
+                $buildParam = $this->buildTemplateFromConfig($key, $value);
+            } else {
+                // $key is not a class, hence the value should just be passed to the constructor
+                $buildParam = $value;
             }
-
+            $constructorParams[] = $buildParam;
         }
-        return array_keys($requiredDataKeys);
+        return new $templateClass(...$constructorParams);
     }
 }
