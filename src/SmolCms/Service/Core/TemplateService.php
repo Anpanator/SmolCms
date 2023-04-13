@@ -12,17 +12,6 @@ use SmolCms\Template\Template;
 
 class TemplateService
 {
-
-    /**
-     * TemplateService constructor.
-     * @param ServiceBuilder $serviceBuilder
-     */
-    public function __construct(
-        private ServiceBuilder $serviceBuilder
-    )
-    {
-    }
-
     public function generateResponse(TemplateConfig $config): Response
     {
         /** Expected config structure:
