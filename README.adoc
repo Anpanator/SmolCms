@@ -28,7 +28,7 @@ Controllers are treated like services.
 So in the simplest case, you use the fully qualified classname for the controller, e.g. `MyController::class`.
 Alternatively, you can use the controllers service identifier.
 
-Routes can contain path parameters in the form of `/some/path/with/{parameter}`.
+Routes can contain path parameters in the form of `/some/path/with/\{parameter\}`.
 Every path parameter must exist in the handler function with the same name (either untyped, mixed or type string, which is recommended).
 
 A handler *must* also have a `$request` parameter.
@@ -55,61 +55,70 @@ If you want to generate responses from templates, you can do so by using the `Te
 ----
 public function getAction(Request $request): Response
 {
-    return $this->templateService->generateResponse(BaseTemplate::class,
-        [
-            'pageTitle' => 'Nice Boat',
-            'articleContent' => $request->getUrl(),
-            'pageLanguage' => 'en',
-        ]
-    );
+        return $this->templateService->generateResponse(
+            new ArticleTemplateConfig(
+                language: "en",
+                pageTitle: "Nice Boat",
+                articleContent: "Fancy ass content"
+            )
+        );
 }
 ----
 
-Your actual templates can be composed of sub-templates, which are passed to the main template constructor, so they can be reused.
-Every template needs to implement the `Template` interface.
+Your actual template structure is composed through a configuration class implementing the `TemplateConfig` interface, e.g.:
+
 [source,php]
 ----
-class BaseTemplate implements Template
+readonly class ArticleTemplateConfig implements TemplateConfig
 {
-    private const VAR_LANG = 'pageLanguage';
-    /**
-     * BaseTemplate constructor.
-     */
+
     public function __construct(
-        private HeadComponent $head,
-        private ArticleComponent $article,
+        private string $language,
+        private string $pageTitle,
+        private string $articleContent
     )
     {
     }
 
-    public function render(array $data): string
+    public function getConfig(): array
     {
-        return <<<HTML
-        <html lang="{$data[self::VAR_LANG]}">
-            <head>
-                {$this->head->render($data)}
-            </head>
-            <body>
-                {$this->article->render($data)}
-            </body>
-        </html>
-        HTML;
-    }
-
-    public static function getTemplateVars(): array
-    {
-        return [self::VAR_LANG];
+        return [
+            HtmlTemplate::class => [
+                HeadComponent::class => [$this->pageTitle],
+                ArticleComponent::class => [$this->articleContent],
+                $this->language
+            ]
+        ];
     }
 }
 ----
 
-The `getTemplateVars()` method is critical as it allows the `TemplateService` to collect all needed template variables.
-It is highly recommended to have this method return the names of all variables used in the template.
+This will ensure that autocompletion and proper typing will be available.
 
-If there are variables missing in the `$data` array passed to the service, an exception will be thrown telling you about the missing keys.
+Every template and component needs to implement the `Template` interface.
 
-IMPORTANT: Given that PHP will pass arrays by reference internally *unless* it is written to (`copy-on-write`), it is strongly discouraged to modify the `$data` array inside templates.
-It should be considered read-only inside templates.
+[source,php]
+----
+readonly class HeadComponent implements Template
+{
+
+    public function __construct(
+        private string $pageTitle
+    )
+    {
+    }
+
+    public function render(): string
+    {
+        return <<<HTML
+        <head>
+            <title>$this->pageTitle</title>
+            <link type="text/css" rel="stylesheet" href="/public/css/main.css">
+        </head>
+        HTML;
+    }
+}
+----
 
 == Validation
 
