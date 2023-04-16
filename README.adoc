@@ -3,6 +3,23 @@
 This is a learning project for me using PHP8. Since I haven't decided on a license yet, I don't accept contributions at the moment.
 If you want to use any code you'll have to ask for permission for the same reason.
 
+== Early startup configuration
+
+If you need to run bootstrapping code very early in the application startup, you can utilise the `ApplicationStartupHandler` service.
+
+In its service definition, it will take any number of `StartupAction` parameters, which will be run, in order, when the application starts.
+
+[source,php]
+----
+new Service(
+    identifier: ApplicationStartupHandler::class,
+    parameters: [
+        MyStatupAction::class,
+        FancyStartupAction::class,
+    ]
+)
+----
+
 == Configuring services
 
 Check the `ServiceConfiguration` class.
