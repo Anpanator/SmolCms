@@ -67,6 +67,7 @@ class ServiceBuilder
             return new $class();
         }
 
+        $configurationParamCount = count($builtParameters);
         foreach ($refConstructor->getParameters() as $refParam) {
             $paramType = $refParam->getType();
             if (!($paramType instanceof ReflectionNamedType) || $paramType->isBuiltin()) {
@@ -75,6 +76,14 @@ class ServiceBuilder
             }
             // The constructor parameter is a custom class, so we need to build it
             $builtParameters[$refParam->getPosition()] = $this->getService($builtParameters[$refParam->getPosition()]);
+            // If the parameter is variadic, it's also always the last one
+            // since it is a class, any remaining entries in the $builtParameters array must be build
+            // as is the case above this comment
+            if ($refParam->isVariadic()) {
+                for ($i = $refParam->getPosition() + 1; $i < $configurationParamCount; $i++) {
+                    $builtParameters[$i] = $this->getService($builtParameters[$i]);
+                }
+            }
         }
         return new $class(...$builtParameters);
     }

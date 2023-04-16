@@ -18,6 +18,8 @@ If you manually configure a service, and it depends on another service that does
 If you have a service definition, you can set the identifier of the service you want to inject.
 The `parameters` array needs to have the same order as the constructor parameters.
 
+Variadic parameters in the form of `MyService ...$services` are supported for services with a configuration, but not for autowiring.
+
 The `class` parameter can be omitted if the identifier is the fully qualified class name.
 
 == Routing
