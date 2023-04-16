@@ -8,6 +8,8 @@ namespace SmolCms\Config;
 use PDO;
 use SmolCms\Data\Business\Service;
 use SmolCms\Exception\ServiceConflictException;
+use SmolCms\Service\Core\ApplicationStartupHandler;
+use SmolCms\Service\Core\Startup\RegisterSessionHandlerStartupAction;
 
 class ServiceConfiguration
 {
@@ -27,6 +29,14 @@ class ServiceConfiguration
                     'mysql:host=localhost;port=3306;dbname=smolcms;charset=utf8mb4',
                     'testuser',
                     'testpw',
+                ]
+            ),
+            new Service(
+                identifier: ApplicationStartupHandler::class,
+                parameters: [
+                    RegisterSessionHandlerStartupAction::class,
+                    RegisterSessionHandlerStartupAction::class,
+                    RegisterSessionHandlerStartupAction::class,
                 ]
             )
         ];

@@ -11,9 +11,10 @@ use SmolCms\Data\Response\Response;
 use SmolCms\Service\Factory\RequestFactory;
 use SmolCms\Service\Url\PathParamMappingService;
 
-class ApplicationCore
+readonly class ApplicationCore
 {
     private ServiceBuilder $serviceBuilder;
+    private ApplicationStartupHandler $startupHandler;
     private Router $router;
     private RequestFactory $requestFactory;
     private PathParamMappingService $pathParamMappingService;
@@ -21,6 +22,7 @@ class ApplicationCore
     public function __construct(ServiceBuilder $serviceBuilder)
     {
         $this->serviceBuilder = $serviceBuilder;
+        $this->startupHandler = $this->serviceBuilder->getService(ApplicationStartupHandler::class);
         $this->router = $this->serviceBuilder->getService(Router::class);
         $this->requestFactory = $this->serviceBuilder->getService(RequestFactory::class);
         $this->pathParamMappingService = $this->serviceBuilder->getService(PathParamMappingService::class);
@@ -28,6 +30,7 @@ class ApplicationCore
 
     public function run(): void
     {
+        $this->startupHandler->runActions();
         if (PHP_SAPI === 'cli') {
             // TODO: Support cli mode
             return;

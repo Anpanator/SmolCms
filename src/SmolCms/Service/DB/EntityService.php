@@ -13,16 +13,16 @@ use SmolCms\Exception\PersistenceException;
 use SmolCms\Service\Core\CaseConverter;
 use Throwable;
 
-abstract class EntityService
+abstract readonly class EntityService
 {
     /**
      * EntityService constructor.
      */
     public function __construct(
-        private   readonly PDO $pdo,
-        protected readonly CaseConverter $caseConverter,
-        private   readonly QueryBuilder $queryBuilder,
-        protected readonly EntityAttributeProcessor $entityAttributeProcessor
+        private PDO                        $pdo,
+        protected CaseConverter            $caseConverter,
+        private QueryBuilder               $queryBuilder,
+        protected EntityAttributeProcessor $entityAttributeProcessor
     )
     {
     }

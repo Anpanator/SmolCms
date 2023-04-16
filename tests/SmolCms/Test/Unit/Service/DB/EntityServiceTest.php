@@ -35,13 +35,12 @@ class EntityServiceTest extends SimpleTestCase
     {
         parent::setUp();
 
-        $this->entityService = new class(
+        $this->entityService = new TestEntityService(
             $this->pdo,
             $this->caseConverter,
             $this->queryBuilder,
             $this->entityAttributeProcessor
-        ) extends EntityService {
-        };
+        );
     }
 
     public function testMapResultToEntity_success()
@@ -130,6 +129,10 @@ class EntityServiceTest extends SimpleTestCase
 
         $this->entityService->update($testEntity);
     }
+}
+
+readonly class TestEntityService extends EntityService
+{
 }
 
 class TestEntityWithDateField

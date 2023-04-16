@@ -4,12 +4,12 @@ declare(strict_types=1);
 namespace SmolCms\Template;
 
 
-class HtmlTemplate implements Template
+readonly class HtmlTemplate implements Template
 {
     public function __construct(
-        private readonly Template $headSlot,
-        private readonly Template $contentSlot,
-        private readonly string   $language,
+        private Template $headSlot,
+        private Template $contentSlot,
+        private string   $language,
     )
     {
     }
