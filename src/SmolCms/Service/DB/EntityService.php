@@ -9,6 +9,7 @@ use Exception;
 use PDO;
 use PDOStatement;
 use ReflectionClass;
+use ReflectionException;
 use ReflectionNamedType;
 use SmolCms\Exception\PersistenceException;
 use SmolCms\Service\Core\CaseConverter;
@@ -145,13 +146,17 @@ abstract readonly class EntityService
         return $result;
     }
 
+    /**
+     * @param string $entityClass
+     * @return array<string, ReflectionNamedType>
+     * @throws ReflectionException
+     */
     private function getEntityPropertyInfo(string $entityClass): array
     {
         $refClass = new ReflectionClass($entityClass);
         $result = [];
-        $i = 0;
         foreach ($refClass->getProperties() as $refProperty) {
-            $result[$refProperty->getName() ?? $i++] = $refProperty->getType();
+            $result[$refProperty->getName()] = $refProperty->getType();
         }
         return $result;
     }
