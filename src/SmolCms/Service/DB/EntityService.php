@@ -5,10 +5,11 @@ namespace SmolCms\Service\DB;
 
 
 use DateTime;
+use Exception;
 use PDO;
 use PDOStatement;
 use ReflectionClass;
-use ReflectionProperty;
+use ReflectionNamedType;
 use SmolCms\Exception\PersistenceException;
 use SmolCms\Service\Core\CaseConverter;
 use Throwable;
@@ -43,6 +44,7 @@ abstract readonly class EntityService
      * @param array<string, mixed> $data
      * @param string $entityClass
      * @return object
+     * @throws Exception
      */
     public function mapResultToEntity(array $data, string $entityClass): object
     {
@@ -53,8 +55,13 @@ abstract readonly class EntityService
             $mappedData[$camelCaseField] = &$value;
         }
 
-        foreach ($this->getEntityPropertyNames($entityClass) as $propName) {
-            $entityProps[$propName] = $mappedData[$propName] ?? null;
+        foreach ($this->getEntityPropertyInfo($entityClass) as $propName => $propType) {
+            /** @var ReflectionNamedType $propType */
+            if (is_a($propType->getName(), DateTime::class, true)) {
+                $entityProps[$propName] = new DateTime($mappedData[$propName]) ?? null;
+            } else {
+                $entityProps[$propName] = $mappedData[$propName] ?? null;
+            }
         }
 
         return new $entityClass(...$entityProps);
@@ -126,9 +133,9 @@ abstract readonly class EntityService
 
     protected function fetchResults(PDOStatement $stmt, array $parameters, string $mappingClass): array
     {
-        $hasResults = $stmt->execute($parameters);
+        $success = $stmt->execute($parameters);
         $result = [];
-        if (!$hasResults) {
+        if (!$success) {
             return $result;
         }
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -138,17 +145,22 @@ abstract readonly class EntityService
         return $result;
     }
 
-    private function getEntityPropertyNames(string $entityClass): array
+    private function getEntityPropertyInfo(string $entityClass): array
     {
         $refClass = new ReflectionClass($entityClass);
-        return array_map(fn(ReflectionProperty $refProp): string => $refProp->getName(), $refClass->getProperties());
+        $result = [];
+        $i = 0;
+        foreach ($refClass->getProperties() as $refProperty) {
+            $result[$refProperty->getName() ?? $i++] = $refProperty->getType();
+        }
+        return $result;
     }
 
     private function getFieldValueMap(object $entity): array
     {
         $data = [];
-        $propertyNames = $this->getEntityPropertyNames($entity::class);
-        foreach ($propertyNames as $propName) {
+        $propertyNames = $this->getEntityPropertyInfo($entity::class);
+        foreach ($propertyNames as $propName => $propType) {
             $dbField = $this->caseConverter->camelCaseToSnakeCase($propName);
             $propVal = $entity->{"get$propName"}();
             //Should probably make this reusable
