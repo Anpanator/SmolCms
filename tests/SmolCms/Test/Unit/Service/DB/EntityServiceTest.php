@@ -45,7 +45,12 @@ class EntityServiceTest extends SimpleTestCase
 
     public function testMapResultToEntity_success()
     {
-        $testData = ['test_field_one' => '!!!', 'test_field_number_two' => 100, 'irrelevant' => 10.1];
+        $testData = [
+            'test_field_one' => '!!!',
+            'test_field_number_two' => 100,
+            'test_date_field' => '2023-01-01 00:12:13',
+            'irrelevant' => 10.1
+        ];
 
         $this->caseConverter
             ->method('snakeCaseToCamelCase')
@@ -53,6 +58,7 @@ class EntityServiceTest extends SimpleTestCase
                 [
                     ['test_field_one', 'testFieldOne'],
                     ['test_field_number_two', 'testFieldNumberTwo'],
+                    ['test_date_field', 'testDateField'],
                     ['irrelevant', 'irrelevant'],
                 ]
             );
@@ -73,13 +79,14 @@ class EntityServiceTest extends SimpleTestCase
                 [
                     ['testFieldOne', 'test_field_one'],
                     ['testFieldNumberTwo', 'test_field_number_two'],
+                    ['testDateField', 'test_date_field'],
                     ['optional', 'optional'],
                 ]
             );
         $this->pdo->method('prepare')->willReturn($this->PDOStatement);
         $this->pdo->method('lastInsertId')->willReturn('123456');
         $this->entityAttributeProcessor->method('getEntityIdFieldName')->willReturn('testFieldNumberTwo');
-        $entity = new TestData('test_field_one', null, null);
+        $entity = new TestData('test_field_one', null, new DateTime(), null);
         $this->entityService->saveAsNew($entity);
         self::assertSame(123456, $entity->testFieldNumberTwo);
     }
@@ -119,10 +126,11 @@ class EntityServiceTest extends SimpleTestCase
                 [
                     ['testFieldOne', 'test_field_one'],
                     ['testFieldNumberTwo', 'test_field_number_two'],
+                    ['testDateField', 'test_date_field'],
                     ['optional', 'optional'],
                 ]
             );
-        $testEntity = new TestData('', null, null);
+        $testEntity = new TestData('', null, new DateTime(), null);
         $this->entityAttributeProcessor
             ->method('getEntityIdFieldName')
             ->willReturn('testFieldNumberTwo');
@@ -158,16 +166,12 @@ class TestEntityWithDateField
 class TestData
 {
     public function __construct(
-        public string  $testFieldOne,
-        public ?int    $testFieldNumberTwo,
-        public ?string $optional
+        public string   $testFieldOne,
+        public ?int     $testFieldNumberTwo,
+        public DateTime $testDateField,
+        public ?string  $optional
     )
     {
-    }
-
-    public function setTestFieldNumberTwo(?int $testFieldNumberTwo): void
-    {
-        $this->testFieldNumberTwo = $testFieldNumberTwo;
     }
 
     public function getTestFieldOne(): string
@@ -175,13 +179,38 @@ class TestData
         return $this->testFieldOne;
     }
 
+    public function setTestFieldOne(string $testFieldOne): void
+    {
+        $this->testFieldOne = $testFieldOne;
+    }
+
     public function getTestFieldNumberTwo(): ?int
     {
         return $this->testFieldNumberTwo;
     }
 
+    public function setTestFieldNumberTwo(?int $testFieldNumberTwo): void
+    {
+        $this->testFieldNumberTwo = $testFieldNumberTwo;
+    }
+
+    public function getTestDateField(): DateTime
+    {
+        return $this->testDateField;
+    }
+
+    public function setTestDateField(DateTime $testDateField): void
+    {
+        $this->testDateField = $testDateField;
+    }
+
     public function getOptional(): ?string
     {
         return $this->optional;
+    }
+
+    public function setOptional(?string $optional): void
+    {
+        $this->optional = $optional;
     }
 }
