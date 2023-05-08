@@ -124,12 +124,16 @@ abstract readonly class EntityService
 
     /**
      * @param QueryCriteria $qc
-     * @return array<object>
+     * @return array<object>|null SELECT always returns an array, DELETE returns null
      */
-    protected function execute(QueryCriteria $qc): array
+    protected function execute(QueryCriteria $qc): ?array
     {
         $stmt = $this->prepare($qc);
-        return $this->fetchResults($stmt, $qc->getParameters(), $qc->getMainEntity());
+        if ($qc->getType() === QueryCriteria::TYPE_SELECT) {
+            return $this->fetchResults($stmt, $qc->getParameters(), $qc->getMainEntity());
+        }
+        $stmt->execute($qc->getParameters());
+        return null;
     }
 
     protected function fetchResults(PDOStatement $stmt, array $parameters, string $mappingClass): array

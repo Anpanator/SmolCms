@@ -28,7 +28,8 @@ readonly class SessionHandler implements SessionHandlerInterface, SessionUpdateT
 
     public function destroy(string $id): bool
     {
-        // TODO: Implement destroy() method.
+        $this->sessionEntityService->deleteBySessionId($id);
+        return true;
     }
 
     public function gc(int $max_lifetime): bool

@@ -37,4 +37,13 @@ readonly class SessionEntityService extends EntityService
             ->withParameters(["created" => date("Y-m-d H:i:s", time() - $seconds)]);
         $this->execute($qc);
     }
+
+    public function deleteBySessionId(string $sessionId)
+    {
+        $qc = new QueryCriteria();
+        $qc->delete(SessionEntity::class)
+            ->andWhere("session_id = :sessionId")
+            ->withParameters(["sessionId" => $sessionId]);
+        $this->execute($qc);
+    }
 }
