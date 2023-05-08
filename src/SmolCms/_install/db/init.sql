@@ -15,6 +15,14 @@ CREATE TABLE user
     last_login_date DATETIME                              NULL
 ) ENGINE = InnoDb;
 
+CREATE TABLE session
+(
+    id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    session_id VARCHAR(64) NOT NULL UNIQUE KEY,
+    created    timestamp   NOT NULL DEFAULT current_timestamp,
+    data       MEDIUMTEXT  NOT NULL
+) ENGINE = InnoDb;
+
 CREATE TABLE article
 (
     id      INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

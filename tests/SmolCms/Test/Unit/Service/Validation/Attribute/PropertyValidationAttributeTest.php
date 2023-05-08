@@ -17,7 +17,8 @@ abstract class PropertyValidationAttributeTest extends SimpleTestCase
         self::assertTrue($result, 'Validation should succeed with value null and nullable true');
     }
 
-    public function testValidate_FailureNullableFalseValueNull() {
+    public function testValidate_failureNullableFalseValueNull()
+    {
         $result = $this->propertyValidationAttribute->validate(null, false);
         self::assertFalse($result, 'Validation should fail with value null and nullable false');
     }

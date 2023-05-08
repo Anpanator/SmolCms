@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 use SmolCms\Config\ServiceConfiguration;
 use SmolCms\Data\Business\ServiceRegistry;
-use SmolCms\Data\Business\Url;
-use SmolCms\Data\Constant\HttpMethod;
-use SmolCms\Data\Request\Request;
 use SmolCms\Service\Core\ApplicationCore;
 use SmolCms\Service\Core\ServiceBuilder;
 
@@ -18,12 +15,12 @@ $applicationCore = new ApplicationCore(
         new ServiceRegistry()
     )
 );
-
-$response = $applicationCore->simulateRequest(
+$applicationCore->run();
+/*$response = $applicationCore->simulateRequest(
     new Request(
         url: new Url(protocol: 'https', host: 'localhost', path: '/'),
         method: HttpMethod::GET
     )
 );
-print_r($response);
-$applicationCore->run();
+print_r($response);*/
+

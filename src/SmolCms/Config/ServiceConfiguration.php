@@ -35,8 +35,6 @@ class ServiceConfiguration
                 identifier: ApplicationStartupHandler::class,
                 parameters: [
                     RegisterSessionHandlerStartupAction::class,
-                    RegisterSessionHandlerStartupAction::class,
-                    RegisterSessionHandlerStartupAction::class,
                 ]
             )
         ];
