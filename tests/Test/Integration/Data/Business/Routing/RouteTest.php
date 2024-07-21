@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SmolCms\Test\Integration\Data\Business\Routing;
+namespace Test\Integration\Data\Business\Routing;
 
 use PHPUnit\Framework\TestCase;
 use SmolCms\Data\Business\Route;
