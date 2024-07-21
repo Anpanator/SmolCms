@@ -1,11 +1,10 @@
 <?php
 declare(strict_types=1);
 
-namespace SmolCms\Controller;
+namespace SmolCms\Data\Request;
 
 use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\HttpMethod;
-use SmolCms\Data\Request\Request;
 
 class LoginRequest extends Request
 {

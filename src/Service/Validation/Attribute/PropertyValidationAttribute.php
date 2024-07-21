@@ -9,7 +9,7 @@ namespace SmolCms\Service\Validation\Attribute;
  * @package SmolCms\Service\Validation\Attribute
  *
  * Interface for any attribute that supports property validation.
- * @see \SmolCms\Service\Validation\Validator
+ * @see \src\Service\Validation\Validator
  */
 interface PropertyValidationAttribute extends ValidationAttribute
 {

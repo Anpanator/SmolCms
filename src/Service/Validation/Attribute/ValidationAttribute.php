@@ -9,7 +9,7 @@ namespace SmolCms\Service\Validation\Attribute;
  * @package SmolCms\Service\Validation\Attribute
  *
  * Marker interface for attributes used for validation
- * @see \SmolCms\Service\Validation\Validator
+ * @see \src\Service\Validation\Validator
  */
 interface ValidationAttribute
 {
