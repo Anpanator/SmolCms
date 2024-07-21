@@ -6,6 +6,7 @@ namespace SmolCms\Config;
 
 
 use SmolCms\Controller\IndexController;
+use SmolCms\Controller\LoginController;
 use SmolCms\Data\Business\Route;
 use SmolCms\Data\Constant\HttpMethod;
 
@@ -35,6 +36,11 @@ class RoutingConfiguration
                 method: HttpMethod::POST,
                 controller: IndexController::class,
                 handler: 'pathParamAction'
+            ),
+            'LoginRoute' => new Route(
+                path: '/login',
+                method: HttpMethod::POST,
+                controller: LoginController::class
             ),
         ];
     }

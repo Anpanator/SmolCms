@@ -3,21 +3,21 @@ declare(strict_types=1);
 
 namespace SmolCms\Data\Request;
 
-use SmolCms\Data\Business\Url;
-use SmolCms\Data\Constant\HttpMethod;
+use SensitiveParameter;
+use SmolCms\Service\Validation\Attribute\ValidateAllowList;
 
-class LoginRequest extends Request
+readonly class LoginRequest extends ValidatedRequest
 {
 
-    public function __construct(Url        $url,
-                                HttpMethod $method,
-                                array      $headers = [],
-                                ?string    $rawBody = null,
-                                ?array     $postParams = null,
-                                ?array     $getParams = null
+
+    public function __construct(
+        Request       $rawRequest,
+        #[ValidateAllowList(['Anpan', 'Delulu'])]
+        public string $username,
+        #[SensitiveParameter]
+        public string $password,
     )
     {
-        parent::__construct($url, $method, $headers, $rawBody, $postParams, $getParams);
+        parent::__construct($rawRequest);
     }
-
 }

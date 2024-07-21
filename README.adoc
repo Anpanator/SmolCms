@@ -66,6 +66,22 @@ class SomeController {
 }
 ----
 
+=== Request Mapping
+
+The `$request` parameter in Controller actions can either be of type `Request` or a subtype of `ValidatedRequest`.
+
+Request::
+Contains raw parameters and headers of the request.
+
+Subtype of ValidatedRequest::
+If a custom subtype of ValidatedRequest is used instead of the plain `Request` class, all `POST` and `GET` parameters will be mapped into the properties of this class with the same name.
+When there are both query and post parameters of the same name, the post one will be used.
++
+The mapping will be done through the class constructor, so all parameters that should be mapped need to be present as a constructor parameter, including one called `$rawRequest`, which will be filled with the standard `Request` object.
++
+Finally, any validation attributes present on the mapped properties will be evaluated.
+For details, refer to the <<_validation>> section.
+
 == Templates
 
 If you want to generate responses from templates, you can do so by using the `TemplateService` in the controller action like this:
@@ -139,6 +155,7 @@ readonly class HeadComponent implements Template
 }
 ----
 
+[#_validation]
 == Validation
 
 For validation on object properties, the generic `Validator` service can be used.
@@ -198,7 +215,7 @@ class ServiceBuilderTest extends SimpleTestCase
 }
 ----
 
-Note: The property type hinting is not necessary and just used for convenient auto completion.
+Note: The property type hinting is not necessary and just used for convenient autocompletion.
 
 Additionally, the `FunctionalTestCase` class will provide an `ApplicationCore` that will allow you to simulate requests even without a web server.
 This is useful when you want to create automated tests for JSON api endpoints for instance.

@@ -18,6 +18,7 @@ readonly class ApplicationCore
     private Router $router;
     private RequestFactory $requestFactory;
     private PathParamMappingService $pathParamMappingService;
+    private RequestMapper $requestMapper;
 
     public function __construct(ServiceBuilder $serviceBuilder)
     {
@@ -26,6 +27,7 @@ readonly class ApplicationCore
         $this->router = $this->serviceBuilder->getService(Router::class);
         $this->requestFactory = $this->serviceBuilder->getService(RequestFactory::class);
         $this->pathParamMappingService = $this->serviceBuilder->getService(PathParamMappingService::class);
+        $this->requestMapper = $this->serviceBuilder->getService(RequestMapper::class);
     }
 
     public function run(): void
@@ -57,8 +59,9 @@ readonly class ApplicationCore
             urlPath: $request->url->path,
             routePattern: $route->path
         );
-        $handlerArguments['request'] = $request;
-        $response = $controller?->{$route->getHandlerOrDefault()}(...$handlerArguments);
+        $handler = $route->getHandlerOrDefault();
+        $handlerArguments['request'] = $this->requestMapper->mapRequest($request, $controller, $handler);
+        $response = $controller?->{$handler}(...$handlerArguments);
         if (!$response) {
             $response = $this->generateDefaultResponse();
         }

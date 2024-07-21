@@ -8,16 +8,16 @@ namespace SmolCms\Data\Request;
 use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\HttpMethod;
 
-class Request
+readonly class Request
 {
 
     public function __construct(
-        public readonly Url        $url,
-        public readonly HttpMethod $method,
-        public readonly array      $headers = [],
-        public readonly ?string    $rawBody = null,
-        public readonly ?array     $postParams = null,
-        public readonly ?array     $getParams = null,
+        public Url        $url,
+        public HttpMethod $method,
+        public array      $headers = [],
+        public ?string    $rawBody = null,
+        public ?array     $postParams = null,
+        public ?array     $getParams = null,
     )
     {
     }

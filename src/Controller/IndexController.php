@@ -1,9 +1,7 @@
 <?php
-
 declare(strict_types=1);
 
 namespace SmolCms\Controller;
-
 
 use SmolCms\Config\Templates\ArticleTemplateConfig;
 use SmolCms\Data\Constant\HttpStatus;
@@ -11,10 +9,10 @@ use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\TemplateService;
 
-class IndexController
+readonly class IndexController
 {
     public function __construct(
-        private readonly TemplateService $templateService,
+        private TemplateService $templateService,
     )
     {
     }
