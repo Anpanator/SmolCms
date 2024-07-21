@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SmolCms\Test\Unit\Service\Core;
+namespace SmolCms\Test\Service\Core;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use SmolCms\Config\RoutingConfiguration;

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace SmolCms\Test\Unit\Service\Url;
+namespace SmolCms\Test\Service\Url;
 
 use SmolCms\Service\Url\PathParamMappingService;
 use SmolCms\TestUtils\SimpleTestCase;

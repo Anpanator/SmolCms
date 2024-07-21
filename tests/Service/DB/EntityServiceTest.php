@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace SmolCms\Test\Unit\Service\DB;
+namespace SmolCms\Test\Service\DB;
 
 use DateTime;
 use PDO;

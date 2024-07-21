@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SmolCms\Test\Unit\Config;
+namespace SmolCms\Test\Config;
 
 use PHPUnit\Framework\TestCase;
 use SmolCms\Config\ServiceConfiguration;

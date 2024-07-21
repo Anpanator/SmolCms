@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace SmolCms\Test\Unit\Service\Core;
+namespace SmolCms\Test\Service\Core;
 
 use SmolCms\Service\Core\CaseConverter;
 use SmolCms\TestUtils\SimpleTestCase;

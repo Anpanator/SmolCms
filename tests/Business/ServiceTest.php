@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SmolCms\Test\Unit\Data\Business;
+namespace SmolCms\Test\Data\Business;
 
 use Exception;
 use InvalidArgumentException;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SmolCms\Test\Unit\Service\Factory;
+namespace SmolCms\Test\Service\Factory;
 
 use InvalidArgumentException;
 use PHPUnit\Framework\MockObject\MockObject;

@@ -6,7 +6,7 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "SmolCms\\Test\\": "tests/Test",
+      "SmolCms\\Test\\": "tests",
       "SmolCms\\TestUtils\\": "tests/TestUtils"
     }
   },
