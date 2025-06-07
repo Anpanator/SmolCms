@@ -81,13 +81,11 @@ class ServiceBuilderTest extends SimpleTestCase
         );
         $this->serviceConfiguration
             ->method('getServiceByIdentifier')
-            ->will(
-                self::returnValueMap(
+            ->willReturnMap(
                     [
                         [$serviceId, $service],
                         [$serviceId2, $service2]
                     ]
-                )
             );
 
         $result = $this->serviceBuilder->getService($serviceId);
@@ -111,13 +109,11 @@ class ServiceBuilderTest extends SimpleTestCase
         );
         $this->serviceConfiguration
             ->method('getServiceByIdentifier')
-            ->will(
-                self::returnValueMap(
+            ->willReturnMap(
                     [
                         [$serviceId, $service],
                         [$serviceId2, $service2]
                     ]
-                )
             );
 
         $result = $this->serviceBuilder->getService($serviceId);

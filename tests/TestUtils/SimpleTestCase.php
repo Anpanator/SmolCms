@@ -32,7 +32,6 @@ class SimpleTestCase extends TestCase
             /** @var Mock $mockAttribute */
             $mockAttribute = reset($attributes)->newInstance();
             $mock = $this->getMockBuilder($mockAttribute->getClassName())
-                ->disallowMockingUnknownTypes()
                 ->disableOriginalConstructor()
                 ->getMock();
 
