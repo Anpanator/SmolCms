@@ -9,6 +9,7 @@ CREATE TABLE user
 (
     id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     login_name      VARCHAR(255)                          NOT NULL UNIQUE KEY,
+    password VARCHAR(128) NOT NULL,
     display_name    VARCHAR(255)                          NOT NULL,
     state           ENUM ('active', 'disabled', 'banned') NOT NULL,
     register_date   DATETIME                              NOT NULL,

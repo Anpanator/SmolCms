@@ -38,7 +38,7 @@ readonly class SessionEntityService extends EntityService
         $this->execute($qc);
     }
 
-    public function deleteBySessionId(string $sessionId)
+    public function deleteBySessionId(string $sessionId): void
     {
         $qc = new QueryCriteria();
         $qc->delete(SessionEntity::class)

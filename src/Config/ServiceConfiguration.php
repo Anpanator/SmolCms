@@ -10,6 +10,7 @@ use SmolCms\Data\Business\Service;
 use SmolCms\Exception\ServiceConflictException;
 use SmolCms\Service\Core\ApplicationStartupHandler;
 use SmolCms\Service\Core\Startup\RegisterSessionHandlerStartupAction;
+use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
 
 class ServiceConfiguration
 {
@@ -35,6 +36,7 @@ class ServiceConfiguration
                 identifier: ApplicationStartupHandler::class,
                 parameters: [
                     RegisterSessionHandlerStartupAction::class,
+                    ResumeSessionStartupAction::class,
                 ]
             )
         ];

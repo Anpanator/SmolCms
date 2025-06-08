@@ -7,13 +7,13 @@ namespace SmolCms\Data\Business;
 
 use SmolCms\Data\Constant\HttpMethod;
 
-class Route
+readonly class Route
 {
     public function __construct(
-        public readonly string $path,
-        public readonly HttpMethod $method,
-        public readonly string $controller,
-        public readonly ?string $handler = null,
+        public string     $path,
+        public HttpMethod $method,
+        public string     $controller,
+        public ?string    $handler = null,
     ) {
     }
 

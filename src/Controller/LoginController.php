@@ -3,26 +3,31 @@ declare(strict_types=1);
 
 namespace SmolCms\Controller;
 
-use SmolCms\Config\Templates\ArticleTemplateConfig;
+use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Request\LoginRequest;
 use SmolCms\Data\Response\Response;
-use SmolCms\Service\Core\TemplateService;
+use SmolCms\Service\Core\Authentication\AuthenticationService;
+use SmolCms\Service\Core\Session\SessionService;
 
 readonly class LoginController
 {
     public function __construct(
-        private TemplateService $templateService
+        private AuthenticationService $authenticationService,
+        private SessionService        $sessionService,
     )
     {
     }
+
     public function postAction(LoginRequest $request): Response
     {
-        return $this->templateService->generateResponse(
-            new ArticleTemplateConfig(
-                language: "en",
-                pageTitle: "SmolCms Login",
-                articleContent: print_r($request, true),
-            )
-        );
+        $authenticated = $this->authenticationService->authenticate($request->loginName, $request->password);
+        if ($authenticated === false) {
+            return new Response(HttpStatus::UNAUTHORIZED);
+        }
+        // TODO: Set session data
+        // $this->sessionService->startSession();
+
+        // TODO: Set location header to redirect to some page after login
+        return new Response();
     }
 }
