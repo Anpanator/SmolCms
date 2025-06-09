@@ -4,24 +4,12 @@ declare(strict_types=1);
 namespace SmolCms\Service\Core\Authentication;
 
 use SensitiveParameter;
-use SmolCms\Service\DB\UserService;
+use SmolCms\Data\Persistence\UserEntity;
 
 readonly class AuthenticationService
 {
-
-    public function __construct(
-        private UserService $userService,
-    )
+    public function authenticate(#[SensitiveParameter] string $password, UserEntity $user): bool
     {
-    }
-
-    public function authenticate(string $loginName, #[SensitiveParameter] string $password): bool
-    {
-        $user = $this->userService->findOneByLoginName($loginName);
-        if ($user === null) {
-            return false;
-        }
-
         $passwordValid = password_verify($password, $user->getPassword());
         if ($passwordValid) {
             // TODO: Handle rehashing

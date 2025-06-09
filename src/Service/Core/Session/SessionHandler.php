@@ -52,12 +52,18 @@ readonly class SessionHandler implements SessionHandlerInterface, SessionUpdateT
 
     public function write(string $id, string $data): bool
     {
-        $session = new SessionEntity(
-            id: null,
-            sessionId: $id,
-            created: null,
-            data: $data
-        );
+        $session = $this->sessionEntityService->findOneBySessionId($id);
+        if ($session) {
+            $session->setData($data);
+        } else {
+            $session = new SessionEntity(
+                id: null,
+                sessionId: $id,
+                created: null,
+                data: $data
+            );
+        }
+
         $validationResult = $this->validator->validate($session);
         if (!$validationResult->isValid()) {
             throw new RuntimeException("Invalid Session: {$validationResult->getMessagesAsString()}");

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace SmolCms\Service\Core\Session;
 
+use SmolCms\Data\DTO\SessionUserData;
 use SmolCms\Exception\InvalidStateException;
 
 readonly class SessionService
@@ -10,7 +11,6 @@ readonly class SessionService
     private const SESSION_NAME = 'session';
     private const SESSION_OPTIONS = [
         'name' => self::SESSION_NAME,
-        'gc_maxlifetime' => 3600,
         'cookie_lifetime' => 3600,
         'cookie_secure' => false, // TODO: Change for live
         'cookie_httponly' => true,
@@ -20,6 +20,7 @@ readonly class SessionService
         'sid_length' => 64,
         'sid_bits_per_character' => 6,
     ];
+    private const string KEY_USER = 'user';
 
     /**
      * @return void
@@ -43,6 +44,16 @@ readonly class SessionService
             throw new InvalidStateException('Session already started.');
         }
         session_start(self::SESSION_OPTIONS);
+    }
+
+    public function setUserData(SessionUserData $userData): void
+    {
+        $_SESSION[self::KEY_USER] = $userData;
+    }
+
+    public function getUserData(): ?SessionUserData
+    {
+        return $_SESSION[self::KEY_USER] ?? null;
     }
 
     private function isSessionActive(): bool
