@@ -5,6 +5,7 @@ namespace SmolCms\Data\Persistence;
 
 use DateTime;
 use SmolCms\Service\DB\Attribute\Entity;
+use SmolCms\Service\DB\Attribute\Id;
 use SmolCms\Service\Validation\Attribute\ValidateNotNull;
 use SmolCms\Service\Validation\Attribute\ValidateStringSizeBytes;
 
@@ -12,6 +13,7 @@ use SmolCms\Service\Validation\Attribute\ValidateStringSizeBytes;
 class SessionEntity
 {
     public function __construct(
+        #[Id]
         private ?int                                 $id,
         #[ValidateStringSizeBytes(max: 64)]
         #[ValidateNotNull]

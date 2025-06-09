@@ -91,6 +91,19 @@ abstract readonly class EntityService
         }
     }
 
+    public function saveOrUpdate(object $entity): void
+    {
+        $idField = $this->entityAttributeProcessor->getEntityIdFieldName($entity::class);
+        if ($idField === null) {
+            throw new PersistenceException('Entity does not have an ID field. Missing attribute?');
+        }
+        if ($entity->{"get$idField"}() !== null) {
+            $this->update($entity);
+        } else {
+            $this->saveAsNew($entity);
+        }
+    }
+
     public function update(object $entity): void
     {
         try {

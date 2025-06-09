@@ -68,7 +68,7 @@ readonly class SessionHandler implements SessionHandlerInterface, SessionUpdateT
         if (!$validationResult->isValid()) {
             throw new RuntimeException("Invalid Session: {$validationResult->getMessagesAsString()}");
         }
-        $this->sessionEntityService->saveAsNew($session);
+        $this->sessionEntityService->saveOrUpdate($session);
         return true;
     }
 
