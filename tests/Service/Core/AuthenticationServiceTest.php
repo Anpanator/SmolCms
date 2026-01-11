@@ -6,16 +6,20 @@ namespace SmolCms\Test\Service\Core;
 use PHPUnit\Framework\MockObject\MockObject;
 use SmolCms\Data\Persistence\UserEntity;
 use SmolCms\Service\Core\Authentication\AuthenticationService;
+use SmolCms\Service\DB\UserService;
+use SmolCms\TestUtils\Attributes\Mock;
 use SmolCms\TestUtils\SimpleTestCase;
 
 class AuthenticationServiceTest extends SimpleTestCase
 {
     private AuthenticationService $service;
+    #[Mock(UserService::class)]
+    private UserService|MockObject $userService;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new AuthenticationService();
+        $this->service = new AuthenticationService($this->userService);
     }
 
     public function testAuthenticate_ReturnsTrueOnValidPassword(): void
