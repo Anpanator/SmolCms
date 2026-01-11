@@ -12,6 +12,8 @@ enum HttpStatus: int
     case ACCEPTED = 202;
     case NO_CONTENT = 204;
 
+    case SEE_OTHER = 303;
+
     case UNAUTHORIZED = 401;
     case FORBIDDEN = 403;
     case NOT_FOUND = 404;

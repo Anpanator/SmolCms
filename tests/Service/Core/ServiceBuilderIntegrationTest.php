@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace SmolCms\Test\Integration\Service\Core;
+namespace SmolCms\Test\Service\Core;
 
 use SmolCms\Config\ServiceConfiguration;
 use SmolCms\Data\Business\ServiceRegistry;
 use SmolCms\Service\Core\ServiceBuilder;
 use SmolCms\TestUtils\SimpleTestCase;
 
-class ServiceBuilderTest extends SimpleTestCase
+class ServiceBuilderIntegrationTest extends SimpleTestCase
 {
 
     public function test__construct_willRegisterOwnServiceRegistryAndConfig()

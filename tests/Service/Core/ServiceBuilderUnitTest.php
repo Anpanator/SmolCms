@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Test\Unit\Service\Core;
+namespace SmolCms\Test\Service\Core;
 
 use InvalidArgumentException;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -14,7 +14,7 @@ use SmolCms\Service\Core\ServiceBuilder;
 use SmolCms\TestUtils\Attributes\Mock;
 use SmolCms\TestUtils\SimpleTestCase;
 
-class ServiceBuilderTest extends SimpleTestCase
+class ServiceBuilderUnitTest extends SimpleTestCase
 {
     private ServiceBuilder $serviceBuilder;
     #[Mock(ServiceConfiguration::class)]

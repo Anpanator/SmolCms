@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SmolCms\Test\Integration\Service\Validation;
+namespace SmolCms\Test\Service\Validation;
 
 use SmolCms\Service\Validation\Attribute\ValidateAllowList;
 use SmolCms\Service\Validation\Attribute\ValidateDenyList;

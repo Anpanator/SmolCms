@@ -9,6 +9,7 @@ use SmolCms\Controller\IndexController;
 use SmolCms\Controller\LoginController;
 use SmolCms\Data\Business\Route;
 use SmolCms\Data\Constant\HttpMethod;
+use SmolCms\Data\Constant\RouteEnum;
 
 class RoutingConfiguration
 {
@@ -21,10 +22,15 @@ class RoutingConfiguration
     public function __construct()
     {
         $this->routes = [
-            'IndexGetRoute' => new Route(
+            RouteEnum::START_PAGE->value => new Route(
                 path: '/',
                 method: HttpMethod::GET,
                 controller: IndexController::class
+            ),
+            RouteEnum::LOGIN->value => new Route(
+                path: '/login',
+                method: HttpMethod::POST,
+                controller: LoginController::class
             ),
             'IndexPostRoute' => new Route(
                 path: '/',
@@ -36,11 +42,6 @@ class RoutingConfiguration
                 method: HttpMethod::POST,
                 controller: IndexController::class,
                 handler: 'pathParamAction'
-            ),
-            'LoginRoute' => new Route(
-                path: '/login',
-                method: HttpMethod::POST,
-                controller: LoginController::class
             ),
         ];
     }

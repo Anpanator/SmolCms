@@ -14,9 +14,11 @@ class Response
      * Response constructor.
      */
     public function __construct(
-        private HttpStatus $status = HttpStatus::OK,
-        private ?string    $content = null,
-    ) {
+        protected HttpStatus $status = HttpStatus::OK,
+        protected ?string    $content = null,
+        protected array      $headers = [],
+    )
+    {
     }
 
     public function getStatus(): HttpStatus
@@ -37,5 +39,20 @@ class Response
     public function setContent(?string $content): void
     {
         $this->content = $content;
+    }
+
+    public function getHeaders(): array
+    {
+        return $this->headers;
+    }
+
+    public function setHeaders(array $headers): void
+    {
+        $this->headers = $headers;
+    }
+
+    public function addHeader(string $name, string $value): void
+    {
+        $this->headers[$name] = $value;
     }
 }

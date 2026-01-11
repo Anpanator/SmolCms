@@ -6,6 +6,7 @@ namespace SmolCms\Controller;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\DTO\SessionUserData;
 use SmolCms\Data\Request\LoginRequest;
+use SmolCms\Data\Response\LoginResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Authentication\AuthenticationService;
 use SmolCms\Service\Core\Session\SessionService;
@@ -41,7 +42,6 @@ readonly class LoginController
             )
         );
 
-        // TODO: Set location header to redirect to some page after login
-        return new Response();
+        return new LoginResponse();
     }
 }

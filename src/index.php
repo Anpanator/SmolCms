@@ -23,7 +23,7 @@ $response = $applicationCore->simulateRequest(
     new Request(
         url: new Url(protocol: 'https', host: 'localhost', path: '/login'),
         method: HttpMethod::POST,
-        postParams: ['username' => "Anpana", 'password' => 'bestPassword!'],
+        postParams: ['loginName' => "Anpana", 'password' => 'bestPassword!'],
     )
 );
 print_r($response);
