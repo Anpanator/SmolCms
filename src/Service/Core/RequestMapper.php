@@ -10,6 +10,7 @@ use SmolCms\Data\Request\Request;
 use SmolCms\Data\Request\ValidatedRequest;
 use SmolCms\Exception\BadRequestException;
 use SmolCms\Service\Validation\Validator;
+use TypeError;
 
 readonly class RequestMapper
 {
@@ -78,7 +79,16 @@ readonly class RequestMapper
             $mappedParams[$name] = $request->postParams[$name] ?? $request->getParams[$name] ?? null;
         }
         $class = $refClassOfClassToMap->getName();
-        $mappedRequest = new $class(...$mappedParams);
+        try {
+            $mappedRequest = new $class(...$mappedParams);
+        } catch (TypeError $e) {
+            throw new BadRequestException(
+                "Could not map request parameters to {$class} for {$refController->getName()}::{$handlerMethodName}",
+                0,
+                $e
+            );
+        }
+
         // TODO: Move validation to some sort of pre-controller action chain
         $validationResult = $this->validator->validate($mappedRequest);
         if (!$validationResult->isValid()) {
