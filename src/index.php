@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 use SmolCms\Config\ServiceConfiguration;
 use SmolCms\Data\Business\ServiceRegistry;
-use SmolCms\Data\Business\Url;
-use SmolCms\Data\Constant\HttpMethod;
-use SmolCms\Data\Request\Request;
 use SmolCms\Service\Core\ApplicationCore;
 use SmolCms\Service\Core\ServiceBuilder;
 
@@ -19,12 +16,15 @@ $applicationCore = new ApplicationCore(
     )
 );
 $applicationCore->run();
-$response = $applicationCore->simulateRequest(
+/*$response = $applicationCore->simulateRequest(
     new Request(
         url: new Url(protocol: 'https', host: 'localhost', path: '/login'),
         method: HttpMethod::POST,
         postParams: ['loginName' => "Anpana", 'password' => 'bestPassword!'],
     )
 );
-print_r($response);
-
+echo <<<HTML
+<pre>
+    print_r($response, true);
+</pre>
+HTML;*/
