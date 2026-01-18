@@ -7,10 +7,15 @@ use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Request\Request;
+use SmolCms\Service\DB\UserService;
+use SmolCms\TestUtils\Attributes\Autowire;
 use SmolCms\TestUtils\FunctionalTestCase;
 
 class LoginControllerTest extends FunctionalTestCase
 {
+    #[Autowire]
+    private UserService $userService;
+
     public function testPostAction_SuccessfulLogin(): void
     {
         $url = new Url(

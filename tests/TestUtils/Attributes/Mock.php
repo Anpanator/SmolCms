@@ -7,7 +7,7 @@ namespace SmolCms\TestUtils\Attributes;
 
 use Attribute;
 
-#[Attribute]
+#[Attribute(Attribute::TARGET_PROPERTY)]
 class Mock
 {
 
