@@ -42,9 +42,9 @@ class FunctionalTestCase extends SimpleTestCase
                 continue;
             }
             $propertyTypeName = $reflectionProperty->getType()->getName();
-            $services = $this->serviceBuilder->getService($propertyTypeName);
+            $service = $this->serviceBuilder->getService($propertyTypeName);
             $reflectionProperty->setAccessible(true);
-            $reflectionProperty->setValue($this, reset($services));
+            $reflectionProperty->setValue($this, $service);
         }
     }
 }

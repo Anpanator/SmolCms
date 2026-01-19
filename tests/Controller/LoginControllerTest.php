@@ -3,9 +3,12 @@ declare(strict_types=1);
 
 namespace SmolCms\Test\Controller;
 
+use DateTime;
+use PDO;
 use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
+use SmolCms\Data\Persistence\UserEntity;
 use SmolCms\Data\Request\Request;
 use SmolCms\Service\DB\UserService;
 use SmolCms\TestUtils\Attributes\Autowire;
@@ -15,9 +18,36 @@ class LoginControllerTest extends FunctionalTestCase
 {
     #[Autowire]
     private UserService $userService;
+    #[Autowire]
+    private PDO $pdo;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->pdo->exec('TRUNCATE TABLE user');
+    }
+
+    protected function tearDown(): void
+    {
+        $this->pdo->exec('TRUNCATE TABLE user');
+    }
 
     public function testPostAction_SuccessfulLogin(): void
     {
+        $loginName = 'admin';
+        $password = 'secure-password-123';
+
+        $user = new UserEntity(
+            id: null,
+            loginName: $loginName,
+            password: password_hash($password, PASSWORD_DEFAULT),
+            displayName: 'Admin User',
+            state: 'active',
+            registerDate: new DateTime(),
+            lastLoginDate: null
+        );
+        $this->userService->saveAsNew($user);
+
         $url = new Url(
             protocol: 'https',
             host: 'localhost',
@@ -25,8 +55,8 @@ class LoginControllerTest extends FunctionalTestCase
         );
 
         $postParams = [
-            'loginName' => 'admin',
-            'password' => 'secure-password-123'
+            'loginName' => $loginName,
+            'password' => $password
         ];
 
         $request = new Request(
@@ -37,7 +67,9 @@ class LoginControllerTest extends FunctionalTestCase
 
         $response = $this->applicationCore->simulateRequest($request);
 
-        $this->assertEquals(HttpStatus::OK, $response->getStatus());
+        $this->assertEquals(HttpStatus::SEE_OTHER, $response->getStatus());
+        $this->assertArrayHasKey('Location', $response->getHeaders());
+        $this->assertSame('/', $response->getHeaders()['Location']);
     }
 
     public function testPostAction_NoErrorOnEmptyPostParams(): void
@@ -56,7 +88,7 @@ class LoginControllerTest extends FunctionalTestCase
 
         $response = $this->applicationCore->simulateRequest($request);
 
-        $this->assertEquals(HttpStatus::OK, $response->getStatus());
+        $this->assertEquals(HttpStatus::BAD_REQUEST, $response->getStatus());
     }
 
     public function testPostAction_UnauthorizedOnInvalidCredentials(): void

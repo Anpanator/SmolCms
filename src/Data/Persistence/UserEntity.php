@@ -13,20 +13,25 @@ class UserEntity
 {
     public function __construct(
         #[Id]
-        private ?int   $id,
-        private string $loginName,
-        private string $password,
-        private string $displayName,
-        private string $state,
+        private ?int     $id,
+        private string   $loginName,
+        private string   $password,
+        private string   $displayName,
+        private string   $state,
         private DateTime $registerDate,
         private ?DateTime $lastLoginDate,
     )
     {
     }
 
-    public function getId(): int
+    public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function setId(?int $id): void
+    {
+        $this->id = $id;
     }
 
     public function getLoginName(): string
@@ -34,24 +39,9 @@ class UserEntity
         return $this->loginName;
     }
 
-    public function getDisplayName(): string
+    public function setLoginName(string $loginName): void
     {
-        return $this->displayName;
-    }
-
-    public function getState(): string
-    {
-        return $this->state;
-    }
-
-    public function getRegisterDate(): DateTime
-    {
-        return $this->registerDate;
-    }
-
-    public function getLastLoginDate(): ?DateTime
-    {
-        return $this->lastLoginDate;
+        $this->loginName = $loginName;
     }
 
     public function getPassword(): string
@@ -62,5 +52,45 @@ class UserEntity
     public function setPassword(string $password): void
     {
         $this->password = $password;
+    }
+
+    public function getDisplayName(): string
+    {
+        return $this->displayName;
+    }
+
+    public function setDisplayName(string $displayName): void
+    {
+        $this->displayName = $displayName;
+    }
+
+    public function getState(): string
+    {
+        return $this->state;
+    }
+
+    public function setState(string $state): void
+    {
+        $this->state = $state;
+    }
+
+    public function getRegisterDate(): DateTime
+    {
+        return $this->registerDate;
+    }
+
+    public function setRegisterDate(DateTime $registerDate): void
+    {
+        $this->registerDate = $registerDate;
+    }
+
+    public function getLastLoginDate(): ?DateTime
+    {
+        return $this->lastLoginDate;
+    }
+
+    public function setLastLoginDate(?DateTime $lastLoginDate): void
+    {
+        $this->lastLoginDate = $lastLoginDate;
     }
 }

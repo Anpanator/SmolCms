@@ -43,8 +43,7 @@ class Validator
                     }
                 } elseif ($attribute instanceof PropertyValidationAttribute) {
                     $isPropertyValid = $attribute->validate(
-                        value: $propertyValue,
-                        nullable: $reflectionProperty->getType()?->allowsNull() ?? false
+                        value: $propertyValue
                     );
                     $isValid = $isValid && $isPropertyValid;
                     if (!$isPropertyValid) {

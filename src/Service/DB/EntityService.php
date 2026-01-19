@@ -58,7 +58,7 @@ abstract readonly class EntityService
 
         foreach ($this->getEntityPropertyInfo($entityClass) as $propName => $propType) {
             /** @var ReflectionNamedType $propType */
-            if (is_a($propType->getName(), DateTime::class, true)) {
+            if (is_a($propType->getName(), DateTime::class, true) && isset($mappedData[$propName])) {
                 $entityProps[$propName] = new DateTime($mappedData[$propName]) ?? null;
             } else {
                 $entityProps[$propName] = $mappedData[$propName] ?? null;
