@@ -16,9 +16,9 @@ readonly class ValidateStringSize implements PropertyValidationAttribute
     {
     }
 
-    public function validate(mixed $value, bool $nullable = false): bool
+    public function validate(mixed $value): bool
     {
-        if ($value === null && $nullable) {
+        if ($value === null) {
             return true;
         }
         if (!is_string($value)) {
@@ -31,5 +31,14 @@ readonly class ValidateStringSize implements PropertyValidationAttribute
             return false;
         }
         return true;
+    }
+
+    public function getErrorMessage(): string
+    {
+        $message = "String value must have at least {$this->minLength} characters";
+        if ($this->maxLength !== null) {
+            $message .= " and no more than {$this->maxLength} characters";
+        }
+        return $message;
     }
 }

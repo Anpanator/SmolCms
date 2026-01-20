@@ -7,13 +7,18 @@ namespace SmolCms\Service\Validation\Attribute;
 use Attribute;
 
 #[Attribute(Attribute::TARGET_PROPERTY)]
-class ValidateNotNull implements PropertyValidationAttribute
+readonly class ValidateNotNull implements PropertyValidationAttribute
 {
     /**
      * @inheritDoc
      */
-    public function validate(mixed $value, bool $nullable = false): bool
+    public function validate(mixed $value): bool
     {
         return $value !== null;
+    }
+
+    public function getErrorMessage(): string
+    {
+        return 'Value cannot be null';
     }
 }

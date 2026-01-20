@@ -15,5 +15,5 @@ use SmolCms\Service\Validation\Validator;
  */
 interface ValidationAttribute
 {
-
+    public function getErrorMessage(): string;
 }

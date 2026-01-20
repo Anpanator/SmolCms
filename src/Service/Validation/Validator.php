@@ -48,8 +48,8 @@ class Validator
                     $isValid = $isValid && $isPropertyValid;
                     if (!$isPropertyValid) {
                         $messages[$reflectionProperty->getName()] =
-                            'Failed validation on ' . $attribute::class
-                            . ' value was: ' . print_r($propertyValue, true);
+                            'Failed validation: ' . array_last(explode('\\', $attribute::class))
+                            . ' - ' . $attribute->getErrorMessage();
                     }
                 }
             }

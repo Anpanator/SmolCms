@@ -71,16 +71,9 @@ class ValidatorTest extends SimpleTestCase
         self::assertCount(4, $messages);
 
         self::assertArrayHasKey('float', $messages);
-        self::assertStringContainsString((string)$floatValue, $messages['float']);
-
         self::assertArrayHasKey('int', $messages);
-        self::assertStringContainsString((string)$intValue, $messages['int']);
-
         self::assertArrayHasKey('mixedAllow', $messages);
-        self::assertStringContainsString($mixedAllowValue, $messages['mixedAllow']);
-
         self::assertArrayHasKey('stringDeny', $messages);
-        self::assertStringContainsString($stringDenyValue, $messages['stringDeny']);
     }
 
     protected function setUp(): void

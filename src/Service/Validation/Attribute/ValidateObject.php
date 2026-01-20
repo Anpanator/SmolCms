@@ -13,7 +13,10 @@ use Attribute;
  * Marker attribute to indicate nested object validation.
  */
 #[Attribute(Attribute::TARGET_PROPERTY)]
-class ValidateObject implements ValidationAttribute
+readonly class ValidateObject implements ValidationAttribute
 {
-
+    public function getErrorMessage(): string
+    {
+        return 'Invalid object';
+    }
 }

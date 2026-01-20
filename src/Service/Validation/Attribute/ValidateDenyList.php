@@ -7,7 +7,7 @@ namespace SmolCms\Service\Validation\Attribute;
 use Attribute;
 
 #[Attribute(Attribute::TARGET_PROPERTY)]
-class ValidateDenyList implements PropertyValidationAttribute
+readonly class ValidateDenyList implements PropertyValidationAttribute
 {
     /**
      * ValidateDenyList constructor.
@@ -21,9 +21,13 @@ class ValidateDenyList implements PropertyValidationAttribute
     /**
      * @inheritDoc
      */
-    public function validate(mixed $value, bool $nullable = false): bool
+    public function validate(mixed $value): bool
     {
-        return ($value === null && $nullable) || ($value !== null && !in_array($value, $this->denyValues, true));
+        return !in_array($value, $this->denyValues, true);
     }
 
+    public function getErrorMessage(): string
+    {
+        return 'Value must not be one of: ' . implode(', ', $this->denyValues);
+    }
 }

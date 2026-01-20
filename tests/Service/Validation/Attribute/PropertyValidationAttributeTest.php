@@ -12,14 +12,9 @@ abstract class PropertyValidationAttributeTest extends SimpleTestCase
 {
     protected PropertyValidationAttribute $propertyValidationAttribute;
 
-    public function testValidate_successNullableTrueValueNull() {
-        $result = $this->propertyValidationAttribute->validate(null, true);
-        self::assertTrue($result, 'Validation should succeed with value null and nullable true');
-    }
-
-    public function testValidate_failureNullableFalseValueNull()
+    public function testValidate_successNullValueReturnsTrue()
     {
-        $result = $this->propertyValidationAttribute->validate(null, false);
-        self::assertFalse($result, 'Validation should fail with value null and nullable false');
+        $result = $this->propertyValidationAttribute->validate(null);
+        self::assertTrue($result, 'Validation should succeed with value null');
     }
 }

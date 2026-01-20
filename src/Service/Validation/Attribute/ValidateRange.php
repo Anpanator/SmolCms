@@ -13,7 +13,7 @@ use Attribute;
  * Validates whether or not a value is numeric (int or float) and checks if it's in the supplied value range.
  */
 #[Attribute(Attribute::TARGET_PROPERTY)]
-class ValidateRange implements PropertyValidationAttribute
+readonly class ValidateRange implements PropertyValidationAttribute
 {
     /**
      * ValidateRange constructor.
@@ -29,9 +29,9 @@ class ValidateRange implements PropertyValidationAttribute
     /**
      * @inheritDoc
      */
-    public function validate(mixed $value, bool $nullable = false): bool
+    public function validate(mixed $value): bool
     {
-        if ($nullable && $value === null) {
+        if ($value === null) {
             return true;
         }
 
@@ -41,4 +41,8 @@ class ValidateRange implements PropertyValidationAttribute
         return $value >= $this->min && $value <= $this->max;
     }
 
+    public function getErrorMessage(): string
+    {
+        return "Value must be between {$this->min} and {$this->max}.";
+    }
 }

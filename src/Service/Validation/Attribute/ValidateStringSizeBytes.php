@@ -13,8 +13,16 @@ readonly class ValidateStringSizeBytes implements PropertyValidationAttribute
     {
     }
 
-    public function validate(mixed $value, bool $nullable = false): bool
+    public function validate(mixed $value): bool
     {
-        return ($nullable && $value === null) || ($value !== null && strlen($value) <= $this->max);
+        if ($value === null) {
+            return true;
+        }
+        return strlen($value) <= $this->max;
+    }
+
+    public function getErrorMessage(): string
+    {
+        return 'Value size must be at most ' . $this->max . ' bytes';
     }
 }

@@ -14,7 +14,7 @@ use Attribute;
  * Pass the type to restrict to particular types. Types may be combined with bitwise OR operator.
  */
 #[Attribute(Attribute::TARGET_PROPERTY)]
-class ValidateHost implements PropertyValidationAttribute
+readonly class ValidateHost implements PropertyValidationAttribute
 {
     public const ALLOW_ALL = PHP_INT_MAX;
     public const IPV4 = 1;
@@ -30,9 +30,9 @@ class ValidateHost implements PropertyValidationAttribute
     ) {
     }
 
-    public function validate(mixed $value, bool $nullable = false): bool
+    public function validate(mixed $value): bool
     {
-        if ($nullable && $value === null) {
+        if ($value === null) {
             return true;
         }
 
@@ -49,5 +49,10 @@ class ValidateHost implements PropertyValidationAttribute
             $isValid = $isValid || filter_var($value, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME);
         }
         return $isValid;
+    }
+
+    public function getErrorMessage(): string
+    {
+        return 'Value must be a valid hostname, IPv4 or IPv6 address.';
     }
 }
