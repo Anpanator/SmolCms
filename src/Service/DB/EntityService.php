@@ -116,7 +116,7 @@ abstract readonly class EntityService
             $query = $this->queryBuilder->buildUpdateQuery($entity::class);
             $stmt = $this->pdo->prepare($query);
             $stmt->execute($data);
-            // potential re-sync with db for db-generated values?
+            // TODO: potential re-sync with db for db-generated values?
         } catch (Throwable $t) {
             throw new PersistenceException('Failed to update entity: ' . $entity::class, $t);
         }

@@ -10,6 +10,7 @@ use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Factory\RequestFactory;
 use SmolCms\Service\Url\PathParamMappingService;
+use Throwable;
 
 readonly class ApplicationCore
 {
@@ -19,6 +20,7 @@ readonly class ApplicationCore
     private RequestFactory $requestFactory;
     private PathParamMappingService $pathParamMappingService;
     private RequestMapper $requestMapper;
+    private ExceptionResponseService $exceptionResponseService;
 
     public function __construct(ServiceBuilder $serviceBuilder)
     {
@@ -28,6 +30,7 @@ readonly class ApplicationCore
         $this->requestFactory = $this->serviceBuilder->getService(RequestFactory::class);
         $this->pathParamMappingService = $this->serviceBuilder->getService(PathParamMappingService::class);
         $this->requestMapper = $this->serviceBuilder->getService(RequestMapper::class);
+        $this->exceptionResponseService = $this->serviceBuilder->getService(ExceptionResponseService::class);
     }
 
     public function run(): void
@@ -60,8 +63,12 @@ readonly class ApplicationCore
             routePattern: $route->path
         );
         $handler = $route->getHandlerOrDefault();
-        $handlerArguments['request'] = $this->requestMapper->mapRequest($request, $controller, $handler);
-        $response = $controller?->{$handler}(...$handlerArguments);
+        try {
+            $handlerArguments['request'] = $this->requestMapper->mapRequest($request, $controller, $handler);
+            $response = $controller?->{$handler}(...$handlerArguments);
+        } catch (Throwable $e) {
+            return $this->exceptionResponseService->createResponseFromException($e);
+        }
         if (!$response) {
             $response = $this->generateDefaultResponse();
         }
