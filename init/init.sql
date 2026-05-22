@@ -2,10 +2,9 @@ CREATE SCHEMA smolcms
     DEFAULT CHARACTER SET utf8mb4
     DEFAULT COLLATE utf8mb4_unicode_ci;
 
-USE
-    smolcms;
+USE smolcms;
 
-CREATE TABLE user
+CREATE TABLE IF NOT EXISTS user
 (
     id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     login_name      VARCHAR(255)                          NOT NULL UNIQUE KEY,
@@ -16,7 +15,7 @@ CREATE TABLE user
     last_login_date DATETIME                              NULL
 ) ENGINE = InnoDb;
 
-CREATE TABLE session
+CREATE TABLE IF NOT EXISTS session
 (
     id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     session_id VARCHAR(64) NOT NULL UNIQUE KEY,
@@ -24,7 +23,7 @@ CREATE TABLE session
     data       MEDIUMTEXT  NOT NULL
 ) ENGINE = InnoDb;
 
-CREATE TABLE article
+CREATE TABLE IF NOT EXISTS article
 (
     id      INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     slug    VARCHAR(255)             NOT NULL UNIQUE KEY,

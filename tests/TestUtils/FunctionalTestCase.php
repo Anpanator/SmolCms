@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SmolCms\TestUtils;
 
 
+use PDO;
 use ReflectionObject;
 use ReflectionProperty;
 use SmolCms\Config\ServiceConfiguration;
@@ -29,6 +30,8 @@ class FunctionalTestCase extends SimpleTestCase
         $this->applicationCore = new ApplicationCore(
             $this->serviceBuilder
         );
+        $pdo = $this->serviceBuilder->getService(PDO::class);
+        $pdo->exec((string)file_get_contents(__DIR__ . '/../../init/init_sqlite.sql'));
         $this->initAutowires();
     }
 

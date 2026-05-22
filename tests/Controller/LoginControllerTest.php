@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace SmolCms\Test\Controller;
 
 use DateTime;
-use PDO;
 use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
@@ -18,18 +17,10 @@ class LoginControllerTest extends FunctionalTestCase
 {
     #[Autowire]
     private UserService $userService;
-    #[Autowire]
-    private PDO $pdo;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->pdo->exec('TRUNCATE TABLE user');
-    }
-
-    protected function tearDown(): void
-    {
-        $this->pdo->exec('TRUNCATE TABLE user');
     }
 
     public function testPostAction_SuccessfulLogin(): void
