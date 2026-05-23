@@ -18,6 +18,7 @@ class FunctionalTestCase extends SimpleTestCase
 {
     protected ApplicationCore $applicationCore;
     private ServiceBuilder $serviceBuilder;
+    private bool $isFirstRun = true;
 
     protected function setUp(): void
     {
@@ -30,8 +31,13 @@ class FunctionalTestCase extends SimpleTestCase
         $this->applicationCore = new ApplicationCore(
             $this->serviceBuilder
         );
-        $pdo = $this->serviceBuilder->getService(PDO::class);
-        $pdo->exec((string)file_get_contents(__DIR__ . '/../../init/init_sqlite.sql'));
+        // this is done here instead of setUpBeforeClass() because it's in a static context.
+        // but since the DB should only be initialized once per test run, we do this workaround
+        if ($this->isFirstRun) {
+            $pdo = $this->serviceBuilder->getService(PDO::class);
+            $pdo->exec((string)file_get_contents(__DIR__ . '/../../init/init_sqlite.sql'));
+            $this->isFirstRun = false;
+        }
         $this->initAutowires();
     }
 

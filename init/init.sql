@@ -4,7 +4,7 @@ CREATE SCHEMA smolcms
 
 USE smolcms;
 
-CREATE TABLE IF NOT EXISTS user
+CREATE TABLE user
 (
     id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     login_name      VARCHAR(255)                          NOT NULL UNIQUE KEY,
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS user
     last_login_date DATETIME                              NULL
 ) ENGINE = InnoDb;
 
-CREATE TABLE IF NOT EXISTS session
+CREATE TABLE session
 (
     id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     session_id VARCHAR(64) NOT NULL UNIQUE KEY,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS session
     data       MEDIUMTEXT  NOT NULL
 ) ENGINE = InnoDb;
 
-CREATE TABLE IF NOT EXISTS article
+CREATE TABLE article
 (
     id      INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     slug    VARCHAR(255)             NOT NULL UNIQUE KEY,

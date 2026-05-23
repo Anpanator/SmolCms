@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS user
+CREATE TABLE user
 (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     login_name      VARCHAR(255) NOT NULL UNIQUE,
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS user
     last_login_date DATETIME     NULL
 );
 
-CREATE TABLE IF NOT EXISTS session
+CREATE TABLE session
 (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id VARCHAR(64) NOT NULL UNIQUE,
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS session
     data       TEXT        NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS article
+CREATE TABLE article
 (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,
     slug    VARCHAR(255) NOT NULL UNIQUE,
