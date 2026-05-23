@@ -35,7 +35,7 @@ class FunctionalTestCase extends SimpleTestCase
         // but since the DB should only be initialized once per test run, we do this workaround
         if ($this->isFirstRun) {
             $pdo = $this->serviceBuilder->getService(PDO::class);
-            $pdo->exec((string)file_get_contents(__DIR__ . '/../../init/init_sqlite.sql'));
+            $pdo->exec(file_get_contents(__DIR__ . '/../../init/init_sqlite.sql'));
             $this->isFirstRun = false;
         }
         $this->initAutowires();
