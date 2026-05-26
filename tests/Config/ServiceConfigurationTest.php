@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SmolCms\Test\Config;
 
 use PHPUnit\Framework\TestCase;
-use SmolCms\Config\ServiceConfiguration;
+use SmolCms\Config\CoreServiceConfiguration;
 use SmolCms\Controller\IndexController;
 use SmolCms\Data\Business\Service;
 use SmolCms\Exception\ServiceConflictException;
@@ -13,7 +13,7 @@ use SmolCms\Service\Core\Router;
 
 class ServiceConfigurationTest extends TestCase
 {
-    private ServiceConfiguration $serviceConfiguration;
+    private CoreServiceConfiguration $serviceConfiguration;
 
     public function testAddService_successForNewService()
     {
@@ -51,6 +51,6 @@ class ServiceConfigurationTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->serviceConfiguration = new ServiceConfiguration();
+        $this->serviceConfiguration = new CoreServiceConfiguration();
     }
 }

@@ -35,7 +35,6 @@ class SimpleTestCase extends TestCase
                 ->disableOriginalConstructor()
                 ->getMock();
 
-            $reflectionProperty->setAccessible(true);
             $reflectionProperty->setValue($this, $mock);
         }
     }

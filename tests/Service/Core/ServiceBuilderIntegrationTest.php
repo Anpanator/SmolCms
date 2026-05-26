@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SmolCms\Test\Service\Core;
 
-use SmolCms\Config\ServiceConfiguration;
+use SmolCms\Config\CoreServiceConfiguration;
 use SmolCms\Data\Business\ServiceRegistry;
 use SmolCms\Service\Core\ServiceBuilder;
 use SmolCms\TestUtils\SimpleTestCase;
@@ -14,11 +14,11 @@ class ServiceBuilderIntegrationTest extends SimpleTestCase
 
     public function test__construct_willRegisterOwnServiceRegistryAndConfig()
     {
-        $serviceConfiguration = new ServiceConfiguration();
+        $serviceConfiguration = new CoreServiceConfiguration();
         $serviceRegistry = new ServiceRegistry();
         $serviceBuilder = new ServiceBuilder($serviceConfiguration, $serviceRegistry);
 
         self::assertSame($serviceRegistry, $serviceBuilder->getService(ServiceRegistry::class));
-        self::assertSame($serviceConfiguration, $serviceBuilder->getService(ServiceConfiguration::class));
+        self::assertSame($serviceConfiguration, $serviceBuilder->getService(CoreServiceConfiguration::class));
     }
 }

@@ -13,14 +13,11 @@ use SmolCms\Service\Core\Startup\RegisterSessionHandlerStartupAction;
 use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
 
 // TODO: Make this overridable, especially for tests.
-class ServiceConfiguration
+class CoreServiceConfiguration
 {
     /** @var array<string, Service> */
     private array $services;
 
-    /**
-     * ServiceConfiguration constructor.
-     */
     public function __construct()
     {
         $services = [

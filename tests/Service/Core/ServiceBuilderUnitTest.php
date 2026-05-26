@@ -6,7 +6,7 @@ namespace SmolCms\Test\Service\Core;
 
 use InvalidArgumentException;
 use PHPUnit\Framework\MockObject\MockObject;
-use SmolCms\Config\ServiceConfiguration;
+use SmolCms\Config\CoreServiceConfiguration;
 use SmolCms\Data\Business\Service;
 use SmolCms\Data\Business\ServiceRegistry;
 use SmolCms\Exception\AutowireException;
@@ -17,8 +17,8 @@ use SmolCms\TestUtils\SimpleTestCase;
 class ServiceBuilderUnitTest extends SimpleTestCase
 {
     private ServiceBuilder $serviceBuilder;
-    #[Mock(ServiceConfiguration::class)]
-    private ServiceConfiguration|MockObject $serviceConfiguration;
+    #[Mock(CoreServiceConfiguration::class)]
+    private CoreServiceConfiguration|MockObject $serviceConfiguration;
     #[Mock(ServiceRegistry::class)]
     private ServiceRegistry|MockObject $serviceRegistry;
 

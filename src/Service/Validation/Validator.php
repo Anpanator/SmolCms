@@ -21,7 +21,6 @@ class Validator
         $messages = [];
         $refObject = new ReflectionObject($objectToValidate);
         foreach ($refObject->getProperties() as $reflectionProperty) {
-            $reflectionProperty->setAccessible(true);
             $propertyValue = $reflectionProperty->getValue($objectToValidate);
 
             $reflectionAttributes = $reflectionProperty->getAttributes(

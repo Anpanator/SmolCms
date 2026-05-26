@@ -8,7 +8,7 @@ use InvalidArgumentException;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionNamedType;
-use SmolCms\Config\ServiceConfiguration;
+use SmolCms\Config\CoreServiceConfiguration;
 use SmolCms\Data\Business\Service;
 use SmolCms\Data\Business\ServiceRegistry;
 use SmolCms\Exception\AutowireException;
@@ -17,12 +17,12 @@ class ServiceBuilder
 {
     /**
      * ServiceBuilder constructor.
-     * @param ServiceConfiguration $serviceConfiguration
+     * @param CoreServiceConfiguration $serviceConfiguration
      * @param ServiceRegistry $serviceRegistry
      */
     public function __construct(
-        private ServiceConfiguration $serviceConfiguration,
-        private ServiceRegistry $serviceRegistry
+        private CoreServiceConfiguration $serviceConfiguration,
+        private ServiceRegistry          $serviceRegistry
     ) {
         $this->serviceRegistry->addService($this::class, $this);
         $this->serviceRegistry->addService($this->serviceRegistry::class, $this->serviceRegistry);

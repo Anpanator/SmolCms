@@ -7,8 +7,7 @@ namespace SmolCms\TestUtils;
 
 use PDO;
 use ReflectionObject;
-use ReflectionProperty;
-use SmolCms\Config\ServiceConfiguration;
+use SmolCms\Config\CoreServiceConfiguration;
 use SmolCms\Data\Business\ServiceRegistry;
 use SmolCms\Service\Core\ApplicationCore;
 use SmolCms\Service\Core\ServiceBuilder;
@@ -25,7 +24,7 @@ class FunctionalTestCase extends SimpleTestCase
         parent::setUp();
 
         $this->serviceBuilder = new ServiceBuilder(
-            new ServiceConfiguration(),
+            new CoreServiceConfiguration(),
             new ServiceRegistry()
         );
         $this->applicationCore = new ApplicationCore(
@@ -44,7 +43,6 @@ class FunctionalTestCase extends SimpleTestCase
     protected function initAutowires(): void
     {
         $reflector = new ReflectionObject($this);
-        /** @var ReflectionProperty $reflectionProperty */
         foreach ($reflector->getProperties() as $reflectionProperty) {
             $attributes = $reflectionProperty->getAttributes(Autowire::class);
             if (!$attributes) {
@@ -52,7 +50,6 @@ class FunctionalTestCase extends SimpleTestCase
             }
             $propertyTypeName = $reflectionProperty->getType()->getName();
             $service = $this->serviceBuilder->getService($propertyTypeName);
-            $reflectionProperty->setAccessible(true);
             $reflectionProperty->setValue($this, $service);
         }
     }
