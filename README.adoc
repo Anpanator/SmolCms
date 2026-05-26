@@ -3,6 +3,12 @@
 This is a learning project for me using PHP8. Since I haven't decided on a license yet, I don't accept contributions at the moment.
 If you want to use any code you'll have to ask for permission for the same reason.
 
+== Project constants
+
+Global constants are defined in `constants.php` at the project root.
+These constants will always be available (even in testing).
+It is not recommended to use them for configuration purposes, such as credentials.
+
 == Early startup configuration
 
 If you need to run bootstrapping code very early in the application startup, you can utilise the `ApplicationStartupHandler` service.
