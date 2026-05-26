@@ -22,18 +22,18 @@ class RoutingConfiguration
     public function __construct()
     {
         $this->routes = [
-            RouteEnum::START_PAGE->value => new Route(
-                path: '/',
+            RouteEnum::START_PAGE->name => new Route(
+                path: RouteEnum::START_PAGE->value,
                 method: HttpMethod::GET,
                 controller: IndexController::class
             ),
-            RouteEnum::LOGIN->value => new Route(
-                path: '/login',
+            RouteEnum::LOGIN->name => new Route(
+                path: RouteEnum::LOGIN->value,
                 method: HttpMethod::POST,
                 controller: LoginController::class
             ),
             'IndexPostRoute' => new Route(
-                path: '/',
+                path: RouteEnum::START_PAGE->value,
                 method: HttpMethod::POST,
                 controller: IndexController::class
             ),

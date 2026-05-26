@@ -56,7 +56,7 @@ class LoginControllerTest extends FunctionalTestCase
             postParams: $postParams
         );
 
-        $response = $this->applicationCore->simulateRequest($request);
+        $response = $this->simulateRequest($request);
 
         $this->assertEquals(HttpStatus::SEE_OTHER, $response->getStatus());
         $this->assertArrayHasKey('Location', $response->getHeaders());
@@ -77,7 +77,7 @@ class LoginControllerTest extends FunctionalTestCase
             postParams: null
         );
 
-        $response = $this->applicationCore->simulateRequest($request);
+        $response = $this->simulateRequest($request);
 
         $this->assertEquals(HttpStatus::BAD_REQUEST, $response->getStatus());
     }
@@ -99,7 +99,7 @@ class LoginControllerTest extends FunctionalTestCase
             ]
         );
 
-        $response = $this->applicationCore->simulateRequest($request);
+        $response = $this->simulateRequest($request);
 
         $this->assertEquals(HttpStatus::UNAUTHORIZED->value, $response->getStatus()->value);
     }

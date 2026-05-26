@@ -7,7 +7,8 @@ use SmolCms\Data\Business\ServiceRegistry;
 use SmolCms\Service\Core\ApplicationCore;
 use SmolCms\Service\Core\ServiceBuilder;
 
-require_once __DIR__ . '/' . '../vendor/autoload.php';
+require_once dirname(__DIR__) . '/constants.php';
+require_once ROOT_DIR . '/vendor/autoload.php';
 
 $applicationCore = new ApplicationCore(
     new ServiceBuilder(

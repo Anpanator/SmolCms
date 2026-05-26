@@ -12,7 +12,6 @@ use SmolCms\Service\Core\ApplicationStartupHandler;
 use SmolCms\Service\Core\Startup\RegisterSessionHandlerStartupAction;
 use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
 
-// TODO: Make this overridable, especially for tests.
 class CoreServiceConfiguration
 {
     /** @var array<string, Service> */

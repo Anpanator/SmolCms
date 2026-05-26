@@ -9,6 +9,8 @@ use PHPUnit\Framework\TestCase;
 use ReflectionObject;
 use SmolCms\TestUtils\Attributes\Mock;
 
+require_once dirname(__DIR__, 2) . '/constants.php';
+
 class SimpleTestCase extends TestCase
 {
     protected function setUp(): void
