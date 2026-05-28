@@ -24,7 +24,7 @@ class CoreServiceConfiguration
                 identifier: PDO::class,
                 class: null,
                 parameters: [
-                    'sqlite::memory:',
+                    'sqlite:' . ROOT_DIR . '/private/db/smolcms.sq3',
                 ]
             ),
             new Service(
