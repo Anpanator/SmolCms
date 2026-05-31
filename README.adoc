@@ -90,46 +90,36 @@ For details, refer to the <<_validation>> section.
 
 == Templates
 
-If you want to generate responses from templates, you can do so by using the `TemplateService` in the controller action like this:
+If you want to generate responses from templates, you can do so by using the `TemplateService` together with `HtmlPageConfigFactory` in a controller action.
+Before calling `wrap()`, set any context values (such as the page title) via `ContextService`:
 
 [source,php]
 ----
 public function getAction(Request $request): Response
 {
-        return $this->templateService->generateResponse(
-            new ArticleTemplateConfig(
-                language: "en",
-                pageTitle: "Nice Boat",
-                articleContent: "Fancy ass content"
-            )
-        );
+    $this->contextService->setContext(ContextKey::PAGE_TITLE, "My Page Title");
+    return $this->templateService->generateResponse(
+        $this->htmlPageConfigFactory->wrap(
+            new ArticleTemplateConfig(articleContent: "Page content here"),
+        )
+    );
 }
 ----
 
-Your actual template structure is composed through a configuration class implementing the `TemplateConfig` interface, e.g.:
+`HtmlPageConfigFactory::wrap()` assembles the full HTML page by combining the given content config with global context (language, navigation routes, page title) sourced from `HtmlPageDataProvider`.
+This means content configs only need to carry page-specific data.
+
+Your content config is a class implementing the `TemplateConfig` interface:
 
 [source,php]
 ----
 readonly class ArticleTemplateConfig implements TemplateConfig
 {
-
-    public function __construct(
-        private string $language,
-        private string $pageTitle,
-        private string $articleContent
-    )
-    {
-    }
+    public function __construct(private string $articleContent) {}
 
     public function getConfig(): array
     {
-        return [
-            HtmlTemplate::class => [
-                HeadComponent::class => [$this->pageTitle],
-                ArticleComponent::class => [$this->articleContent],
-                $this->language
-            ]
-        ];
+        return [ArticleComponent::class => [$this->articleContent]];
     }
 }
 ----
