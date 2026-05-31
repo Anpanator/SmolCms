@@ -23,7 +23,6 @@ readonly class HtmlPageDataProvider
         return $this->contextService->getContext(ContextKey::PAGE_TITLE);
     }
 
-    /** @return RouteEnum[] */
     public function getNavigationRoutes(): array
     {
         return RouteEnum::cases();
