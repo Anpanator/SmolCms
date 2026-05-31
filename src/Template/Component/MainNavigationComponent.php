@@ -17,11 +17,19 @@ readonly class MainNavigationComponent implements Template
     {
         $items = '';
         foreach ($this->routes as $route) {
-            $label = $route->name;
-            $items .= "<li><a href=\"{$route->value}\">{$label}</a></li>";
+            $items .=
+                <<<HTML
+                <li>
+                    <a href="{$route->value}">{$route->name}</a>
+                </li>
+                HTML;
         }
         return <<<HTML
-        <nav id="main-nav"><ul>{$items}</ul></nav>
+        <nav id="main-nav">
+            <ul>
+                {$items}
+            </ul>
+        </nav>
         HTML;
     }
 }
