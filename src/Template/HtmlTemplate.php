@@ -18,6 +18,7 @@ readonly class HtmlTemplate implements Template
     public function render(): string
     {
         return <<<HTML
+        <!DOCTYPE html>
         <html lang="$this->language">
             {$this->headSlot->render()}           
             <body> 

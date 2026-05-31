@@ -27,7 +27,9 @@ readonly class IndexController
         $this->contextService->setContext(ContextKey::PAGE_TITLE, "Nice Boat");
         return $this->templateService->generateResponse(
             $this->htmlPageConfigFactory->wrap(
-                contentConfig: new ArticleTemplateConfig(articleContent: "Fancy ass content"),
+                new ArticleTemplateConfig(
+                    articleContent: "Fancy ass content"
+                ),
             )
         );
     }
