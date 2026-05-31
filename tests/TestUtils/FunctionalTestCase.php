@@ -21,19 +21,11 @@ class FunctionalTestCase extends SimpleTestCase
     private static ApplicationCore $applicationCore;
     private static ServiceBuilder $serviceBuilder;
     private static CoreServiceConfiguration $serviceConfiguration;
-    private bool $isFirstRun = true;
 
     public static function setUpBeforeClass(): void
     {
         parent::setUpBeforeClass();
         self::$serviceConfiguration = new CoreServiceConfiguration();
-        self::$serviceBuilder = new ServiceBuilder(
-            self::$serviceConfiguration,
-            new ServiceRegistry()
-        );
-        self::$applicationCore = new ApplicationCore(
-            self::$serviceBuilder
-        );
 
         self::registerTestServices(
             new Service(
@@ -74,10 +66,24 @@ class FunctionalTestCase extends SimpleTestCase
         foreach ($services as $service) {
             self::$serviceConfiguration->addService($service, true);
         }
+
+        // Application core needs to be reset after services are updated
+        self::initCore();
     }
 
     protected function simulateRequest(Request $request): Response
     {
         return self::$applicationCore->simulateRequest($request);
+    }
+
+    private static function initCore(): void
+    {
+        self::$serviceBuilder = new ServiceBuilder(
+            self::$serviceConfiguration,
+            new ServiceRegistry()
+        );
+        self::$applicationCore = new ApplicationCore(
+            self::$serviceBuilder
+        );
     }
 }
