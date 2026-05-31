@@ -8,6 +8,7 @@ readonly class HtmlTemplate implements Template
 {
     public function __construct(
         private Template $headSlot,
+        private Template $navigationSlot,
         private Template $contentSlot,
         private string   $language,
     )
@@ -20,6 +21,7 @@ readonly class HtmlTemplate implements Template
         <html lang="$this->language">
             {$this->headSlot->render()}           
             <body> 
+                {$this->navigationSlot->render()}
                 {$this->contentSlot->render()}
             </body>
         </html>
