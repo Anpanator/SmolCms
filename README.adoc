@@ -215,3 +215,21 @@ Note: The property type hinting is not necessary and just used for convenient au
 
 Additionally, the `FunctionalTestCase` class will provide an `ApplicationCore` that will allow you to simulate requests even without a web server.
 This is useful when you want to create automated tests for JSON api endpoints for instance.
+
+To override a service for a specific test class, call `self::registerTestServices()` in `setUpBeforeClass()` after `parent::setUpBeforeClass()`.
+This replaces the service in the container and reinitialises the `ApplicationCore`, so all tests in the class will use the new service.
+`FunctionalTestCase` itself already uses this mechanism to replace `PDO` with an SQLite in-memory instance.
+
+[source,php]
+----
+public static function setUpBeforeClass(): void
+{
+    parent::setUpBeforeClass();
+    self::registerTestServices(
+        new Service(
+            identifier: MyExternalClient::class,
+            parameters: ['http://localhost:9999'],
+        )
+    );
+}
+----
