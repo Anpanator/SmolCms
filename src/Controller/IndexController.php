@@ -10,6 +10,7 @@ use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\ContextService;
+use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\Core\TemplateService;
 
 readonly class IndexController
@@ -18,6 +19,7 @@ readonly class IndexController
         private TemplateService       $templateService,
         private HtmlPageConfigFactory $htmlPageConfigFactory,
         private ContextService        $contextService,
+        private SessionService $sessionService,
     )
     {
     }
@@ -28,7 +30,8 @@ readonly class IndexController
         return $this->templateService->generateResponse(
             $this->htmlPageConfigFactory->wrap(
                 new ArticleTemplateConfig(
-                    articleContent: "Fancy ass content"
+                    articleContent: "Fancy ass content",
+                    showLoginForm: $this->sessionService->getUserData() === null,
                 ),
             )
         );

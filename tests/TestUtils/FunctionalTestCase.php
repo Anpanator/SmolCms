@@ -38,7 +38,7 @@ class FunctionalTestCase extends SimpleTestCase
         );
 
         $pdo = self::$serviceBuilder->getService(PDO::class);
-        $pdo->exec(file_get_contents(__DIR__ . '/../../private/init/init_sqlite.sql'));
+        $pdo->exec(file_get_contents(ROOT_DIR . '/private/init/init_sqlite.sql'));
     }
 
     protected function setUp(): void
