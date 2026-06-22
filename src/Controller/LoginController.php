@@ -9,25 +9,28 @@ use SmolCms\Data\Constant\ContextKey;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\ContextService;
+use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\Core\TemplateService;
 
-readonly class IndexController
+readonly class LoginController
 {
     public function __construct(
         private TemplateService       $templateService,
         private HtmlPageConfigFactory $htmlPageConfigFactory,
         private ContextService        $contextService,
+        private SessionService        $sessionService,
     )
     {
     }
 
     public function getAction(Request $request): Response
     {
-        $this->contextService->setContext(ContextKey::PAGE_TITLE, "Nice Boat");
+        $this->contextService->setContext(ContextKey::PAGE_TITLE, 'Login');
         return $this->templateService->generateResponse(
             $this->htmlPageConfigFactory->wrap(
                 new SimpleContentComponent(
-                    content: "Fancy ass content",
+                    content: 'Please log in',
+                    showLoginForm: $this->sessionService->getUserData() === null,
                 ),
             )
         );

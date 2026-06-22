@@ -8,10 +8,10 @@ use SmolCms\Data\Constant\RouteEnum;
 use SmolCms\Template\Component\ArticleComponent;
 use SmolCms\Template\Component\LoginFormComponent;
 
-readonly class ArticleTemplateConfig implements TemplateConfig
+readonly class SimpleContentComponent implements TemplateConfig
 {
     public function __construct(
-        private string $articleContent,
+        private string $content,
         private bool   $showLoginForm = false,
     )
     {
@@ -21,7 +21,7 @@ readonly class ArticleTemplateConfig implements TemplateConfig
     {
         return [
             ArticleComponent::class => [
-                $this->articleContent,
+                $this->content,
                 ...$this->showLoginForm ? [LoginFormComponent::class => [RouteEnum::LOGIN, HttpMethod::POST]] : [],
             ],
         ];

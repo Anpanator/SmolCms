@@ -7,6 +7,7 @@ namespace SmolCms\Config;
 
 use SmolCms\Controller\AuthController;
 use SmolCms\Controller\IndexController;
+use SmolCms\Controller\LoginController;
 use SmolCms\Data\Business\Route;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\RouteEnum;
@@ -28,6 +29,11 @@ class RoutingConfiguration
                 controller: IndexController::class
             ),
             RouteEnum::LOGIN->name => new Route(
+                path: RouteEnum::LOGIN->value,
+                method: HttpMethod::GET,
+                controller: LoginController::class,
+            ),
+            'LoginPostRoute' => new Route(
                 path: RouteEnum::LOGIN->value,
                 method: HttpMethod::POST,
                 controller: AuthController::class
