@@ -4,13 +4,16 @@ declare(strict_types=1);
 namespace SmolCms\Controller;
 
 use SmolCms\Config\Templates\HtmlPageConfigFactory;
-use SmolCms\Config\Templates\SimpleContentComponent;
+use SmolCms\Config\Templates\SimpleContentComponentConfig;
 use SmolCms\Data\Constant\ContextKey;
+use SmolCms\Data\Constant\HttpMethod;
+use SmolCms\Data\Constant\RouteEnum;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\ContextService;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\Core\TemplateService;
+use SmolCms\Template\Component\LoginFormComponent;
 
 readonly class LoginController
 {
@@ -28,9 +31,11 @@ readonly class LoginController
         $this->contextService->setContext(ContextKey::PAGE_TITLE, 'Login');
         return $this->templateService->generateResponse(
             $this->htmlPageConfigFactory->wrap(
-                new SimpleContentComponent(
+                new SimpleContentComponentConfig(
                     content: 'Please log in',
-                    showLoginForm: $this->sessionService->getUserData() === null,
+                    extraComponents: $this->sessionService->getUserData() === null
+                        ? [LoginFormComponent::class => [RouteEnum::LOGIN, HttpMethod::POST]]
+                        : [],
                 ),
             )
         );

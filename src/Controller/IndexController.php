@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace SmolCms\Controller;
 
 use SmolCms\Config\Templates\HtmlPageConfigFactory;
-use SmolCms\Config\Templates\SimpleContentComponent;
+use SmolCms\Config\Templates\SimpleContentComponentConfig;
 use SmolCms\Data\Constant\ContextKey;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
@@ -26,7 +26,7 @@ readonly class IndexController
         $this->contextService->setContext(ContextKey::PAGE_TITLE, "Nice Boat");
         return $this->templateService->generateResponse(
             $this->htmlPageConfigFactory->wrap(
-                new SimpleContentComponent(
+                new SimpleContentComponentConfig(
                     content: "Fancy ass content",
                 ),
             )
