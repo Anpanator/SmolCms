@@ -25,6 +25,14 @@ readonly class HtmlPageDataProvider
 
     public function getNavigationRoutes(): array
     {
-        return RouteEnum::cases();
+        return [
+            'Start' => RouteEnum::START_PAGE,
+            'User' => [
+                'Login' => RouteEnum::LOGIN,
+                'Settings' => RouteEnum::SETTINGS,
+                'Logout' => RouteEnum::LOGOUT,
+            ],
+            'Register' => RouteEnum::REGISTER,
+        ];
     }
 }
