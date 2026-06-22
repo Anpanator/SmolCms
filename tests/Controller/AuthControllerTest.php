@@ -9,14 +9,18 @@ use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Persistence\UserEntity;
 use SmolCms\Data\Request\Request;
+use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\UserService;
 use SmolCms\TestUtils\Attributes\Autowire;
 use SmolCms\TestUtils\FunctionalTestCase;
 
-class LoginControllerTest extends FunctionalTestCase
+class AuthControllerTest extends FunctionalTestCase
 {
     #[Autowire]
     private UserService $userService;
+
+    #[Autowire]
+    private SessionService $sessionService;
 
     protected function setUp(): void
     {
@@ -102,5 +106,59 @@ class LoginControllerTest extends FunctionalTestCase
         $response = $this->simulateRequest($request);
 
         $this->assertEquals(HttpStatus::UNAUTHORIZED->value, $response->getStatus()->value);
+    }
+
+    public function testLogoutAction_RedirectsToStartPage(): void
+    {
+        $loginName = 'logout-test-user';
+        $password = 'secure-password-123';
+
+        $user = new UserEntity(
+            id: null,
+            loginName: $loginName,
+            password: password_hash($password, PASSWORD_DEFAULT),
+            displayName: 'Admin User',
+            state: 'active',
+            registerDate: new DateTime(),
+            lastLoginDate: null
+        );
+        $this->userService->saveAsNew($user);
+
+        $loginUrl = new Url(
+            protocol: 'https',
+            host: 'localhost',
+            path: '/login'
+        );
+
+        $loginRequest = new Request(
+            url: $loginUrl,
+            method: HttpMethod::POST,
+            postParams: [
+                'loginName' => $loginName,
+                'password' => $password
+            ]
+        );
+
+        $this->simulateRequest($loginRequest);
+        $this->assertNotNull($this->sessionService->getUserData());
+
+        $logoutUrl = new Url(
+            protocol: 'https',
+            host: 'localhost',
+            path: '/logout'
+        );
+
+        $logoutRequest = new Request(
+            url: $logoutUrl,
+            method: HttpMethod::POST,
+            postParams: null
+        );
+
+        $response = $this->simulateRequest($logoutRequest);
+
+        $this->assertEquals(HttpStatus::SEE_OTHER, $response->getStatus());
+        $this->assertArrayHasKey('Location', $response->getHeaders());
+        $this->assertSame('/', $response->getHeaders()['Location']);
+        $this->assertNull($this->sessionService->getUserData());
     }
 }

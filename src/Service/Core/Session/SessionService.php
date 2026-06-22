@@ -56,6 +56,16 @@ readonly class SessionService
         return $_SESSION[self::KEY_USER] ?? null;
     }
 
+    public function destroySession(): void
+    {
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+            setcookie(self::SESSION_NAME, '', 0, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+        }
+        session_destroy();
+    }
+
     private function isSessionActive(): bool
     {
         return session_status() === PHP_SESSION_ACTIVE;

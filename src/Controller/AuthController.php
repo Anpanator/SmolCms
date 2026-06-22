@@ -6,13 +6,14 @@ namespace SmolCms\Controller;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\DTO\SessionUserData;
 use SmolCms\Data\Request\LoginRequest;
-use SmolCms\Data\Response\LoginResponse;
+use SmolCms\Data\Request\Request;
+use SmolCms\Data\Response\AuthResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Authentication\AuthenticationService;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\UserService;
 
-readonly class LoginController
+readonly class AuthController
 {
     public function __construct(
         private AuthenticationService $authenticationService,
@@ -42,6 +43,12 @@ readonly class LoginController
             )
         );
 
-        return new LoginResponse();
+        return new AuthResponse();
+    }
+
+    public function logoutAction(Request $request): Response
+    {
+        $this->sessionService->destroySession();
+        return new AuthResponse();
     }
 }

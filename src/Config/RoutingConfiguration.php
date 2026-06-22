@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace SmolCms\Config;
 
 
+use SmolCms\Controller\AuthController;
 use SmolCms\Controller\IndexController;
-use SmolCms\Controller\LoginController;
 use SmolCms\Data\Business\Route;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\RouteEnum;
@@ -30,7 +30,13 @@ class RoutingConfiguration
             RouteEnum::LOGIN->name => new Route(
                 path: RouteEnum::LOGIN->value,
                 method: HttpMethod::POST,
-                controller: LoginController::class
+                controller: AuthController::class
+            ),
+            RouteEnum::LOGOUT->name => new Route(
+                path: RouteEnum::LOGOUT->value,
+                method: HttpMethod::POST,
+                controller: AuthController::class,
+                handler: 'logoutAction'
             ),
             'IndexPostRoute' => new Route(
                 path: RouteEnum::START_PAGE->value,
