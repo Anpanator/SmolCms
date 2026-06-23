@@ -58,6 +58,7 @@ readonly class RegisterController
 
         $existingUser = $this->userService->findOneByLoginName($request->loginName);
         if ($existingUser !== null) {
+            // TODO: Add error message, redirect to a proper page to display it
             return new Response(HttpStatus::CONFLICT);
         }
 
