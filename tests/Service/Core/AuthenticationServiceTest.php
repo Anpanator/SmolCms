@@ -6,30 +6,33 @@ namespace SmolCms\Test\Service\Core;
 use PHPUnit\Framework\MockObject\MockObject;
 use SmolCms\Data\Persistence\UserEntity;
 use SmolCms\Service\Core\Authentication\AuthenticationService;
-use SmolCms\Service\DB\UserService;
+use SmolCms\Service\Core\Authentication\PasswordService;
 use SmolCms\TestUtils\Attributes\Mock;
 use SmolCms\TestUtils\SimpleTestCase;
 
 class AuthenticationServiceTest extends SimpleTestCase
 {
     private AuthenticationService $service;
-    #[Mock(UserService::class)]
-    private UserService|MockObject $userService;
+    #[Mock(PasswordService::class)]
+    private PasswordService|MockObject $passwordService;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new AuthenticationService($this->userService);
+        $this->service = new AuthenticationService($this->passwordService);
     }
 
     public function testAuthenticate_ReturnsTrueOnValidPassword(): void
     {
         $password = 'correct-password';
-        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
         /** @var UserEntity|MockObject $user */
         $user = $this->createMock(UserEntity::class);
-        $user->method('getPassword')->willReturn($hashedPassword);
+
+        $this->passwordService
+            ->method('verifyAndRehashIfNeeded')
+            ->with($password, $user)
+            ->willReturn(true);
 
         $result = $this->service->authenticate($password, $user);
 
@@ -39,11 +42,14 @@ class AuthenticationServiceTest extends SimpleTestCase
     public function testAuthenticate_ReturnsFalseOnInvalidPassword(): void
     {
         $password = 'wrong-password';
-        $hashedPassword = password_hash('correct-password', PASSWORD_DEFAULT);
 
         /** @var UserEntity|MockObject $user */
         $user = $this->createMock(UserEntity::class);
-        $user->method('getPassword')->willReturn($hashedPassword);
+
+        $this->passwordService
+            ->method('verifyAndRehashIfNeeded')
+            ->with($password, $user)
+            ->willReturn(false);
 
         $result = $this->service->authenticate($password, $user);
 

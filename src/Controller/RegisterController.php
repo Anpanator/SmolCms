@@ -15,6 +15,7 @@ use SmolCms\Data\Request\RegisterRequest;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\AuthResponse;
 use SmolCms\Data\Response\Response;
+use SmolCms\Service\Core\Authentication\PasswordService;
 use SmolCms\Service\Core\ContextService;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\Core\TemplateService;
@@ -29,6 +30,7 @@ readonly class RegisterController
         private ContextService        $contextService,
         private SessionService        $sessionService,
         private UserService           $userService,
+        private PasswordService $passwordService,
     )
     {
     }
@@ -62,7 +64,7 @@ readonly class RegisterController
         $user = new UserEntity(
             id: null,
             loginName: $request->loginName,
-            password: password_hash($request->password, PASSWORD_DEFAULT),
+            password: $this->passwordService->hash($request->password),
             displayName: $request->displayName,
             state: 'active',
             registerDate: new DateTime(),
