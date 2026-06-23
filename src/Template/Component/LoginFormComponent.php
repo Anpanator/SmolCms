@@ -21,8 +21,10 @@ readonly class LoginFormComponent implements Template
     {
         return <<<HTML
         <form method="{$this->method->value}" action="{$this->route->value}">
-            <input type="text" name="loginName">
-            <input type="password" name="password">
+            <label for="login-name">Login Name</label>
+            <input type="text" id="login-name" name="loginName">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password">
             <button type="submit">Login</button>
         </form>
         HTML;

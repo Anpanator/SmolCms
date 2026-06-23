@@ -22,7 +22,8 @@ readonly class UserSettingsFormComponent implements Template
     {
         return <<<HTML
         <form method="{$this->method->value}" action="{$this->route->value}">
-            <input type="text" name="displayName" value="{$this->currentDisplayName}">
+            <label for="display-name">Display Name</label>
+            <input type="text" id="display-name" name="displayName" value="{$this->currentDisplayName}">
             <button type="submit">Update</button>
         </form>
         HTML;
