@@ -7,7 +7,7 @@ use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Constant\RouteEnum;
 
-class AuthResponse extends Response
+class RedirectResponse extends Response
 {
 
     public function __construct(?RouteEnum $targetRoute = null)

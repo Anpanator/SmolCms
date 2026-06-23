@@ -7,7 +7,7 @@ use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\DTO\SessionUserData;
 use SmolCms\Data\Request\LoginRequest;
 use SmolCms\Data\Request\Request;
-use SmolCms\Data\Response\AuthResponse;
+use SmolCms\Data\Response\RedirectResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Authentication\AuthenticationService;
 use SmolCms\Service\Core\Session\SessionService;
@@ -43,12 +43,12 @@ readonly class AuthController
             )
         );
 
-        return new AuthResponse();
+        return new RedirectResponse();
     }
 
     public function logoutAction(Request $request): Response
     {
         $this->sessionService->destroySession();
-        return new AuthResponse();
+        return new RedirectResponse();
     }
 }

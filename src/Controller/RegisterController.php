@@ -13,7 +13,7 @@ use SmolCms\Data\Constant\RouteEnum;
 use SmolCms\Data\Persistence\UserEntity;
 use SmolCms\Data\Request\RegisterRequest;
 use SmolCms\Data\Request\Request;
-use SmolCms\Data\Response\AuthResponse;
+use SmolCms\Data\Response\RedirectResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Authentication\PasswordService;
 use SmolCms\Service\Core\ContextService;
@@ -74,6 +74,6 @@ readonly class RegisterController
 
         $this->userService->saveOrUpdate($user);
 
-        return new AuthResponse(RouteEnum::LOGIN);
+        return new RedirectResponse(RouteEnum::LOGIN);
     }
 }
