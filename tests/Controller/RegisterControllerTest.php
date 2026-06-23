@@ -18,21 +18,22 @@ class RegisterControllerTest extends FunctionalTestCase
     #[Autowire]
     private UserService $userService;
 
+    private Url $url;
+
     protected function setUp(): void
     {
         parent::setUp();
-    }
-
-    public function testPostAction_SuccessfulRegistration(): void
-    {
-        $url = new Url(
+        $this->url = new Url(
             protocol: 'https',
             host: 'localhost',
             path: '/register'
         );
+    }
 
+    public function testPostAction_SuccessfulRegistration(): void
+    {
         $request = new Request(
-            url: $url,
+            url: $this->url,
             method: HttpMethod::POST,
             postParams: [
                 'email' => 'user@example.com',
@@ -57,14 +58,8 @@ class RegisterControllerTest extends FunctionalTestCase
 
     public function testPostAction_PasswordMismatch(): void
     {
-        $url = new Url(
-            protocol: 'https',
-            host: 'localhost',
-            path: '/register'
-        );
-
         $request = new Request(
-            url: $url,
+            url: $this->url,
             method: HttpMethod::POST,
             postParams: [
                 'email' => 'user@example.com',
@@ -93,14 +88,8 @@ class RegisterControllerTest extends FunctionalTestCase
         );
         $this->userService->saveAsNew($existingUser);
 
-        $url = new Url(
-            protocol: 'https',
-            host: 'localhost',
-            path: '/register'
-        );
-
         $request = new Request(
-            url: $url,
+            url: $this->url,
             method: HttpMethod::POST,
             postParams: [
                 'email' => 'other@example.com',
@@ -118,14 +107,8 @@ class RegisterControllerTest extends FunctionalTestCase
 
     public function testPostAction_NullPostParams(): void
     {
-        $url = new Url(
-            protocol: 'https',
-            host: 'localhost',
-            path: '/register'
-        );
-
         $request = new Request(
-            url: $url,
+            url: $this->url,
             method: HttpMethod::POST,
             postParams: null
         );
@@ -137,19 +120,32 @@ class RegisterControllerTest extends FunctionalTestCase
 
     public function testPostAction_ShortPassword(): void
     {
-        $url = new Url(
-            protocol: 'https',
-            host: 'localhost',
-            path: '/register'
-        );
-
         $request = new Request(
-            url: $url,
+            url: $this->url,
             method: HttpMethod::POST,
             postParams: [
                 'email' => 'user@example.com',
                 'password' => 'short',
                 'passwordRepeat' => 'short',
+                'displayName' => 'Test User',
+                'loginName' => 'testuser',
+            ]
+        );
+
+        $response = $this->simulateRequest($request);
+
+        $this->assertEquals(HttpStatus::BAD_REQUEST, $response->getStatus());
+    }
+
+    public function testPostAction_InvalidEmail(): void
+    {
+        $request = new Request(
+            url: $this->url,
+            method: HttpMethod::POST,
+            postParams: [
+                'email' => 'not-an-email',
+                'password' => 'long-enough-password',
+                'passwordRepeat' => 'long-enough-password',
                 'displayName' => 'Test User',
                 'loginName' => 'testuser',
             ]
