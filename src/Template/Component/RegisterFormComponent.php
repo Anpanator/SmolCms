@@ -22,15 +22,15 @@ readonly class RegisterFormComponent implements Template
         return <<<HTML
         <form method="{$this->method->value}" action="{$this->route->value}">
             <label for="email">Email</label>
-            <input type="email" id="email" name="email">
+            <input type="email" id="email" name="email" required minlength="1" maxlength="255">
             <label for="password">Password</label>
-            <input type="password" id="password" name="password">
+            <input type="password" id="password" name="password" required minlength="10" maxlength="72">
             <label for="password-repeat">Repeat Password</label>
-            <input type="password" id="password-repeat" name="passwordRepeat">
+            <input type="password" id="password-repeat" name="passwordRepeat" required minlength="10" maxlength="72">
             <label for="display-name">Display Name</label>
-            <input type="text" id="display-name" name="displayName">
+            <input type="text" id="display-name" name="displayName" required minlength="1" maxlength="69">
             <label for="login-name">Login Name</label>
-            <input type="text" id="login-name" name="loginName">
+            <input type="text" id="login-name" name="loginName" required minlength="1" maxlength="255">
             <button type="submit">Register</button>
         </form>
         HTML;
