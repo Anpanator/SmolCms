@@ -8,6 +8,7 @@ namespace SmolCms\Service\Core;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
+use SmolCms\Service\Core\Action\PreControllerActionFacade;
 use SmolCms\Service\Factory\RequestFactory;
 use SmolCms\Service\Url\PathParamMappingService;
 use Throwable;
@@ -19,7 +20,7 @@ readonly class ApplicationCore
     private Router $router;
     private RequestFactory $requestFactory;
     private PathParamMappingService $pathParamMappingService;
-    private RequestMapper $requestMapper;
+    private PreControllerActionFacade $preControllerActionFacade;
     private ExceptionResponseService $exceptionResponseService;
 
     public function __construct(ServiceBuilder $serviceBuilder)
@@ -29,7 +30,7 @@ readonly class ApplicationCore
         $this->router = $this->serviceBuilder->getService(Router::class);
         $this->requestFactory = $this->serviceBuilder->getService(RequestFactory::class);
         $this->pathParamMappingService = $this->serviceBuilder->getService(PathParamMappingService::class);
-        $this->requestMapper = $this->serviceBuilder->getService(RequestMapper::class);
+        $this->preControllerActionFacade = $this->serviceBuilder->getService(PreControllerActionFacade::class);
         $this->exceptionResponseService = $this->serviceBuilder->getService(ExceptionResponseService::class);
     }
 
@@ -64,8 +65,7 @@ readonly class ApplicationCore
         );
         $handler = $route->getHandlerOrDefault();
         try {
-            $handlerArguments['request'] = $this->requestMapper->mapRequest($request, $controller, $handler);
-            $response = $controller?->{$handler}(...$handlerArguments);
+            $response = $this->preControllerActionFacade->process($request, $controller, $handler, $handlerArguments);
         } catch (Throwable $e) {
             return $this->exceptionResponseService->createResponseFromException($e);
         }

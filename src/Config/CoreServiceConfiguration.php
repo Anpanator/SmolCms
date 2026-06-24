@@ -8,6 +8,9 @@ namespace SmolCms\Config;
 use PDO;
 use SmolCms\Data\Business\Service;
 use SmolCms\Exception\ServiceConflictException;
+use SmolCms\Service\Core\Action\PreControllerActionFacade;
+use SmolCms\Service\Core\Action\RequestMappingPreControllerAction;
+use SmolCms\Service\Core\Action\ValidationPreControllerAction;
 use SmolCms\Service\Core\ApplicationStartupHandler;
 use SmolCms\Service\Core\Startup\RegisterSessionHandlerStartupAction;
 use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
@@ -33,7 +36,14 @@ class CoreServiceConfiguration
                     RegisterSessionHandlerStartupAction::class,
                     ResumeSessionStartupAction::class,
                 ]
-            )
+            ),
+            new Service(
+                identifier: PreControllerActionFacade::class,
+                parameters: [
+                    RequestMappingPreControllerAction::class,
+                    ValidationPreControllerAction::class,
+                ]
+            ),
         ];
 
         foreach ($services as $service) {

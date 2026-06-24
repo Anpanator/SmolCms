@@ -9,16 +9,13 @@ use RuntimeException;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Request\ValidatedRequest;
 use SmolCms\Exception\BadRequestException;
-use SmolCms\Service\Validation\Validator;
 use TypeError;
 
 readonly class RequestMapper
 {
     const string RAW_REQUEST_PARAM_NAME = 'rawRequest';
 
-    public function __construct(
-        private Validator $validator
-    )
+    public function __construct()
     {
     }
 
@@ -86,15 +83,6 @@ readonly class RequestMapper
                 "Could not map request parameters to {$class} for {$refController->getName()}::{$handlerMethodName}",
                 0,
                 $e
-            );
-        }
-
-        // TODO: Move validation to some sort of pre-controller action chain
-        $validationResult = $this->validator->validate($mappedRequest);
-        if (!$validationResult->isValid()) {
-            throw new BadRequestException(
-                "Validation failed for request in {$refController->getName()}::{$handlerMethodName}"
-                . ": {$validationResult->getMessagesAsString()}"
             );
         }
         return $mappedRequest;
