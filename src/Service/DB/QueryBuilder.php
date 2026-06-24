@@ -29,20 +29,24 @@ class QueryBuilder
         if ($qc->getType() === QueryCriteria::TYPE_SELECT) {
             $queryParts[] = implode(', ', $this->getEntityFields($mainEntity));
         }
-        $queryParts[] = 'FROM';
+        if ($qc->getType() === QueryCriteria::TYPE_SELECT || $qc->getType() === QueryCriteria::TYPE_DELETE) {
+            $queryParts[] = 'FROM';
+        }
         $queryParts[] = $table;
 
-        $queryParts[] = 'WHERE';
-        $firstCondition = true;
-        foreach ($qc->getWhereConditions() as $condition) {
-            if (isset($condition[QueryCriteria::KEY_AND])) {
-                if (!$firstCondition) $queryParts[] = 'AND';
-                $queryParts[] = $condition[QueryCriteria::KEY_AND];
-            } else if (isset($condition[QueryCriteria::KEY_OR])) {
-                if (!$firstCondition) $queryParts[] = 'OR';
-                $queryParts[] = $condition[QueryCriteria::KEY_OR];
+        if ($qc->getType() === QueryCriteria::TYPE_UPDATE) {
+            $queryParts[] = 'SET';
+            $fields = $this->getEntityFields($qc->getMainEntity());
+            $fieldPart = [];
+            foreach ($fields as $field) {
+                $fieldPart[] = "$field = :$field";
             }
-            $firstCondition = false;
+            $queryParts[] = implode(',', $fieldPart);
+        }
+        $whereParts = $this->buildWhereParts($qc);
+        if (!empty($whereParts)) {
+            $queryParts[] = 'WHERE 1';
+            array_push($queryParts, ...$whereParts);
         }
 
         if ($qc->getLimit() !== null || $qc->getOffset() !== null) {
@@ -65,20 +69,19 @@ class QueryBuilder
         return $query;
     }
 
-    public function buildUpdateQuery(string $entityClass, ?string $idField = null): string
+    private function buildWhereParts(QueryCriteria $qc): array
     {
-        $tableName = $this->entityAttributeProcessor->getEntityTableName($entityClass);
-        $fields = $this->getEntityFields($entityClass);
-        $query = "UPDATE $tableName SET";
-        $fieldPart = [];
-        foreach ($fields as $field) {
-            $fieldPart[] = " $field = :$field";
+        $parts = [];
+        foreach ($qc->getWhereConditions() as $condition) {
+            if (isset($condition[QueryCriteria::KEY_AND])) {
+                $parts[] = 'AND';
+                $parts[] = $condition[QueryCriteria::KEY_AND];
+            } else if (isset($condition[QueryCriteria::KEY_OR])) {
+                $parts[] = 'OR';
+                $parts[] = $condition[QueryCriteria::KEY_OR];
+            }
         }
-        $query .= implode(',', $fieldPart);
-        if ($idField !== null) {
-            $query .= " WHERE $idField = :$idField";
-        }
-        return $query;
+        return $parts;
     }
 
     private function getEntityFields(string $entityClass): array

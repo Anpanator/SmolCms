@@ -38,7 +38,7 @@ class QueryBuilderTest extends SimpleTestCase
 
     public function testBuildQuery_successWithSelectQueryCriteria(): void
     {
-        $expectedQuery = 'select id, test_field from test_table where id = :id limit 33, 200';
+        $expectedQuery = 'select id, test_field from test_table where 1 and id = :id limit 33, 200';
         $queryCriteria = new QueryCriteria();
         $queryCriteria
             ->select(TestEntity::class)
@@ -52,12 +52,12 @@ class QueryBuilderTest extends SimpleTestCase
 
     public function testBuildQuery_successWithSelectQueryCriteriaMultipleConditions(): void
     {
-        $expectedQuery = 'select id, test_field from test_table where id < :id and id > :id limit 22, 111';
+        $expectedQuery = 'select id, test_field from test_table where 1 and id > :id or id < :id limit 22, 111';
         $queryCriteria = new QueryCriteria();
         $queryCriteria
             ->select(TestEntity::class)
-            ->orWhere('id < :id')
             ->andWhere('id > :id')
+            ->orWhere('id < :id')
             ->skipResults(22)
             ->maxResults(111);
 
@@ -72,10 +72,24 @@ class QueryBuilderTest extends SimpleTestCase
         self::assertSame($expectedQuery, strtolower($resultQuery));
     }
 
-    public function testBuildUpdateQuery_success()
+    public function testBuildUpdateQuery_success(): void
     {
-        $expectedQuery = 'update test_table set id = :id, test_field = :test_field';
-        $resultQuery = $this->queryBuilder->buildUpdateQuery(TestEntity::class);
+        $expectedQuery = 'update test_table set id = :id,test_field = :test_field';
+        $queryCriteria = new QueryCriteria();
+        $queryCriteria
+            ->update(TestEntity::class);
+        $resultQuery = $this->queryBuilder->buildQuery($queryCriteria);
+        self::assertSame($expectedQuery, strtolower($resultQuery));
+    }
+
+    public function testBuildUpdateQuery_successWithWhere(): void
+    {
+        $expectedQuery = 'update test_table set id = :id,test_field = :test_field where 1 and id = :id';
+        $queryCriteria = new QueryCriteria();
+        $queryCriteria
+            ->update(TestEntity::class)
+            ->andWhere('id = :id');
+        $resultQuery = $this->queryBuilder->buildQuery($queryCriteria);
         self::assertSame($expectedQuery, strtolower($resultQuery));
     }
 

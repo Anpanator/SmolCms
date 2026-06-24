@@ -116,9 +116,15 @@ abstract readonly class EntityService
             if ($entity->{"get$idField"}() === null) {
                 throw new PersistenceException('Cannot update entity without id set');
             }
-            $query = $this->queryBuilder->buildUpdateQuery($entity::class, $idField);
+
+            $qc = new QueryCriteria();
+            $qc->update($entity::class)
+                ->andWhere("$idField = :$idField")
+                ->withParameters($data);
+
+            $query = $this->queryBuilder->buildQuery($qc);
             $stmt = $this->pdo->prepare($query);
-            $stmt->execute($data);
+            $stmt->execute($qc->getParameters());
             // TODO: potential re-sync with db for db-generated values?
         } catch (Throwable $t) {
             throw new PersistenceException('Failed to update entity: ' . $entity::class, $t);
