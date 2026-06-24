@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace SmolCms\Service\DB;
 
 use RuntimeException;
+use SmolCms\Exception\InvalidStateException;
 
 class QueryCriteria
 {
@@ -53,6 +54,9 @@ class QueryCriteria
 
     public function orWhere(string $condition): static
     {
+        if (empty($this->whereConditions)) {
+            throw new InvalidStateException('Cannot use orWhere as the first where condition. Use andWhere instead.');
+        }
         $this->whereConditions[] = [self::KEY_OR => $condition];
         return $this;
     }
