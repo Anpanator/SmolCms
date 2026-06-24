@@ -44,6 +44,10 @@ class FunctionalTestCase extends SimpleTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $_SESSION = [];
+            session_destroy();
+        }
         $this->initAutowires();
     }
 

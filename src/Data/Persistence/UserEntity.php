@@ -5,6 +5,7 @@ namespace SmolCms\Data\Persistence;
 
 
 use DateTime;
+use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Service\DB\Attribute\Entity;
 use SmolCms\Service\DB\Attribute\Id;
 
@@ -20,6 +21,7 @@ class UserEntity
         private string   $state,
         private DateTime $registerDate,
         private ?DateTime $lastLoginDate,
+        private AccessLevel $accessLevel,
     )
     {
     }
@@ -92,5 +94,15 @@ class UserEntity
     public function setLastLoginDate(?DateTime $lastLoginDate): void
     {
         $this->lastLoginDate = $lastLoginDate;
+    }
+
+    public function getAccessLevel(): AccessLevel
+    {
+        return $this->accessLevel;
+    }
+
+    public function setAccessLevel(AccessLevel $accessLevel): void
+    {
+        $this->accessLevel = $accessLevel;
     }
 }

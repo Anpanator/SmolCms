@@ -1,16 +1,15 @@
 <?php
 declare(strict_types=1);
 
-namespace SmolCms\Data\DTO;
+namespace SmolCms\Service\Core\Attribute;
 
+use Attribute;
 use SmolCms\Data\Constant\AccessLevel;
 
-readonly class SessionUserData
+#[Attribute(Attribute::TARGET_METHOD)]
+readonly class Authenticated
 {
-
     public function __construct(
-        public int         $id,
-        public string      $displayName,
         public AccessLevel $accessLevel = AccessLevel::NOVICE,
     )
     {

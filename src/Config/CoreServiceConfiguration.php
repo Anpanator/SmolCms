@@ -8,6 +8,7 @@ namespace SmolCms\Config;
 use PDO;
 use SmolCms\Data\Business\Service;
 use SmolCms\Exception\ServiceConflictException;
+use SmolCms\Service\Core\Action\AuthorizationPreControllerAction;
 use SmolCms\Service\Core\Action\PreControllerActionFacade;
 use SmolCms\Service\Core\Action\RequestMappingPreControllerAction;
 use SmolCms\Service\Core\Action\ValidationPreControllerAction;
@@ -40,6 +41,7 @@ class CoreServiceConfiguration
             new Service(
                 identifier: PreControllerActionFacade::class,
                 parameters: [
+                    AuthorizationPreControllerAction::class,
                     RequestMappingPreControllerAction::class,
                     ValidationPreControllerAction::class,
                 ]

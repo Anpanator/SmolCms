@@ -65,7 +65,7 @@ class QueryBuilder
         return $query;
     }
 
-    public function buildUpdateQuery(string $entityClass): string
+    public function buildUpdateQuery(string $entityClass, ?string $idField = null): string
     {
         $tableName = $this->entityAttributeProcessor->getEntityTableName($entityClass);
         $fields = $this->getEntityFields($entityClass);
@@ -75,6 +75,9 @@ class QueryBuilder
             $fieldPart[] = " $field = :$field";
         }
         $query .= implode(',', $fieldPart);
+        if ($idField !== null) {
+            $query .= " WHERE $idField = :$idField";
+        }
         return $query;
     }
 

@@ -6,6 +6,7 @@ namespace SmolCms\Controller;
 use DateTime;
 use SmolCms\Config\Templates\HtmlPageConfigFactory;
 use SmolCms\Config\Templates\SimpleContentComponentConfig;
+use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\ContextKey;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
@@ -70,6 +71,7 @@ readonly class RegisterController
             state: 'active',
             registerDate: new DateTime(),
             lastLoginDate: null,
+            accessLevel: AccessLevel::NOVICE,
         );
 
         $this->userService->saveOrUpdate($user);

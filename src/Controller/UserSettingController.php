@@ -55,7 +55,7 @@ readonly class UserSettingController
         $user->setDisplayName($request->displayName);
         $this->userService->saveOrUpdate($user);
         $this->sessionService->setUserData(
-            new SessionUserData($user->getId(), $user->getDisplayName())
+            new SessionUserData($user->getId(), $user->getDisplayName(), $user->getAccessLevel())
         );
 
         return new RedirectResponse(RouteEnum::SETTINGS);

@@ -12,7 +12,8 @@ CREATE TABLE user
     display_name    VARCHAR(255)                          NOT NULL,
     state           ENUM ('active', 'disabled', 'banned') NOT NULL,
     register_date   DATETIME                              NOT NULL,
-    last_login_date DATETIME                              NULL
+    last_login_date DATETIME NULL,
+    access_level    INT      NOT NULL
 ) ENGINE = InnoDb;
 
 CREATE TABLE session

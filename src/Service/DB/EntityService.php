@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace SmolCms\Service\DB;
 
 
+use BackedEnum;
 use DateTime;
 use Exception;
 use PDO;
@@ -60,6 +61,8 @@ abstract readonly class EntityService
             /** @var ReflectionNamedType $propType */
             if (is_a($propType->getName(), DateTime::class, true) && isset($mappedData[$propName])) {
                 $entityProps[$propName] = new DateTime($mappedData[$propName]) ?? null;
+            } elseif (is_a($propType->getName(), BackedEnum::class, true) && isset($mappedData[$propName])) {
+                $entityProps[$propName] = $propType->getName()::from($mappedData[$propName]);
             } else {
                 $entityProps[$propName] = $mappedData[$propName] ?? null;
             }
@@ -113,7 +116,7 @@ abstract readonly class EntityService
             if ($entity->{"get$idField"}() === null) {
                 throw new PersistenceException('Cannot update entity without id set');
             }
-            $query = $this->queryBuilder->buildUpdateQuery($entity::class);
+            $query = $this->queryBuilder->buildUpdateQuery($entity::class, $idField);
             $stmt = $this->pdo->prepare($query);
             $stmt->execute($data);
             // TODO: potential re-sync with db for db-generated values?
@@ -188,6 +191,9 @@ abstract readonly class EntityService
             //Should probably make this reusable
             if ($propVal instanceof DateTime) {
                 $propVal = $propVal->format('Y-m-d H:i:s');
+            }
+            if ($propVal instanceof BackedEnum) {
+                $propVal = $propVal->value;
             }
             $data[$dbField] = $propVal;
         }

@@ -6,7 +6,8 @@ CREATE TABLE user
     display_name    VARCHAR(255) NOT NULL,
     state           TEXT         NOT NULL CHECK (state IN ('active', 'disabled', 'banned')),
     register_date   DATETIME     NOT NULL,
-    last_login_date DATETIME     NULL
+    last_login_date DATETIME NULL,
+    access_level    INTEGER  NOT NULL
 );
 
 CREATE TABLE session

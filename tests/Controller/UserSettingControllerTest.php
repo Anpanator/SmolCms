@@ -5,6 +5,7 @@ namespace SmolCms\Test\Controller;
 
 use DateTime;
 use SmolCms\Data\Business\Url;
+use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Persistence\UserEntity;
@@ -133,7 +134,8 @@ class UserSettingControllerTest extends FunctionalTestCase
             displayName: $displayName,
             state: 'active',
             registerDate: new DateTime(),
-            lastLoginDate: null
+            lastLoginDate: null,
+            accessLevel: AccessLevel::NOVICE,
         );
         $this->userService->saveAsNew($user);
 

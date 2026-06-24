@@ -39,7 +39,8 @@ readonly class AuthController
         $this->sessionService->setUserData(
             new SessionUserData(
                 $user->getId(),
-                $user->getDisplayName()
+                $user->getDisplayName(),
+                $user->getAccessLevel(),
             )
         );
 
