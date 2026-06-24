@@ -88,6 +88,27 @@ The mapping will be done through the class constructor, so all parameters that s
 Finally, any validation attributes present on the mapped properties will be evaluated.
 For details, refer to the <<_validation>> section.
 
+== PreControllerAction Chain
+
+Before a controller handler is invoked, the `PreControllerActionFacade` runs an ordered chain of `PreControllerAction` implementations.
+Each action can modify the handler arguments or short-circuit the request by returning a `Response` (e.g. a 401).
+
+=== Configuration
+
+Register actions in `CoreServiceConfiguration` as parameters to
+`PreControllerActionFacade`, mirroring the `ApplicationStartupHandler` pattern:
+
+[source,php]
+----
+new Service(
+    identifier: PreControllerActionFacade::class,
+    parameters: [
+        RequestMappingPreControllerAction::class,
+        ValidationPreControllerAction::class,
+    ]
+)
+----
+
 == Templates
 
 If you want to generate responses from templates, you can do so by using the `TemplateService` together with `HtmlPageConfigFactory` in a controller action.
