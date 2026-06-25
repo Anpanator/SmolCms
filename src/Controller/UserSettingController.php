@@ -5,6 +5,7 @@ namespace SmolCms\Controller;
 
 use SmolCms\Config\Templates\HtmlPageConfigFactory;
 use SmolCms\Config\Templates\SimpleContentComponentConfig;
+use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\ContextKey;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\RouteEnum;
@@ -13,6 +14,7 @@ use SmolCms\Data\Request\Request;
 use SmolCms\Data\Request\UserSettingsUpdateRequest;
 use SmolCms\Data\Response\RedirectResponse;
 use SmolCms\Data\Response\Response;
+use SmolCms\Service\Core\Attribute\Authenticated;
 use SmolCms\Service\Core\ContextService;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\Core\TemplateService;
@@ -48,6 +50,7 @@ readonly class UserSettingController
         );
     }
 
+    #[Authenticated(AccessLevel::NOVICE)]
     public function postAction(UserSettingsUpdateRequest $request): Response
     {
         $userData = $this->sessionService->getUserData();

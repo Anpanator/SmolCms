@@ -10,7 +10,7 @@ use SmolCms\Data\Constant\AccessLevel;
 readonly class Authenticated
 {
     public function __construct(
-        public AccessLevel $accessLevel = AccessLevel::NOVICE,
+        public AccessLevel $accessLevel,
     )
     {
     }

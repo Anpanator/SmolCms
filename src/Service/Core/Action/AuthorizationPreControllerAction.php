@@ -34,7 +34,7 @@ final readonly class AuthorizationPreControllerAction implements PreControllerAc
         $userData = $this->sessionService->getUserData();
 
         if ($userData === null) {
-            return new Response(HttpStatus::FORBIDDEN);
+            return new Response(HttpStatus::UNAUTHORIZED);
         }
 
         if ($userData->accessLevel->value < $requiredAccessLevel->value) {

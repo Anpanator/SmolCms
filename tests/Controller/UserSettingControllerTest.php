@@ -92,7 +92,7 @@ class UserSettingControllerTest extends FunctionalTestCase
         );
         $response = $this->simulateRequest($request);
 
-        $this->assertEquals(HttpStatus::INTERNAL_SERVER_ERROR, $response->getStatus());
+        $this->assertEquals(HttpStatus::UNAUTHORIZED, $response->getStatus());
     }
 
     public function testPostAction_EmptyDisplayName(): void
