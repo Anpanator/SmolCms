@@ -109,6 +109,27 @@ new Service(
 )
 ----
 
+=== Authentication
+
+To require authentication for a controller handler, add the `#[Authenticated]` attribute to the handler method.
+It accepts an optional `AccessLevel` parameter.
+
+The `AuthorizationPreControllerAction` (registered in the `PreControllerActionFacade` chain) checks for this attribute on the target method at runtime:
+
+* If the attribute is absent, the endpoint is openly accessible.
+* If present and the user is not logged in, a `401 UNAUTHORIZED` response is returned.
+* If present and the user's access level is below the required level, a `403 FORBIDDEN` response is returned.
+* Otherwise, the request proceeds.
+
+[source,php]
+----
+#[Authenticated(AccessLevel::NOVICE)]
+public function postAction(UserSettingsUpdateRequest $request): Response
+{
+    // ...
+}
+----
+
 == Templates
 
 If you want to generate responses from templates, you can do so by using the `TemplateService` together with `HtmlPageConfigFactory` in a controller action.
