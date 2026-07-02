@@ -13,6 +13,7 @@ use SmolCms\Service\DB\EntityAttributeProcessor;
 use SmolCms\Service\DB\EntityService;
 use SmolCms\Service\DB\QueryBuilder;
 use SmolCms\TestUtils\Attributes\Mock;
+use SmolCms\TestUtils\Attributes\Stub;
 use SmolCms\TestUtils\Helper\Capture;
 use SmolCms\TestUtils\SimpleTestCase;
 
@@ -24,11 +25,11 @@ class EntityServiceTest extends SimpleTestCase
     private PDO|MockObject $pdo;
     #[Mock(PDOStatement::class)]
     private PDOStatement|MockObject $PDOStatement;
-    #[Mock(CaseConverter::class)]
+    #[Stub(CaseConverter::class)]
     private CaseConverter|MockObject $caseConverter;
-    #[Mock(QueryBuilder::class)]
+    #[Stub(QueryBuilder::class)]
     private QueryBuilder|MockObject $queryBuilder;
-    #[Mock(EntityAttributeProcessor::class)]
+    #[Stub(EntityAttributeProcessor::class)]
     private EntityAttributeProcessor|MockObject $entityAttributeProcessor;
 
     protected function setUp(): void

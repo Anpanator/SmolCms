@@ -11,13 +11,13 @@ use SmolCms\Data\Business\Route;
 use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Service\Core\Router;
-use SmolCms\TestUtils\Attributes\Mock;
+use SmolCms\TestUtils\Attributes\Stub;
 use SmolCms\TestUtils\SimpleTestCase;
 
 class RouterTest extends SimpleTestCase
 {
     private Router $router;
-    #[Mock(RoutingConfiguration::class)]
+    #[Stub(RoutingConfiguration::class)]
     private RoutingConfiguration|MockObject $routingConfiguration;
 
     public function testGetRouteByUrlAndMethod_successSimpleUrl()

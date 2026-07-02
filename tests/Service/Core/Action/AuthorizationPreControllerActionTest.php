@@ -11,7 +11,7 @@ use SmolCms\Data\Request\Request;
 use SmolCms\Service\Core\Action\AuthorizationPreControllerAction;
 use SmolCms\Service\Core\Attribute\Authenticated;
 use SmolCms\Service\Core\Session\SessionService;
-use SmolCms\TestUtils\Attributes\Mock;
+use SmolCms\TestUtils\Attributes\Stub;
 use SmolCms\TestUtils\SimpleTestCase;
 
 
@@ -19,7 +19,7 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
 {
     private AuthorizationPreControllerAction $action;
 
-    #[Mock(SessionService::class)]
+    #[Stub(SessionService::class)]
     private SessionService|MockObject $sessionService;
 
     protected function setUp(): void

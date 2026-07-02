@@ -12,6 +12,7 @@ use SmolCms\Data\Business\ServiceRegistry;
 use SmolCms\Exception\AutowireException;
 use SmolCms\Service\Core\ServiceBuilder;
 use SmolCms\TestUtils\Attributes\Mock;
+use SmolCms\TestUtils\Attributes\Stub;
 use SmolCms\TestUtils\SimpleTestCase;
 
 class ServiceBuilderUnitTest extends SimpleTestCase
@@ -19,7 +20,7 @@ class ServiceBuilderUnitTest extends SimpleTestCase
     private ServiceBuilder $serviceBuilder;
     #[Mock(CoreServiceConfiguration::class)]
     private CoreServiceConfiguration|MockObject $serviceConfiguration;
-    #[Mock(ServiceRegistry::class)]
+    #[Stub(ServiceRegistry::class)]
     private ServiceRegistry|MockObject $serviceRegistry;
 
     public function testGetService_success()
