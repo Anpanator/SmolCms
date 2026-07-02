@@ -47,7 +47,8 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
 
         $this->sessionService
             ->method('getUserData')
-            ->willReturn(null);
+            ->willReturn(null)
+            ->seal();
 
         $result = $this->action->process($request, $controller, 'restrictedFellow', $handlerArguments);
 
@@ -64,7 +65,8 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
         $userData = new SessionUserData(1, 'test', AccessLevel::NOVICE);
         $this->sessionService
             ->method('getUserData')
-            ->willReturn($userData);
+            ->willReturn($userData)
+            ->seal();
 
         $result = $this->action->process($request, $controller, 'restrictedWizard', $handlerArguments);
 
@@ -81,7 +83,8 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
         $userData = new SessionUserData(1, 'test', AccessLevel::WIZARD);
         $this->sessionService
             ->method('getUserData')
-            ->willReturn($userData);
+            ->willReturn($userData)
+            ->seal();
 
         $result = $this->action->process($request, $controller, 'restrictedWizard', $handlerArguments);
 
@@ -97,7 +100,8 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
         $userData = new SessionUserData(1, 'test', AccessLevel::FELLOW);
         $this->sessionService
             ->method('getUserData')
-            ->willReturn($userData);
+            ->willReturn($userData)
+            ->seal();
 
         $result = $this->action->process($request, $controller, 'restrictedFellow', $handlerArguments);
 

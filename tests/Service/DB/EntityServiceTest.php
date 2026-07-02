@@ -61,7 +61,8 @@ class EntityServiceTest extends SimpleTestCase
                     ['test_date_field', 'testDateField'],
                     ['irrelevant', 'irrelevant'],
                 ]
-            );
+            )
+            ->seal();
 
         /** @var TestData $result */
         $result = $this->entityService->mapResultToEntity($testData, TestData::class);
@@ -82,10 +83,11 @@ class EntityServiceTest extends SimpleTestCase
                     ['testDateField', 'test_date_field'],
                     ['optional', 'optional'],
                 ]
-            );
+            )
+            ->seal();
         $this->pdo->method('prepare')->willReturn($this->PDOStatement);
-        $this->pdo->method('lastInsertId')->willReturn('123456');
-        $this->entityAttributeProcessor->method('getEntityIdFieldName')->willReturn('testFieldNumberTwo');
+        $this->pdo->method('lastInsertId')->willReturn('123456')->seal();
+        $this->entityAttributeProcessor->method('getEntityIdFieldName')->willReturn('testFieldNumberTwo')->seal();
         $entity = new TestData('test_field_one', null, new DateTime(), null);
         $this->entityService->saveAsNew($entity);
         self::assertSame(123456, $entity->testFieldNumberTwo);
@@ -106,11 +108,12 @@ class EntityServiceTest extends SimpleTestCase
                 [
                     [$dateFieldName, $dbFieldName],
                 ]
-            );
+            )
+            ->seal();
         $this->pdo->method('prepare')->willReturn($this->PDOStatement);
-        $this->pdo->expects(self::never())->method('lastInsertId');
-        $this->entityAttributeProcessor->method('getEntityIdFieldName')->willReturn(null);
-        $this->PDOStatement->method('execute')->with(Capture::arg($capturedParams));
+        $this->pdo->expects(self::never())->method('lastInsertId')->seal();
+        $this->entityAttributeProcessor->method('getEntityIdFieldName')->willReturn(null)->seal();
+        $this->PDOStatement->method('execute')->with(Capture::arg($capturedParams))->seal();
 
         $this->entityService->saveAsNew($entity);
 
@@ -129,11 +132,13 @@ class EntityServiceTest extends SimpleTestCase
                     ['testDateField', 'test_date_field'],
                     ['optional', 'optional'],
                 ]
-            );
+            )
+            ->seal();
         $testEntity = new TestData('', null, new DateTime(), null);
         $this->entityAttributeProcessor
             ->method('getEntityIdFieldName')
-            ->willReturn('testFieldNumberTwo');
+            ->willReturn('testFieldNumberTwo')
+            ->seal();
 
         $this->entityService->update($testEntity);
     }

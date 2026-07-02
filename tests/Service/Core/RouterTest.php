@@ -36,7 +36,8 @@ class RouterTest extends SimpleTestCase
                     $postRoute = new Route(path: $path, method: HttpMethod::POST, controller: IndexController::class),
                     new Route(path: $path, method: HttpMethod::PUT, controller: IndexController::class),
                 ]
-            );
+            )
+            ->seal();
         $result = $this->router->getRouteByUrlAndMethod($url, HttpMethod::POST);
         self::assertNotNull($result);
         self::assertSame($postRoute, $result);
@@ -66,7 +67,8 @@ class RouterTest extends SimpleTestCase
                         handler: 'pathParamAction'
                     )
                 ]
-            );
+            )
+            ->seal();
         $result = $this->router->getRouteByUrlAndMethod($url, HttpMethod::POST);
         self::assertNotNull($result);
         self::assertSame($complexRoute, $result);

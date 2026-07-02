@@ -25,7 +25,7 @@ class QueryBuilderTest extends SimpleTestCase
         parent::setUp();
         $this->queryBuilder = new QueryBuilder($this->caseConverter, $this->entityAttributeProcessor);
         $this->entityAttributeProcessor->method('getEntityTableName')->willReturn('test_table');
-        $this->entityAttributeProcessor->method('getEntityTableName')->willReturn('test_table');
+        $this->entityAttributeProcessor->method('getEntityTableName')->willReturn('test_table')->seal();
         $this->caseConverter
             ->method('camelCaseToSnakeCase')
             ->willReturnMap(
@@ -33,7 +33,8 @@ class QueryBuilderTest extends SimpleTestCase
                     ['id', 'id'],
                     ['testField', 'test_field'],
                 ]
-            );
+            )
+            ->seal();
     }
 
     public function testBuildQuery_successWithSelectQueryCriteria(): void

@@ -32,7 +32,8 @@ class AuthenticationServiceTest extends SimpleTestCase
         $this->passwordService
             ->method('verifyAndRehashIfNeeded')
             ->with($password, $user)
-            ->willReturn(true);
+            ->willReturn(true)
+            ->seal();
 
         $result = $this->service->authenticate($password, $user);
 
@@ -49,7 +50,8 @@ class AuthenticationServiceTest extends SimpleTestCase
         $this->passwordService
             ->method('verifyAndRehashIfNeeded')
             ->with($password, $user)
-            ->willReturn(false);
+            ->willReturn(false)
+            ->seal();
 
         $result = $this->service->authenticate($password, $user);
 

@@ -58,7 +58,8 @@ class ServiceBuilderUnitTest extends SimpleTestCase
         $this->serviceConfiguration
             ->method('getServiceByIdentifier')
             ->with($serviceId)
-            ->willReturn($service);
+            ->willReturn($service)
+            ->seal();
 
         $result = $this->serviceBuilder->getService($serviceId);
         self::assertInstanceOf(TestClassWithOnlyScalarDependencies::class, $result);
@@ -86,7 +87,8 @@ class ServiceBuilderUnitTest extends SimpleTestCase
                         [$serviceId, $service],
                         [$serviceId2, $service2]
                     ]
-            );
+            )
+            ->seal();
 
         $result = $this->serviceBuilder->getService($serviceId);
         self::assertInstanceOf(TestClassWithScalarDependencies::class, $result);
@@ -114,7 +116,8 @@ class ServiceBuilderUnitTest extends SimpleTestCase
                         [$serviceId, $service],
                         [$serviceId2, $service2]
                     ]
-            );
+            )
+            ->seal();
 
         $result = $this->serviceBuilder->getService($serviceId);
         self::assertInstanceOf(TestClassWithScalarDependencies::class, $result);
