@@ -14,7 +14,7 @@ $serviceBuilder = new ServiceBuilder(
     new CoreServiceConfiguration(),
     new ServiceRegistry()
 );
-$applicationCore = new ApplicationCore($serviceBuilder);
+$applicationCore = $serviceBuilder->getService(ApplicationCore::class);
 $applicationCore->run();
 /*$response = $applicationCore->simulateRequest(
     new Request(

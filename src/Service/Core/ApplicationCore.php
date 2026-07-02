@@ -15,25 +15,17 @@ use Throwable;
 
 readonly class ApplicationCore
 {
-    private ServiceBuilder $serviceBuilder;
-    private ApplicationStartupHandler $startupHandler;
-    private Router $router;
-    private RequestFactory $requestFactory;
-    private PathParamMappingService $pathParamMappingService;
-    private PreControllerActionFacade $preControllerActionFacade;
-    private ExceptionResponseService $exceptionResponseService;
-    private CliCommandHandler $cliCommandHandler;
-
-    public function __construct(ServiceBuilder $serviceBuilder)
+    public function __construct(
+        private ServiceBuilder            $serviceBuilder,
+        private ApplicationStartupHandler $startupHandler,
+        private Router                    $router,
+        private RequestFactory            $requestFactory,
+        private PathParamMappingService   $pathParamMappingService,
+        private PreControllerActionFacade $preControllerActionFacade,
+        private ExceptionResponseService  $exceptionResponseService,
+        private CliCommandHandler         $cliCommandHandler,
+    )
     {
-        $this->serviceBuilder = $serviceBuilder;
-        $this->startupHandler = $this->serviceBuilder->getService(ApplicationStartupHandler::class);
-        $this->router = $this->serviceBuilder->getService(Router::class);
-        $this->requestFactory = $this->serviceBuilder->getService(RequestFactory::class);
-        $this->pathParamMappingService = $this->serviceBuilder->getService(PathParamMappingService::class);
-        $this->preControllerActionFacade = $this->serviceBuilder->getService(PreControllerActionFacade::class);
-        $this->exceptionResponseService = $this->serviceBuilder->getService(ExceptionResponseService::class);
-        $this->cliCommandHandler = $this->serviceBuilder->getService(CliCommandHandler::class);
     }
 
     public function run(): void

@@ -101,8 +101,6 @@ class FunctionalTestCase extends SimpleTestCase
             new ServiceRegistry()
         );
         self::$contextService = self::$serviceBuilder->getService(ContextService::class);
-        self::$applicationCore = new ApplicationCore(
-            self::$serviceBuilder
-        );
+        self::$applicationCore = self::$serviceBuilder->getService(ApplicationCore::class);
     }
 }
