@@ -22,6 +22,7 @@ readonly class ApplicationCore
     private PathParamMappingService $pathParamMappingService;
     private PreControllerActionFacade $preControllerActionFacade;
     private ExceptionResponseService $exceptionResponseService;
+    private CliCommandHandler $cliCommandHandler;
 
     public function __construct(ServiceBuilder $serviceBuilder)
     {
@@ -32,15 +33,13 @@ readonly class ApplicationCore
         $this->pathParamMappingService = $this->serviceBuilder->getService(PathParamMappingService::class);
         $this->preControllerActionFacade = $this->serviceBuilder->getService(PreControllerActionFacade::class);
         $this->exceptionResponseService = $this->serviceBuilder->getService(ExceptionResponseService::class);
+        $this->cliCommandHandler = $this->serviceBuilder->getService(CliCommandHandler::class);
     }
 
     public function run(): void
     {
         $this->startupHandler->runActions();
-        if (PHP_SAPI === 'cli') {
-            // TODO: Support cli mode
-            return;
-        }
+        $this->cliCommandHandler->runCommand();
         $request = $this->requestFactory->buildRequestFromGlobals();
         $response = $this->handleRequest($request);
         $this->output($response);

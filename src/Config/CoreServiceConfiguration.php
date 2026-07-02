@@ -13,6 +13,10 @@ use SmolCms\Service\Core\Action\PreControllerActionFacade;
 use SmolCms\Service\Core\Action\RequestMappingPreControllerAction;
 use SmolCms\Service\Core\Action\ValidationPreControllerAction;
 use SmolCms\Service\Core\ApplicationStartupHandler;
+use SmolCms\Service\Core\CliCommand\MigrationsExecutor;
+use SmolCms\Service\Core\CliCommand\ResetDbExecutor;
+use SmolCms\Service\Core\CliCommandHandler;
+use SmolCms\Service\Core\ContextService;
 use SmolCms\Service\Core\Startup\RegisterSessionHandlerStartupAction;
 use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
 
@@ -44,6 +48,14 @@ class CoreServiceConfiguration
                     AuthorizationPreControllerAction::class,
                     RequestMappingPreControllerAction::class,
                     ValidationPreControllerAction::class,
+                ]
+            ),
+            new Service(
+                identifier: CliCommandHandler::class,
+                parameters: [
+                    ContextService::class,
+                    MigrationsExecutor::class,
+                    ResetDbExecutor::class,
                 ]
             ),
         ];

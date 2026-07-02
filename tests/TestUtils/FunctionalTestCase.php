@@ -13,14 +13,17 @@ use SmolCms\Data\Business\ServiceRegistry;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\ApplicationCore;
+use SmolCms\Service\Core\ContextService;
 use SmolCms\Service\Core\ServiceBuilder;
 use SmolCms\TestUtils\Attributes\Autowire;
+use SmolCms\TestUtils\TestServices\TestContextService;
 
 class FunctionalTestCase extends SimpleTestCase
 {
     private static ApplicationCore $applicationCore;
     private static ServiceBuilder $serviceBuilder;
     private static CoreServiceConfiguration $serviceConfiguration;
+    private static TestContextService $contextService;
 
     public static function setUpBeforeClass(): void
     {
@@ -35,6 +38,11 @@ class FunctionalTestCase extends SimpleTestCase
                     'sqlite::memory:',
                 ]
             ),
+            new Service(
+                identifier: ContextService::class,
+                class: TestContextService::class,
+                parameters: []
+            )
         );
 
         $pdo = self::$serviceBuilder->getService(PDO::class);
@@ -75,8 +83,14 @@ class FunctionalTestCase extends SimpleTestCase
         self::initCore();
     }
 
+    protected static function setCliModeTest(bool $isCliMode): void
+    {
+        self::$contextService->setIsCliMode($isCliMode);
+    }
+
     protected function simulateRequest(Request $request): Response
     {
+        self::setCliModeTest(false);
         return self::$applicationCore->simulateRequest($request);
     }
 
@@ -86,6 +100,7 @@ class FunctionalTestCase extends SimpleTestCase
             self::$serviceConfiguration,
             new ServiceRegistry()
         );
+        self::$contextService = self::$serviceBuilder->getService(ContextService::class);
         self::$applicationCore = new ApplicationCore(
             self::$serviceBuilder
         );

@@ -32,4 +32,9 @@ class ContextService
     {
         return $this->context[$key->name] ?? null;
     }
+
+    public function isCliMode(): bool
+    {
+        return PHP_SAPI === 'cli';
+    }
 }
