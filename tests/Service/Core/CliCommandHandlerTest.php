@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace SmolCms\Test\Service\Core;
 
+use PHPUnit\Framework\MockObject\MockObject;
 use SmolCms\Data\Constant\CliCommandFlag;
 use SmolCms\Service\Core\CliCommand\CliCommandExecutor;
 use SmolCms\Service\Core\CliCommandHandler;
@@ -13,10 +14,10 @@ use SmolCms\TestUtils\SimpleTestCase;
 class CliCommandHandlerTest extends SimpleTestCase
 {
     #[Mock(CliCommandExecutor::class)]
-    private CliCommandExecutor $migrationsExecutor;
+    private CliCommandExecutor|MockObject $migrationsExecutor;
 
     #[Mock(CliCommandExecutor::class)]
-    private CliCommandExecutor $resetDbExecutor;
+    private CliCommandExecutor|MockObject $resetDbExecutor;
 
     private CliCommandHandler $handler;
 
