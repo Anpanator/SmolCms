@@ -26,8 +26,7 @@ class AuthenticationServiceTest extends SimpleTestCase
     {
         $password = 'correct-password';
 
-        /** @var UserEntity|MockObject $user */
-        $user = $this->createMock(UserEntity::class);
+        $user = $this->createStub(UserEntity::class);
 
         $this->passwordService
             ->expects($this->once())
@@ -45,8 +44,7 @@ class AuthenticationServiceTest extends SimpleTestCase
     {
         $password = 'wrong-password';
 
-        /** @var UserEntity|MockObject $user */
-        $user = $this->createMock(UserEntity::class);
+        $user = $this->createStub(UserEntity::class);
 
         $this->passwordService
             ->expects($this->once())

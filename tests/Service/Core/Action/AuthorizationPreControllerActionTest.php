@@ -31,7 +31,7 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
     public function testProcess_ReturnsNullWhenNoAuthenticatedAttribute(): void
     {
         $controller = new AuthorizationPreControllerActionTest_NoAuthController();
-        $request = $this->createMock(Request::class);
+        $request = $this->createStub(Request::class);
         $handlerArguments = [];
 
         $result = $this->action->process($request, $controller, 'handle', $handlerArguments);
@@ -42,7 +42,7 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
     public function testProcess_ReturnsUnauthorizedWhenNoUserInSession(): void
     {
         $controller = new AuthorizationPreControllerActionTest_WithAuthController();
-        $request = $this->createMock(Request::class);
+        $request = $this->createStub(Request::class);
         $handlerArguments = [];
 
         $this->sessionService
@@ -59,7 +59,7 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
     public function testProcess_ReturnsForbiddenWhenInsufficientAccessLevel(): void
     {
         $controller = new AuthorizationPreControllerActionTest_WithAuthController();
-        $request = $this->createMock(Request::class);
+        $request = $this->createStub(Request::class);
         $handlerArguments = [];
 
         $userData = new SessionUserData(1, 'test', AccessLevel::NOVICE);
@@ -77,7 +77,7 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
     public function testProcess_ReturnsNullWhenSufficientAccessLevel(): void
     {
         $controller = new AuthorizationPreControllerActionTest_WithAuthController();
-        $request = $this->createMock(Request::class);
+        $request = $this->createStub(Request::class);
         $handlerArguments = [];
 
         $userData = new SessionUserData(1, 'test', AccessLevel::WIZARD);
@@ -94,7 +94,7 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
     public function testProcess_ReturnsNullWhenExactAccessLevelMatch(): void
     {
         $controller = new AuthorizationPreControllerActionTest_WithAuthController();
-        $request = $this->createMock(Request::class);
+        $request = $this->createStub(Request::class);
         $handlerArguments = [];
 
         $userData = new SessionUserData(1, 'test', AccessLevel::FELLOW);
