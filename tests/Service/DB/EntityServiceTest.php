@@ -114,7 +114,7 @@ class EntityServiceTest extends SimpleTestCase
         $this->pdo->method('prepare')->willReturn($this->PDOStatement);
         $this->pdo->expects(self::never())->method('lastInsertId')->seal();
         $this->entityAttributeProcessor->method('getEntityIdFieldName')->willReturn(null)->seal();
-        $this->PDOStatement->method('execute')->with(Capture::arg($capturedParams))->seal();
+        $this->PDOStatement->expects($this->once())->method('execute')->with(Capture::arg($capturedParams))->seal();
 
         $this->entityService->saveAsNew($entity);
 

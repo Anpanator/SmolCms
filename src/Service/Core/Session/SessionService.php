@@ -17,8 +17,6 @@ readonly class SessionService
         'cookie_samesite' => 'Strict',
         'use_strict_mode' => true,
         'use_only_cookies' => true,
-        'sid_length' => 64,
-        'sid_bits_per_character' => 6,
     ];
     private const string KEY_USER = 'user';
 

@@ -57,6 +57,7 @@ class ServiceBuilderUnitTest extends SimpleTestCase
             parameters: [1234, 'I am a String']
         );
         $this->serviceConfiguration
+            ->expects($this->atLeastOnce())
             ->method('getServiceByIdentifier')
             ->with($serviceId)
             ->willReturn($service)

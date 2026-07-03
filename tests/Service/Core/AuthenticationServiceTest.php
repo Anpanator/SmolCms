@@ -30,6 +30,7 @@ class AuthenticationServiceTest extends SimpleTestCase
         $user = $this->createMock(UserEntity::class);
 
         $this->passwordService
+            ->expects($this->once())
             ->method('verifyAndRehashIfNeeded')
             ->with($password, $user)
             ->willReturn(true)
@@ -48,6 +49,7 @@ class AuthenticationServiceTest extends SimpleTestCase
         $user = $this->createMock(UserEntity::class);
 
         $this->passwordService
+            ->expects($this->once())
             ->method('verifyAndRehashIfNeeded')
             ->with($password, $user)
             ->willReturn(false)
