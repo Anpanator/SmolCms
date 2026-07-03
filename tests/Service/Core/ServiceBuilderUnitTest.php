@@ -25,24 +25,28 @@ class ServiceBuilderUnitTest extends SimpleTestCase
 
     public function testGetService_success()
     {
+        $this->serviceConfiguration->expects($this->atLeastOnce())->method('getServiceByIdentifier')->seal();
         $result = $this->serviceBuilder->getService(TestClass::class);
         self::assertInstanceOf(TestClass::class, $result);
     }
 
     public function testGetService_nonExistingClassThrowsException()
     {
+        $this->serviceConfiguration->expects($this->atLeastOnce())->method('getServiceByIdentifier')->seal();
         $this->expectException(InvalidArgumentException::class);
         $this->serviceBuilder->getService('I AM NOT A CLASS');
     }
 
     public function testGetService_throwsAutowireExceptionWithScalarDependencyAndNoManualConfig()
     {
+        $this->serviceConfiguration->expects($this->atLeastOnce())->method('getServiceByIdentifier')->seal();
         $this->expectException(AutowireException::class);
         $this->serviceBuilder->getService(TestClassWithScalarDependencies::class);
     }
 
     public function testGetService_throwsAutowireExceptionWithUntypedDependencyAndNoManualConfig()
     {
+        $this->serviceConfiguration->expects($this->atLeastOnce())->method('getServiceByIdentifier')->seal();
         $this->expectException(AutowireException::class);
         $this->serviceBuilder->getService(TestClassWithUntypedDependencies::class);
     }

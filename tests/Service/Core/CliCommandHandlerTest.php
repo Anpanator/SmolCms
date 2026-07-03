@@ -95,6 +95,7 @@ class CliCommandHandlerTest extends SimpleTestCase
         $GLOBALS['argv'] = ['script.php', '--migrations', 'arg1', 'arg2'];
 
         $this->migrationsExecutor->expects($this->once())->method('execute')->with(['arg1', 'arg2'], false)->seal();
+        $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
 
         $this->handler->runCommand();
     }
@@ -104,6 +105,7 @@ class CliCommandHandlerTest extends SimpleTestCase
         $GLOBALS['argv'] = ['script.php', '--migrations', "'hello world'"];
 
         $this->migrationsExecutor->expects($this->once())->method('execute')->with(['hello world'], false)->seal();
+        $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
 
         $this->handler->runCommand();
     }
@@ -113,6 +115,7 @@ class CliCommandHandlerTest extends SimpleTestCase
         $GLOBALS['argv'] = ['script.php', '--migrations', '"hello world"'];
 
         $this->migrationsExecutor->expects($this->once())->method('execute')->with(['hello world'], false)->seal();
+        $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
 
         $this->handler->runCommand();
     }
@@ -122,6 +125,7 @@ class CliCommandHandlerTest extends SimpleTestCase
         $GLOBALS['argv'] = ['script.php', '--migrations', "'hello", "world'"];
 
         $this->migrationsExecutor->expects($this->once())->method('execute')->with(['hello world'], false)->seal();
+        $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
 
         $this->handler->runCommand();
     }
@@ -131,6 +135,7 @@ class CliCommandHandlerTest extends SimpleTestCase
         $GLOBALS['argv'] = ['script.php', '--migrations', '"hello', 'world"'];
 
         $this->migrationsExecutor->expects($this->once())->method('execute')->with(['hello world'], false)->seal();
+        $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
 
         $this->handler->runCommand();
     }
@@ -140,6 +145,7 @@ class CliCommandHandlerTest extends SimpleTestCase
         $GLOBALS['argv'] = ['script.php', '--migrations', "'hello', '--noconfirm'"];
 
         $this->migrationsExecutor->expects($this->once())->method('execute')->with(["hello', '--noconfirm"], false)->seal();
+        $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
 
         $this->handler->runCommand();
     }
@@ -160,6 +166,7 @@ class CliCommandHandlerTest extends SimpleTestCase
         $GLOBALS['argv'] = ['script.php', 'some', 'junk', '--migrations'];
 
         $this->migrationsExecutor->expects($this->once())->method('execute')->with([], false)->seal();
+        $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
 
         $this->handler->runCommand();
     }

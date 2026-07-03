@@ -24,6 +24,8 @@ class PasswordServiceTest extends SimpleTestCase
 
     public function testHash_ReturnsVerifiableHash(): void
     {
+        $this->userService->expects($this->never())->method('saveOrUpdate')->seal();
+
         $password = 'test-password';
         $hash = $this->service->hash($password);
 
@@ -33,6 +35,8 @@ class PasswordServiceTest extends SimpleTestCase
 
     public function testVerifyAndRehashIfNeeded_ReturnsTrueForCorrectPassword(): void
     {
+        $this->userService->expects($this->never())->method('saveOrUpdate')->seal();
+
         $password = 'correct-password';
         $hash = password_hash($password, PASSWORD_DEFAULT);
 
@@ -47,6 +51,8 @@ class PasswordServiceTest extends SimpleTestCase
 
     public function testVerifyAndRehashIfNeeded_ReturnsFalseForWrongPassword(): void
     {
+        $this->userService->expects($this->never())->method('saveOrUpdate')->seal();
+
         $hash = password_hash('correct-password', PASSWORD_DEFAULT);
 
         /** @var UserEntity|MockObject $user */
