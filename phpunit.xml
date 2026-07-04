@@ -6,7 +6,6 @@
   <testsuites>
     <testsuite name="default">
       <directory>tests</directory>
-      <exclude>tests/Service/Validation/Attribute/PropertyValidationAttributeTest.php</exclude>
     </testsuite>
   </testsuites>
   <source>

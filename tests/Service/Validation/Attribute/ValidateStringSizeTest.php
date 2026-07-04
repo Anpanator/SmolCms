@@ -8,7 +8,7 @@ use function PHPUnit\Framework\assertFalse;
 use function PHPUnit\Framework\assertTrue;
 
 
-class ValidateStringSizeTest extends PropertyValidationAttributeTest
+class ValidateStringSizeTest extends PropertyValidationAttributeTestCase
 {
     protected function setUp(): void
     {

@@ -6,7 +6,7 @@ namespace SmolCms\Test\Service\Validation\Attribute;
 
 use SmolCms\Service\Validation\Attribute\ValidateDenyList;
 
-class ValidateDenyListTest extends PropertyValidationAttributeTest
+class ValidateDenyListTest extends PropertyValidationAttributeTestCase
 {
     public function testValidate_successWithNoDeniedValue()
     {

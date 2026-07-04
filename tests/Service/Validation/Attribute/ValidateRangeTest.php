@@ -6,7 +6,7 @@ namespace SmolCms\Test\Service\Validation\Attribute;
 
 use SmolCms\Service\Validation\Attribute\ValidateRange;
 
-class ValidateRangeTest extends PropertyValidationAttributeTest
+class ValidateRangeTest extends PropertyValidationAttributeTestCase
 {
     public function testValidate_successValueInRange()
     {

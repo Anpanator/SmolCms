@@ -5,7 +5,7 @@ namespace SmolCms\Test\Service\Validation\Attribute;
 
 use SmolCms\Service\Validation\Attribute\ValidateStringSizeBytes;
 
-class ValidateStringSizeBytesTest extends PropertyValidationAttributeTest
+class ValidateStringSizeBytesTest extends PropertyValidationAttributeTestCase
 {
     protected function setUp(): void
     {

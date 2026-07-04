@@ -6,7 +6,7 @@ namespace SmolCms\Test\Service\Validation\Attribute;
 
 use SmolCms\Service\Validation\Attribute\ValidateHost;
 
-class ValidateHostTest extends PropertyValidationAttributeTest
+class ValidateHostTest extends PropertyValidationAttributeTestCase
 {
     public function testValidate_successIPV4AllowAll()
     {

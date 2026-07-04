@@ -6,7 +6,7 @@ namespace SmolCms\Test\Service\Validation\Attribute;
 
 use SmolCms\Service\Validation\Attribute\ValidateEmail;
 
-class ValidateEmailTest extends PropertyValidationAttributeTest
+class ValidateEmailTest extends PropertyValidationAttributeTestCase
 {
     public function testValidate_successValidEmail()
     {

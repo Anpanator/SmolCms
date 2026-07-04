@@ -6,7 +6,7 @@ namespace SmolCms\Test\Service\Validation\Attribute;
 
 use SmolCms\Service\Validation\Attribute\ValidateAllowList;
 
-class ValidateAllowListTest extends PropertyValidationAttributeTest
+class ValidateAllowListTest extends PropertyValidationAttributeTestCase
 {
     public function testValidate_successWithAllowedValue()
     {

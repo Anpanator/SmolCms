@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace SmolCms\Test\Service\Validation\Attribute;
 
-
 use SmolCms\Service\Validation\Attribute\PropertyValidationAttribute;
 use SmolCms\TestUtils\SimpleTestCase;
 
-abstract class PropertyValidationAttributeTest extends SimpleTestCase
+abstract class PropertyValidationAttributeTestCase extends SimpleTestCase
 {
     protected PropertyValidationAttribute $propertyValidationAttribute;
 
