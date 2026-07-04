@@ -34,3 +34,9 @@ CREATE TABLE article
     created DATETIME                 NOT NULL,
     updated DATETIME                 NOT NULL
 ) ENGINE = InnoDb;
+
+CREATE TABLE migration
+(
+    filename    VARCHAR(255) NOT NULL PRIMARY KEY,
+    executed_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE = InnoDb;
