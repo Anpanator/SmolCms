@@ -18,6 +18,7 @@ use SmolCms\Service\Core\CliCommand\ResetDbExecutor;
 use SmolCms\Service\Core\CliCommandHandler;
 use SmolCms\Service\Core\ContextService;
 use SmolCms\Service\Core\Startup\RegisterSessionHandlerStartupAction;
+use SmolCms\Service\Core\Startup\RestrictDirectoryAccessStartupAction;
 use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
 
 class CoreServiceConfiguration
@@ -36,8 +37,15 @@ class CoreServiceConfiguration
                 ]
             ),
             new Service(
+                identifier: RestrictDirectoryAccessStartupAction::class,
+                parameters: [
+                    ...FS_DIRECTORY_WHITELIST
+                ]
+            ),
+            new Service(
                 identifier: ApplicationStartupHandler::class,
                 parameters: [
+                    RestrictDirectoryAccessStartupAction::class,
                     RegisterSessionHandlerStartupAction::class,
                     ResumeSessionStartupAction::class,
                 ]

@@ -28,10 +28,18 @@ readonly class ApplicationCore
     {
     }
 
-    public function run(): void
+    public function init(): void
     {
         $this->startupHandler->runActions();
+    }
+
+    public function runCli(): void
+    {
         $this->cliCommandHandler->runCommand();
+    }
+
+    public function runCgi(): void
+    {
         $request = $this->requestFactory->buildRequestFromGlobals();
         $response = $this->handleRequest($request);
         $this->output($response);

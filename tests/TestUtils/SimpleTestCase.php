@@ -11,6 +11,7 @@ use SmolCms\TestUtils\Attributes\Mock;
 use SmolCms\TestUtils\Attributes\Stub;
 
 require_once dirname(__DIR__, 2) . '/constants.php';
+require_once ROOT_DIR . '/config.php';
 
 class SimpleTestCase extends TestCase
 {

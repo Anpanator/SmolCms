@@ -14,8 +14,11 @@ $serviceBuilder = new ServiceBuilder(
     new CoreServiceConfiguration(),
     new ServiceRegistry()
 );
+/** @var ApplicationCore $applicationCore */
 $applicationCore = $serviceBuilder->getService(ApplicationCore::class);
-$applicationCore->run();
+$applicationCore->init();
+$applicationCore->runCli();
+$applicationCore->runCgi();
 /*$response = $applicationCore->simulateRequest(
     new Request(
         url: new Url(protocol: 'https', host: 'localhost', path: '/login'),

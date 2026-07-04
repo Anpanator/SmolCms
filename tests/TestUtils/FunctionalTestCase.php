@@ -15,6 +15,7 @@ use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\ApplicationCore;
 use SmolCms\Service\Core\ContextService;
 use SmolCms\Service\Core\ServiceBuilder;
+use SmolCms\Service\Core\Startup\RestrictDirectoryAccessStartupAction;
 use SmolCms\TestUtils\Attributes\Autowire;
 use SmolCms\TestUtils\TestServices\TestContextService;
 
@@ -42,6 +43,13 @@ class FunctionalTestCase extends SimpleTestCase
                 identifier: ContextService::class,
                 class: TestContextService::class,
                 parameters: []
+            ),
+            new Service(
+                identifier: RestrictDirectoryAccessStartupAction::class,
+                class: null,
+                parameters: [
+                    '/'
+                ]
             )
         );
 
@@ -102,5 +110,6 @@ class FunctionalTestCase extends SimpleTestCase
         );
         self::$contextService = self::$serviceBuilder->getService(ContextService::class);
         self::$applicationCore = self::$serviceBuilder->getService(ApplicationCore::class);
+        self::$applicationCore->init();
     }
 }
