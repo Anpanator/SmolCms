@@ -45,6 +45,22 @@ Variadic parameters in the form of `MyService ...$services` are supported for se
 
 The `class` parameter can be omitted if the identifier is the fully qualified class name.
 
+== File system access
+
+The `FileSystemAccessService` provides secure file system operations restricted to a configured set of allowed directories.
+
+Configuration for allowed paths is currently a constant in the service.
+
+All paths are resolved via `realpath()` before any operation, preventing directory traversal attacks.
+If a path does not resolve or falls outside the allowed directories, a `FileAccessException` is thrown.
+
+Available methods:
+
+* `readFile(string $path): string` — reads and returns file content
+* `fileExists(string $path): bool` — checks whether a file exists
+* `deleteFile(string $path): void` — deletes a file
+* `listFiles(string $path): array` — returns file names in a directory (skips symlinks pointing outside allowed paths)
+
 == Routing
 
 You can define routes in the `RoutingConfiguration` class, similar to the service configuration.
