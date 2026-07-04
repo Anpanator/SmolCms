@@ -291,3 +291,42 @@ public static function setUpBeforeClass(): void
     );
 }
 ----
+
+== CLI Commands
+
+The application supports CLI commands.
+
+Flags are specified with a `--` prefix.
+Arguments following a flag are passed to the corresponding executor.
+Flag arguments are separated by spaces.
+If a single argument requires spaces, the argument needs to be quoted.
+
+All commands are registered as `CliCommandExecutor` parameters in the `CliCommandHandler` service definition.
+
+=== Available commands
+
+|===
+| Flag | Description
+
+| `--migrations`
+| Reads `.sql` files from `private/sql/`, compares them against an internal `migration` table, and executes any pending migrations in sorted order. Skips already-executed files. Prompts for confirmation unless `--noconfirm` is also specified.
+
+| `--reset-db`
+| Drops all user tables in the database (SQLite or MySQL). For MySQL, temporarily disables foreign key checks to avoid constraint errors. Prompts for confirmation unless `--noconfirm` is also specified.
+
+| `--noconfirm`
+| Suppresses interactive confirmation prompts. Can be combined with other flags (e.g. `--migrations --noconfirm`).
+|===
+
+=== Usage examples
+
+Run pending migrations with confirmation::
+`php src/index.php --migrations`
+
+Run pending migrations without confirmation::
+`php src/index.php --migrations --noconfirm`
+
+Reset the database::
+`php src/index.php --reset-db`
+
+If no recognized flag is provided, the handler prints the list of available flags.
