@@ -7,17 +7,14 @@ namespace SmolCms\Service\File;
 use RuntimeException;
 use SmolCms\Exception\FileAccessException;
 
-class FileSystemAccessService
+readonly class FileSystemAccessService
 {
-    private const array ALLOWED_DIRECTORIES = [
-        ROOT_DIR . '/private'
-    ];
-    private readonly array $resolvedAllowedDirectories;
+    private array $resolvedAllowedDirectories;
 
-    public function __construct()
+    public function __construct(string ...$allowedDirectories)
     {
         $allowedDirs = [];
-        foreach (self::ALLOWED_DIRECTORIES as $unresolvedAllowedDir) {
+        foreach ($allowedDirectories as $unresolvedAllowedDir) {
             $allowedDirs[] = realpath($unresolvedAllowedDir)
                 ?: throw new RuntimeException("Allowed directory $unresolvedAllowedDir does not exist. Check config!");
         }

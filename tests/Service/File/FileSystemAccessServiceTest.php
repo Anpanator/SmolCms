@@ -20,7 +20,7 @@ class FileSystemAccessServiceTest extends SimpleTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->testee = new FileSystemAccessService();
+        $this->testee = new FileSystemAccessService(ROOT_DIR . '/private');
         @mkdir(ROOT_DIR . self::EMPTY_DIR, 0777, true);
         file_put_contents(ROOT_DIR . self::TEST_FILE, 'hello world');
         file_put_contents(self::FORBIDDEN_FILE_THAT_EXISTS, 'I exist');

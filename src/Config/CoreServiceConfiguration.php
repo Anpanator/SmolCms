@@ -20,6 +20,7 @@ use SmolCms\Service\Core\ContextService;
 use SmolCms\Service\Core\Startup\RegisterSessionHandlerStartupAction;
 use SmolCms\Service\Core\Startup\RestrictDirectoryAccessStartupAction;
 use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
+use SmolCms\Service\File\FileSystemAccessService;
 
 class CoreServiceConfiguration
 {
@@ -40,6 +41,12 @@ class CoreServiceConfiguration
                 identifier: RestrictDirectoryAccessStartupAction::class,
                 parameters: [
                     ...FS_DIRECTORY_WHITELIST
+                ]
+            ),
+            new Service(
+                identifier: FileSystemAccessService::class,
+                parameters: [
+                    ...FS_APP_LEVEL_WHITELIST
                 ]
             ),
             new Service(
