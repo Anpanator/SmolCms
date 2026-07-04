@@ -26,6 +26,13 @@ new Service(
 )
 ----
 
+== Directory Access Restrictions
+
+During early application bootstrapping, access to directories from php is restricted via `open_basedir` runtime `ini_set`.
+The whitelist can be changed in `config.php`.
+
+Note:: When the startup action is run, relevant includes already happened, so it is unnecessary to add `/src` or the project root to the allow list.
+
 == Configuring services
 
 Check the `ServiceConfiguration` class.
