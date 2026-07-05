@@ -25,6 +25,7 @@ final class CliCommandHandler
         }
     }
 
+    // TODO: This has poor readability. Improve.
     private function parseGlobalArgs(): array
     {
         global $argv;
@@ -91,10 +92,10 @@ final class CliCommandHandler
         return implode(' ', $parts);
     }
 
-    public function runCommand(): void
+    public function runCommand(): bool
     {
         if (!$this->contextService->isCliMode()) {
-            return;
+            return false;
         }
 
         $this->flags = $this->parseGlobalArgs();
@@ -116,5 +117,6 @@ final class CliCommandHandler
             ));
             echo "No command specified. Available flags: $available\n";
         }
+        return true;
     }
 }

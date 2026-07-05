@@ -35,7 +35,10 @@ readonly class ApplicationCore
 
     public function runCli(): void
     {
-        $this->cliCommandHandler->runCommand();
+        $ran = $this->cliCommandHandler->runCommand();
+        if ($ran) {
+            exit(0);
+        }
     }
 
     public function runCgi(): void
