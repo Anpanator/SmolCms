@@ -12,15 +12,12 @@ use SmolCms\Service\File\FileSystemAccessService;
 
 final readonly class MigrationsExecutor implements CliCommandExecutor
 {
-    const string MIGRATION_DIR = ROOT_DIR . '/private/sql';
-    private PDO $pdo;
-
     public function __construct(
-        PDO                             $pdo,
+        private string $migrationDir,
+        private PDO    $pdo,
         private FileSystemAccessService $fileSystemAccessService,
     )
     {
-        $this->pdo = $pdo;
     }
 
     public function handles(): CliCommandFlag
@@ -30,22 +27,22 @@ final readonly class MigrationsExecutor implements CliCommandExecutor
 
     public function helptext(): string
     {
-        return 'Execute pending database migration files from ' . self::MIGRATION_DIR;
+        return 'Execute pending database migration files from ' . $this->migrationDir;
     }
 
     public function execute(array $arguments, bool $noconfirm = false): void
     {
         try {
-            $migrationFiles = $this->fileSystemAccessService->listFiles(self::MIGRATION_DIR);
+            $migrationFiles = $this->fileSystemAccessService->listFiles($this->migrationDir);
         } catch (FileAccessException) {
-            echo "Migration directory not found: {${self::MIGRATION_DIR}}\n";
+            echo "Migration directory not found: {${$this->migrationDir}}\n";
             return;
         }
 
         $files = [];
         foreach ($migrationFiles as $file) {
             if (str_ends_with($file, '.sql')) {
-                $files[] = self::MIGRATION_DIR . '/' . $file;
+                $files[] = $this->migrationDir . '/' . $file;
             }
         }
         if ($files === []) {

@@ -13,3 +13,5 @@ const FS_DIRECTORY_WHITELIST = [
 const FS_APP_LEVEL_WHITELIST = [
     ROOT_DIR . '/private'
 ];
+
+const MIGRATION_DIR = ROOT_DIR . '/private/sql';

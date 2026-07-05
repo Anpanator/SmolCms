@@ -67,6 +67,14 @@ class CoreServiceConfiguration
                 ]
             ),
             new Service(
+                identifier: MigrationsExecutor::class,
+                parameters: [
+                    MIGRATION_DIR,
+                    PDO::class,
+                    FileSystemAccessService::class,
+                ]
+            ),
+            new Service(
                 identifier: CliCommandHandler::class,
                 parameters: [
                     ContextService::class,
