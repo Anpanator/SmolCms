@@ -11,4 +11,6 @@ interface CliCommandExecutor
     public function handles(): CliCommandFlag;
 
     public function execute(array $arguments, bool $noconfirm = false): void;
+
+    public function helptext(): string;
 }

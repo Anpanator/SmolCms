@@ -30,8 +30,11 @@ class CliCommandHandlerTest extends SimpleTestCase
         parent::setUp();
         $GLOBALS['argv'] = ['script.php'];
         $this->generateMigrationExecutor->method('handles')->willReturn(CliCommandFlag::GENERATE_MIGRATION);
+        $this->generateMigrationExecutor->method('helptext')->willReturn('Generate a new migration file.');
         $this->migrationsExecutor->method('handles')->willReturn(CliCommandFlag::MIGRATIONS);
+        $this->migrationsExecutor->method('helptext')->willReturn('Execute pending database migrations.');
         $this->resetDbExecutor->method('handles')->willReturn(CliCommandFlag::RESET_DB);
+        $this->resetDbExecutor->method('helptext')->willReturn('Drop all tables and reinitialize the database.');
         $this->handler = new CliCommandHandler(
             new ContextService(),
             $this->generateMigrationExecutor,
@@ -51,7 +54,13 @@ class CliCommandHandlerTest extends SimpleTestCase
         $this->migrationsExecutor->expects($this->never())->method('execute')->seal();
         $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
 
-        $this->expectOutputString("No command specified. Available flags: --generate-migration, --migrations, --noconfirm, --reset-db\n");
+        $this->expectOutputString(
+            "Available commands:\n"
+            . "  --generate-migration  Generate a new migration file.\n"
+            . "  --migrations  Execute pending database migrations.\n"
+            . "  --reset-db  Drop all tables and reinitialize the database.\n"
+            . "  --noconfirm  Skip confirmation prompts.\n"
+        );
         $this->handler->runCommand();
     }
 
@@ -72,7 +81,13 @@ class CliCommandHandlerTest extends SimpleTestCase
         $this->migrationsExecutor->expects($this->never())->method('execute')->seal();
         $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
 
-        $this->expectOutputString("No command specified. Available flags: --generate-migration, --migrations, --noconfirm, --reset-db\n");
+        $this->expectOutputString(
+            "Available commands:\n"
+            . "  --generate-migration  Generate a new migration file.\n"
+            . "  --migrations  Execute pending database migrations.\n"
+            . "  --reset-db  Drop all tables and reinitialize the database.\n"
+            . "  --noconfirm  Skip confirmation prompts.\n"
+        );
         $this->handler->runCommand();
     }
 
@@ -163,7 +178,13 @@ class CliCommandHandlerTest extends SimpleTestCase
         $this->migrationsExecutor->expects($this->never())->method('execute')->seal();
         $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
 
-        $this->expectOutputString("No command specified. Available flags: --generate-migration, --migrations, --noconfirm, --reset-db\n");
+        $this->expectOutputString(
+            "Available commands:\n"
+            . "  --generate-migration  Generate a new migration file.\n"
+            . "  --migrations  Execute pending database migrations.\n"
+            . "  --reset-db  Drop all tables and reinitialize the database.\n"
+            . "  --noconfirm  Skip confirmation prompts.\n"
+        );
         $this->handler->runCommand();
     }
 

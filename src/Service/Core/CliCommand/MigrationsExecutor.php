@@ -28,6 +28,11 @@ final readonly class MigrationsExecutor implements CliCommandExecutor
         return CliCommandFlag::MIGRATIONS;
     }
 
+    public function helptext(): string
+    {
+        return 'Execute pending database migration files from ' . self::MIGRATION_DIR;
+    }
+
     public function execute(array $arguments, bool $noconfirm = false): void
     {
         try {

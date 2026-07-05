@@ -23,6 +23,11 @@ final readonly class GenerateMigrationExecutor implements CliCommandExecutor
         return CliCommandFlag::GENERATE_MIGRATION;
     }
 
+    public function helptext(): string
+    {
+        return 'Generate a new migration file. Usage: --generate-migration "<description>"';
+    }
+
     public function execute(array $arguments, bool $noconfirm = false): void
     {
         $description = $arguments[0] ?? '';

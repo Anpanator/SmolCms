@@ -25,6 +25,11 @@ final readonly class ResetDbExecutor implements CliCommandExecutor
         return CliCommandFlag::RESET_DB;
     }
 
+    public function helptext(): string
+    {
+        return 'Drop all tables and reinitialize the database from the schema file.';
+    }
+
     public function execute(array $arguments, bool $noconfirm = false): void
     {
         $driver = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);

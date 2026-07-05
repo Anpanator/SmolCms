@@ -111,11 +111,12 @@ final class CliCommandHandler
         }
 
         if (!$executed) {
-            $available = implode(', ', array_map(
-                fn(CliCommandFlag $f) => '--' . $f->value,
-                CliCommandFlag::cases()
-            ));
-            echo "No command specified. Available flags: $available\n";
+            echo "Available commands:\n";
+            foreach ($this->executors as $executor) {
+                $flag = $executor->handles()->value;
+                echo "  --$flag  {$executor->helptext()}\n";
+            }
+            echo "  --noconfirm  Skip confirmation prompts.\n";
         }
         return true;
     }
