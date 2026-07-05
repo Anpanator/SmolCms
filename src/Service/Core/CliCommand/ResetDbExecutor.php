@@ -7,14 +7,17 @@ namespace SmolCms\Service\Core\CliCommand;
 use PDO;
 use RuntimeException;
 use SmolCms\Data\Constant\CliCommandFlag;
+use SmolCms\Service\File\FileSystemAccessService;
 
 final readonly class ResetDbExecutor implements CliCommandExecutor
 {
     private PDO $pdo;
+    private FileSystemAccessService $fileSystemAccessService;
 
-    public function __construct(PDO $pdo)
+    public function __construct(PDO $pdo, FileSystemAccessService $fileSystemAccessService)
     {
         $this->pdo = $pdo;
+        $this->fileSystemAccessService = $fileSystemAccessService;
     }
 
     public function handles(): CliCommandFlag
@@ -34,7 +37,6 @@ final readonly class ResetDbExecutor implements CliCommandExecutor
 
         if ($tableNames === []) {
             echo "No tables to drop.\n";
-            return;
         }
 
         if ($driver === 'mysql') {
@@ -49,6 +51,17 @@ final readonly class ResetDbExecutor implements CliCommandExecutor
         if ($driver === 'mysql') {
             $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
         }
+
+        $initFile = match ($driver) {
+            'sqlite' => ROOT_DIR . '/private/init/init_sqlite.sql',
+            'mysql' => ROOT_DIR . '/private/init/init.sql',
+            default => throw new RuntimeException("Unsupported database driver: $driver"),
+        };
+
+        $sql = $this->fileSystemAccessService->readFile($initFile);
+
+        $this->pdo->exec($sql);
+        echo "Initialized database from: $initFile\n";
 
         echo "Reset complete.\n";
     }
