@@ -20,12 +20,13 @@ In its service definition, it will take any number of `StartupAction` parameters
 new Service(
     identifier: ApplicationStartupHandler::class,
     parameters: [
-        MyStatupAction::class,
+        MyStartupAction::class,
         FancyStartupAction::class,
     ]
 )
 ----
 
+[#_directory_access_restrictions]
 == Directory Access Restrictions
 
 During early application bootstrapping, access to directories from php is restricted via `open_basedir` runtime `ini_set`.
@@ -35,7 +36,7 @@ Note:: When the startup action is run, relevant includes already happened, so it
 
 == Configuring services
 
-Check the `ServiceConfiguration` class.
+Check the `CoreServiceConfiguration` class.
 For now, it's just hard-coded in the constructor.
 Configuration of a new service is only necessary if:
 
@@ -56,7 +57,8 @@ The `class` parameter can be omitted if the identifier is the fully qualified cl
 
 The `FileSystemAccessService` provides secure file system operations restricted to a configured set of allowed directories.
 
-Configuration for allowed paths is currently a constant in the service.
+Configuration for allowed paths lives in `config.php` as the `FS_APP_LEVEL_WHITELIST` constant, and is wired into the service parameters in `CoreServiceConfiguration`.
+This sits on top of the `open_basedir` whitelist (`FS_DIRECTORY_WHITELIST` in the same file) — see <<_directory_access_restrictions>>.
 
 All paths are resolved via `realpath()` before any operation, preventing directory traversal attacks.
 If a path does not resolve or falls outside the allowed directories, a `FileAccessException` is thrown.
@@ -126,6 +128,7 @@ Register actions in `CoreServiceConfiguration` as parameters to
 new Service(
     identifier: PreControllerActionFacade::class,
     parameters: [
+        AuthorizationPreControllerAction::class,
         RequestMappingPreControllerAction::class,
         ValidationPreControllerAction::class,
     ]
@@ -257,9 +260,9 @@ The validator will then use it automatically.
 
 == Testing
 
-For ease of testing, the `Mock` attribute, `SimpleTestCase` and `FunctionalTestCase` classes have been introduced.
+For ease of testing, the `Mock` and `Stub` attributes, plus the `SimpleTestCase` and `FunctionalTestCase` base classes, have been introduced.
 
-The `setUp()` method will automatically put an unconfigured test double into the property you use the `Mock` attribute on.
+In `SimpleTestCase::setUp()`, properties tagged with `#[Mock(...)]` are populated with a PHPUnit mock (created via `getMockBuilder(...)->disableOriginalConstructor()->getMock()`), while `#[Stub(...)]` properties receive a pre-configured PHPUnit stub (via `createStub(...)`).
 
 Usage:
 
@@ -280,6 +283,8 @@ Note: The property type hinting is not necessary and just used for convenient au
 
 Additionally, the `FunctionalTestCase` class will provide an `ApplicationCore` that will allow you to simulate requests even without a web server.
 This is useful when you want to create automated tests for JSON api endpoints for instance.
+
+`FunctionalTestCase::setUp()` additionally scans for `#[Autowire]` properties and resolves them through the test container, so you can inject fully built services directly into the test class without going through `Mock` or `Stub`.
 
 To override a service for a specific test class, call `self::registerTestServices()` in `setUpBeforeClass()` after `parent::setUpBeforeClass()`.
 This replaces the service in the container and reinitialises the `ApplicationCore`, so all tests in the class will use the new service.
@@ -328,12 +333,12 @@ All commands are registered as `CliCommandExecutor` parameters in the `CliComman
 === Usage examples
 
 Run pending migrations with confirmation::
-`php src/index.php --migrations`
+`php src/app.php --migrations`
 
 Run pending migrations without confirmation::
-`php src/index.php --migrations --noconfirm`
+`php src/app.php --migrations --noconfirm`
 
 Reset the database::
-`php src/index.php --reset-db`
+`php src/app.php --reset-db`
 
 If no recognized flag is provided, the handler prints the list of available flags.
