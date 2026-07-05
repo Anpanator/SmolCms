@@ -50,6 +50,19 @@ readonly class FileSystemAccessService
         return is_file($resolvedPath);
     }
 
+    public function writeFile(string $path, string $content): void
+    {
+        $resolvedDir = realpath(dirname($path));
+        $filename = basename($path);
+        if ($resolvedDir === false) {
+            throw new FileAccessException("Could not resolve directory for path '$path'.");
+        }
+        $this->isPathAllowed($resolvedDir) ?: $this->throwNotAllowed($path);
+        if (file_put_contents("$resolvedDir/$filename", $content) === false) {
+            throw new FileAccessException("Could not write file at path '$path'.");
+        }
+    }
+
     public function deleteFile(string $path): void
     {
         $resolvedPath = realpath($path);

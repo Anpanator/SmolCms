@@ -13,6 +13,7 @@ use SmolCms\Service\Core\Action\PreControllerActionFacade;
 use SmolCms\Service\Core\Action\RequestMappingPreControllerAction;
 use SmolCms\Service\Core\Action\ValidationPreControllerAction;
 use SmolCms\Service\Core\ApplicationStartupHandler;
+use SmolCms\Service\Core\CliCommand\GenerateMigrationExecutor;
 use SmolCms\Service\Core\CliCommand\MigrationsExecutor;
 use SmolCms\Service\Core\CliCommand\ResetDbExecutor;
 use SmolCms\Service\Core\CliCommandHandler;
@@ -69,6 +70,7 @@ class CoreServiceConfiguration
                 identifier: CliCommandHandler::class,
                 parameters: [
                     ContextService::class,
+                    GenerateMigrationExecutor::class,
                     MigrationsExecutor::class,
                     ResetDbExecutor::class,
                 ]

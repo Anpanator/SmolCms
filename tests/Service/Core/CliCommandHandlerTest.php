@@ -14,6 +14,9 @@ use SmolCms\TestUtils\SimpleTestCase;
 class CliCommandHandlerTest extends SimpleTestCase
 {
     #[Mock(CliCommandExecutor::class)]
+    private CliCommandExecutor|MockObject $generateMigrationExecutor;
+
+    #[Mock(CliCommandExecutor::class)]
     private CliCommandExecutor|MockObject $migrationsExecutor;
 
     #[Mock(CliCommandExecutor::class)]
@@ -25,10 +28,12 @@ class CliCommandHandlerTest extends SimpleTestCase
     {
         parent::setUp();
         $GLOBALS['argv'] = ['script.php'];
+        $this->generateMigrationExecutor->method('handles')->willReturn(CliCommandFlag::GENERATE_MIGRATION);
         $this->migrationsExecutor->method('handles')->willReturn(CliCommandFlag::MIGRATIONS);
         $this->resetDbExecutor->method('handles')->willReturn(CliCommandFlag::RESET_DB);
         $this->handler = new CliCommandHandler(
             new ContextService(),
+            $this->generateMigrationExecutor,
             $this->migrationsExecutor,
             $this->resetDbExecutor,
         );
@@ -45,7 +50,7 @@ class CliCommandHandlerTest extends SimpleTestCase
         $this->migrationsExecutor->expects($this->never())->method('execute')->seal();
         $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
 
-        $this->expectOutputString("No command specified. Available flags: --migrations, --noconfirm, --reset-db\n");
+        $this->expectOutputString("No command specified. Available flags: --generate-migration, --migrations, --noconfirm, --reset-db\n");
         $this->handler->runCommand();
     }
 
@@ -66,7 +71,7 @@ class CliCommandHandlerTest extends SimpleTestCase
         $this->migrationsExecutor->expects($this->never())->method('execute')->seal();
         $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
 
-        $this->expectOutputString("No command specified. Available flags: --migrations, --noconfirm, --reset-db\n");
+        $this->expectOutputString("No command specified. Available flags: --generate-migration, --migrations, --noconfirm, --reset-db\n");
         $this->handler->runCommand();
     }
 
@@ -157,7 +162,7 @@ class CliCommandHandlerTest extends SimpleTestCase
         $this->migrationsExecutor->expects($this->never())->method('execute')->seal();
         $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
 
-        $this->expectOutputString("No command specified. Available flags: --migrations, --noconfirm, --reset-db\n");
+        $this->expectOutputString("No command specified. Available flags: --generate-migration, --migrations, --noconfirm, --reset-db\n");
         $this->handler->runCommand();
     }
 

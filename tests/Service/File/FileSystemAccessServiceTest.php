@@ -163,4 +163,26 @@ class FileSystemAccessServiceTest extends SimpleTestCase
         $this->expectException(FileAccessException::class);
         $this->testee->fileExists($symlinkPath);
     }
+
+    public function testWriteFile_success(): void
+    {
+        $file = ROOT_DIR . self::TEST_DIR . '/written.txt';
+
+        $this->testee->writeFile($file, 'hello write');
+
+        self::assertFileExists($file);
+        self::assertStringEqualsFile($file, 'hello write');
+    }
+
+    public function testWriteFile_throwsWhenDirectoryNotResolvable(): void
+    {
+        $this->expectException(FileAccessException::class);
+        $this->testee->writeFile('/nonexistent-parent-dir-12345/file.txt', 'content');
+    }
+
+    public function testWriteFile_throwsWhenDirectoryNotAllowed(): void
+    {
+        $this->expectException(FileAccessException::class);
+        $this->testee->writeFile('/etc/test-write.txt', 'content');
+    }
 }
