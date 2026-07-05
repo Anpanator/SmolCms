@@ -9,11 +9,12 @@ use SmolCms\Service\Core\CliCommand\CliCommandExecutor;
 use SmolCms\Service\Core\CliCommandHandler;
 use SmolCms\Service\Core\ContextService;
 use SmolCms\TestUtils\Attributes\Mock;
+use SmolCms\TestUtils\Attributes\Stub;
 use SmolCms\TestUtils\SimpleTestCase;
 
 class CliCommandHandlerTest extends SimpleTestCase
 {
-    #[Mock(CliCommandExecutor::class)]
+    #[Stub(CliCommandExecutor::class)]
     private CliCommandExecutor|MockObject $generateMigrationExecutor;
 
     #[Mock(CliCommandExecutor::class)]
