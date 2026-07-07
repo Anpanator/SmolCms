@@ -24,8 +24,13 @@ class QueryBuilderTest extends SimpleTestCase
     {
         parent::setUp();
         $this->queryBuilder = new QueryBuilder($this->caseConverter, $this->entityAttributeProcessor);
-        $this->entityAttributeProcessor->method('getEntityTableName')->willReturn('test_table');
-        $this->entityAttributeProcessor->method('getEntityTableName')->willReturn('test_table')->seal();
+        $this->entityAttributeProcessor
+            ->method('getEntityTableName')
+            ->willReturn('test_table');
+        $this->entityAttributeProcessor
+            ->method('getEntityTableName')
+            ->willReturn('test_table')
+            ->seal();
         $this->caseConverter
             ->method('camelCaseToSnakeCase')
             ->willReturnMap(

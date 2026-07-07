@@ -32,13 +32,27 @@ class CliCommandHandlerTest extends SimpleTestCase
     {
         parent::setUp();
         $GLOBALS['argv'] = ['script.php'];
-        $this->contextService->method('isCliMode')->willReturn(true);
-        $this->generateMigrationExecutor->method('handles')->willReturn(CliCommandFlag::GENERATE_MIGRATION);
-        $this->generateMigrationExecutor->method('helptext')->willReturn('Generate a new migration file.');
-        $this->migrationsExecutor->method('handles')->willReturn(CliCommandFlag::MIGRATIONS);
-        $this->migrationsExecutor->method('helptext')->willReturn('Execute pending database migrations.');
-        $this->resetDbExecutor->method('handles')->willReturn(CliCommandFlag::RESET_DB);
-        $this->resetDbExecutor->method('helptext')->willReturn('Drop all tables and reinitialize the database.');
+        $this->contextService
+            ->method('isCliMode')
+            ->willReturn(true);
+        $this->generateMigrationExecutor
+            ->method('handles')
+            ->willReturn(CliCommandFlag::GENERATE_MIGRATION);
+        $this->generateMigrationExecutor
+            ->method('helptext')
+            ->willReturn('Generate a new migration file.');
+        $this->migrationsExecutor
+            ->method('handles')
+            ->willReturn(CliCommandFlag::MIGRATIONS);
+        $this->migrationsExecutor
+            ->method('helptext')
+            ->willReturn('Execute pending database migrations.');
+        $this->resetDbExecutor
+            ->method('handles')
+            ->willReturn(CliCommandFlag::RESET_DB);
+        $this->resetDbExecutor
+            ->method('helptext')
+            ->willReturn('Drop all tables and reinitialize the database.');
         $this->handler = new CliCommandHandler(
             $this->contextService,
             $this->generateMigrationExecutor,
@@ -55,9 +69,18 @@ class CliCommandHandlerTest extends SimpleTestCase
 
     public function testRunCommand_noFlags_outputsAvailableFlags(): void
     {
-        $this->migrationsExecutor->expects($this->never())->method('execute')->seal();
-        $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
-        $this->generateMigrationExecutor->expects($this->never())->method('execute')->seal();
+        $this->migrationsExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->resetDbExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->generateMigrationExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
 
         $this->expectOutputString(
             "Available commands:\n"
@@ -73,9 +96,19 @@ class CliCommandHandlerTest extends SimpleTestCase
     {
         $GLOBALS['argv'] = ['script.php', '--migrations'];
 
-        $this->migrationsExecutor->expects($this->once())->method('execute')->with([], false)->seal();
-        $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
-        $this->generateMigrationExecutor->expects($this->never())->method('execute')->seal();
+        $this->migrationsExecutor
+            ->expects($this->once())
+            ->method('execute')
+            ->with([], false)
+            ->seal();
+        $this->resetDbExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->generateMigrationExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
 
         $this->handler->runCommand();
     }
@@ -84,9 +117,18 @@ class CliCommandHandlerTest extends SimpleTestCase
     {
         $GLOBALS['argv'] = ['script.php', '--noconfirm'];
 
-        $this->migrationsExecutor->expects($this->never())->method('execute')->seal();
-        $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
-        $this->generateMigrationExecutor->expects($this->never())->method('execute')->seal();
+        $this->migrationsExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->resetDbExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->generateMigrationExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
 
         $this->expectOutputString(
             "Available commands:\n"
@@ -102,9 +144,19 @@ class CliCommandHandlerTest extends SimpleTestCase
     {
         $GLOBALS['argv'] = ['script.php', '--migrations', '--noconfirm'];
 
-        $this->migrationsExecutor->expects($this->once())->method('execute')->with([], true)->seal();
-        $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
-        $this->generateMigrationExecutor->expects($this->never())->method('execute')->seal();
+        $this->migrationsExecutor
+            ->expects($this->once())
+            ->method('execute')
+            ->with([], true)
+            ->seal();
+        $this->resetDbExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->generateMigrationExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
 
         $this->handler->runCommand();
     }
@@ -113,9 +165,18 @@ class CliCommandHandlerTest extends SimpleTestCase
     {
         $GLOBALS['argv'] = ['script.php', '--migrations', '--reset-db'];
 
-        $this->migrationsExecutor->expects($this->once())->method('execute')->seal();
-        $this->resetDbExecutor->expects($this->once())->method('execute')->seal();
-        $this->generateMigrationExecutor->expects($this->never())->method('execute')->seal();
+        $this->migrationsExecutor
+            ->expects($this->once())
+            ->method('execute')
+            ->seal();
+        $this->resetDbExecutor
+            ->expects($this->once())
+            ->method('execute')
+            ->seal();
+        $this->generateMigrationExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
 
         $this->handler->runCommand();
     }
@@ -124,9 +185,19 @@ class CliCommandHandlerTest extends SimpleTestCase
     {
         $GLOBALS['argv'] = ['script.php', '--migrations', 'arg1', 'arg2'];
 
-        $this->migrationsExecutor->expects($this->once())->method('execute')->with(['arg1', 'arg2'], false)->seal();
-        $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
-        $this->generateMigrationExecutor->expects($this->never())->method('execute')->seal();
+        $this->migrationsExecutor
+            ->expects($this->once())
+            ->method('execute')
+            ->with(['arg1', 'arg2'], false)
+            ->seal();
+        $this->resetDbExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->generateMigrationExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
 
         $this->handler->runCommand();
     }
@@ -135,9 +206,18 @@ class CliCommandHandlerTest extends SimpleTestCase
     {
         unset($GLOBALS['argv']);
 
-        $this->migrationsExecutor->expects($this->never())->method('execute')->seal();
-        $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
-        $this->generateMigrationExecutor->expects($this->never())->method('execute')->seal();
+        $this->migrationsExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->resetDbExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->generateMigrationExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
 
         $this->expectOutputString(
             "Available commands:\n"
@@ -153,9 +233,19 @@ class CliCommandHandlerTest extends SimpleTestCase
     {
         $GLOBALS['argv'] = ['script.php', 'some', 'junk', '--migrations'];
 
-        $this->migrationsExecutor->expects($this->once())->method('execute')->with([], false)->seal();
-        $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
-        $this->generateMigrationExecutor->expects($this->never())->method('execute')->seal();
+        $this->migrationsExecutor
+            ->expects($this->once())
+            ->method('execute')
+            ->with([], false)
+            ->seal();
+        $this->resetDbExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->generateMigrationExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
 
         $this->handler->runCommand();
     }
@@ -163,7 +253,9 @@ class CliCommandHandlerTest extends SimpleTestCase
     public function testRunCommand_notCliMode_returnsFalse(): void
     {
         $this->contextService = $this->createStub(ContextService::class);
-        $this->contextService->method('isCliMode')->willReturn(false);
+        $this->contextService
+            ->method('isCliMode')
+            ->willReturn(false);
 
         $this->handler = new CliCommandHandler(
             $this->contextService,
@@ -172,9 +264,18 @@ class CliCommandHandlerTest extends SimpleTestCase
             $this->resetDbExecutor,
         );
 
-        $this->migrationsExecutor->expects($this->never())->method('execute')->seal();
-        $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
-        $this->generateMigrationExecutor->expects($this->never())->method('execute')->seal();
+        $this->migrationsExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->resetDbExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->generateMigrationExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
 
 
         self::assertFalse($this->handler->runCommand());
@@ -184,9 +285,19 @@ class CliCommandHandlerTest extends SimpleTestCase
     {
         $GLOBALS['argv'] = ['script.php', '--reset-db'];
 
-        $this->migrationsExecutor->expects($this->never())->method('execute')->seal();
-        $this->resetDbExecutor->expects($this->once())->method('execute')->with([], false)->seal();
-        $this->generateMigrationExecutor->expects($this->never())->method('execute')->seal();
+        $this->migrationsExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->resetDbExecutor
+            ->expects($this->once())
+            ->method('execute')
+            ->with([], false)
+            ->seal();
+        $this->generateMigrationExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
 
         $this->handler->runCommand();
     }
@@ -195,9 +306,18 @@ class CliCommandHandlerTest extends SimpleTestCase
     {
         $GLOBALS['argv'] = ['script.php', '--generate-migration'];
 
-        $this->migrationsExecutor->expects($this->never())->method('execute')->seal();
-        $this->resetDbExecutor->expects($this->never())->method('execute')->seal();
-        $this->generateMigrationExecutor->expects($this->once())->method('execute')->seal();
+        $this->migrationsExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->resetDbExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->generateMigrationExecutor
+            ->expects($this->once())
+            ->method('execute')
+            ->seal();
 
         $this->expectOutputString('');
         $this->handler->runCommand();
@@ -207,9 +327,19 @@ class CliCommandHandlerTest extends SimpleTestCase
     {
         $GLOBALS['argv'] = ['script.php', '--reset-db', '--noconfirm'];
 
-        $this->migrationsExecutor->expects($this->never())->method('execute')->seal();
-        $this->resetDbExecutor->expects($this->once())->method('execute')->with([], true)->seal();
-        $this->generateMigrationExecutor->expects($this->never())->method('execute')->seal();
+        $this->migrationsExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->resetDbExecutor
+            ->expects($this->once())
+            ->method('execute')
+            ->with([], true)
+            ->seal();
+        $this->generateMigrationExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
 
         $this->handler->runCommand();
     }

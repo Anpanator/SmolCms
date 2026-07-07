@@ -46,8 +46,14 @@ class EntityServiceTest extends SimpleTestCase
 
     public function testMapResultToEntity_success()
     {
-        $this->pdo->expects($this->never())->method('prepare')->seal();
-        $this->PDOStatement->expects($this->never())->method('execute')->seal();
+        $this->pdo
+            ->expects($this->never())
+            ->method('prepare')
+            ->seal();
+        $this->PDOStatement
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
 
         $testData = [
             'test_field_one' => '!!!',
@@ -89,10 +95,21 @@ class EntityServiceTest extends SimpleTestCase
                 ]
             )
             ->seal();
-        $this->pdo->method('prepare')->willReturn($this->PDOStatement);
-        $this->pdo->method('lastInsertId')->willReturn('123456')->seal();
-        $this->entityAttributeProcessor->method('getEntityIdFieldName')->willReturn('testFieldNumberTwo')->seal();
-        $this->PDOStatement->expects($this->once())->method('execute')->seal();
+        $this->pdo
+            ->method('prepare')
+            ->willReturn($this->PDOStatement);
+        $this->pdo
+            ->method('lastInsertId')
+            ->willReturn('123456')
+            ->seal();
+        $this->entityAttributeProcessor
+            ->method('getEntityIdFieldName')
+            ->willReturn('testFieldNumberTwo')
+            ->seal();
+        $this->PDOStatement
+            ->expects($this->once())
+            ->method('execute')
+            ->seal();
         $entity = new TestData('test_field_one', null, new DateTime(), null);
         $this->entityService->saveAsNew($entity);
         self::assertSame(123456, $entity->testFieldNumberTwo);
@@ -115,10 +132,22 @@ class EntityServiceTest extends SimpleTestCase
                 ]
             )
             ->seal();
-        $this->pdo->method('prepare')->willReturn($this->PDOStatement);
-        $this->pdo->expects(self::never())->method('lastInsertId')->seal();
-        $this->entityAttributeProcessor->method('getEntityIdFieldName')->willReturn(null)->seal();
-        $this->PDOStatement->expects($this->once())->method('execute')->with(Capture::arg($capturedParams))->seal();
+        $this->pdo
+            ->method('prepare')
+            ->willReturn($this->PDOStatement);
+        $this->pdo
+            ->expects(self::never())
+            ->method('lastInsertId')
+            ->seal();
+        $this->entityAttributeProcessor
+            ->method('getEntityIdFieldName')
+            ->willReturn(null)
+            ->seal();
+        $this->PDOStatement
+            ->expects($this->once())
+            ->method('execute')
+            ->with(Capture::arg($capturedParams))
+            ->seal();
 
         $this->entityService->saveAsNew($entity);
 
@@ -127,8 +156,14 @@ class EntityServiceTest extends SimpleTestCase
 
     public function testUpdate_failureWithoutIdInEntity()
     {
-        $this->pdo->expects($this->never())->method('prepare')->seal();
-        $this->PDOStatement->expects($this->never())->method('execute')->seal();
+        $this->pdo
+            ->expects($this->never())
+            ->method('prepare')
+            ->seal();
+        $this->PDOStatement
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
 
         self::expectException(PersistenceException::class);
         $this->caseConverter

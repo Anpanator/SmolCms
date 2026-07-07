@@ -24,7 +24,10 @@ class PasswordServiceTest extends SimpleTestCase
 
     public function testHash_ReturnsVerifiableHash(): void
     {
-        $this->userService->expects($this->never())->method('saveOrUpdate')->seal();
+        $this->userService
+            ->expects($this->never())
+            ->method('saveOrUpdate')
+            ->seal();
 
         $password = 'test-password';
         $hash = $this->service->hash($password);
@@ -35,14 +38,19 @@ class PasswordServiceTest extends SimpleTestCase
 
     public function testVerifyAndRehashIfNeeded_ReturnsTrueForCorrectPassword(): void
     {
-        $this->userService->expects($this->never())->method('saveOrUpdate')->seal();
+        $this->userService
+            ->expects($this->never())
+            ->method('saveOrUpdate')
+            ->seal();
 
         $password = 'correct-password';
         $hash = password_hash($password, PASSWORD_DEFAULT);
 
         /** @var UserEntity|MockObject $user */
         $user = $this->createStub(UserEntity::class);
-        $user->method('getPassword')->willReturn($hash);
+        $user
+            ->method('getPassword')
+            ->willReturn($hash);
 
         $result = $this->service->verifyAndRehashIfNeeded($password, $user);
 
@@ -51,13 +59,19 @@ class PasswordServiceTest extends SimpleTestCase
 
     public function testVerifyAndRehashIfNeeded_ReturnsFalseForWrongPassword(): void
     {
-        $this->userService->expects($this->never())->method('saveOrUpdate')->seal();
+        $this->userService
+            ->expects($this->never())
+            ->method('saveOrUpdate')
+            ->seal();
 
         $hash = password_hash('correct-password', PASSWORD_DEFAULT);
 
         /** @var UserEntity|MockObject $user */
         $user = $this->createStub(UserEntity::class);
-        $user->method('getPassword')->willReturn($hash)->seal();
+        $user
+            ->method('getPassword')
+            ->willReturn($hash)
+            ->seal();
 
         $result = $this->service->verifyAndRehashIfNeeded('wrong-password', $user);
 
@@ -71,10 +85,19 @@ class PasswordServiceTest extends SimpleTestCase
 
         /** @var UserEntity|MockObject $user */
         $user = $this->createMock(UserEntity::class);
-        $user->method('getPassword')->willReturn($weakHash);
-        $user->expects($this->once())->method('setPassword')->seal();
+        $user
+            ->method('getPassword')
+            ->willReturn($weakHash);
+        $user
+            ->expects($this->once())
+            ->method('setPassword')
+            ->seal();
 
-        $this->userService->expects($this->once())->method('saveOrUpdate')->with($user)->seal();
+        $this->userService
+            ->expects($this->once())
+            ->method('saveOrUpdate')
+            ->with($user)
+            ->seal();
 
         $result = $this->service->verifyAndRehashIfNeeded($password, $user);
 
