@@ -25,73 +25,6 @@ final class CliCommandHandler
         }
     }
 
-    // TODO: This has poor readability. Improve.
-    private function parseGlobalArgs(): array
-    {
-        global $argv;
-        $flags = [];
-        if (!isset($argv)) {
-            return $flags;
-        }
-
-        $args = array_slice($argv, 1);
-        $count = count($args);
-        $currentFlag = null;
-
-        for ($i = 0; $i < $count; $i++) {
-            $arg = $args[$i];
-
-            if (str_starts_with($arg, '--')) {
-                $flag = CliCommandFlag::tryFrom(substr($arg, 2));
-                $currentFlag = $flag;
-                if ($flag !== null) {
-                    $flags[$flag->name] ??= [];
-                }
-                continue;
-            }
-
-            if ($currentFlag === null) {
-                continue;
-            }
-
-            $flags[$currentFlag->name][] = $this->resolveQuotedArgument($args, $i, $count);
-        }
-
-        return $flags;
-    }
-
-    private function resolveQuotedArgument(array $args, int &$i, int $count): string
-    {
-        $arg = $args[$i];
-        $quote = $arg[0];
-
-        if ($quote !== "'" && $quote !== '"') {
-            return $arg;
-        }
-
-        if (str_ends_with($arg, $quote) && strlen($arg) > 1) {
-            return substr($arg, 1, -1);
-        }
-
-        $parts = [strlen($arg) > 1 ? substr($arg, 1) : ''];
-        $i++;
-        while ($i < $count) {
-            $next = $args[$i];
-            if (str_starts_with($next, '--')) {
-                $i--;
-                break;
-            }
-            if (str_ends_with($next, $quote)) {
-                $parts[] = substr($next, 0, -1);
-                break;
-            }
-            $parts[] = $next;
-            $i++;
-        }
-
-        return implode(' ', $parts);
-    }
-
     public function runCommand(): bool
     {
         if (!$this->contextService->isCliMode()) {
@@ -119,5 +52,31 @@ final class CliCommandHandler
             echo "  --noconfirm  Skip confirmation prompts.\n";
         }
         return true;
+    }
+
+    private function parseGlobalArgs(): array
+    {
+        global $argv;
+        $flags = [];
+        if (!isset($argv)) {
+            return $flags;
+        }
+        $result = [];
+
+        $args = array_slice($argv, 1);
+        $currentFlag = null;
+        foreach ($args as $arg) {
+            $isNewFlag = str_starts_with($arg, '--');
+            if (isset($currentFlag) && !$isNewFlag) {
+                $result[$currentFlag->name][] = $arg;
+                continue;
+            }
+
+            if ($isNewFlag && $currentFlag = CliCommandFlag::tryFrom(substr($arg, 2))) {
+                $result[$currentFlag->name] = [];
+                continue;
+            }
+        }
+        return $result;
     }
 }

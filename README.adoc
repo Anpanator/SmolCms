@@ -315,7 +315,6 @@ The application supports CLI commands.
 Flags are specified with a `--` prefix.
 Arguments following a flag are passed to the corresponding executor.
 Flag arguments are separated by spaces.
-If a single argument requires spaces, the argument needs to be quoted.
 
 All commands are registered as `CliCommandExecutor` parameters in the `CliCommandHandler` service definition.
 
