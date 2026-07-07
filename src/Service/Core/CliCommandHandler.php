@@ -25,71 +25,119 @@ final class CliCommandHandler
         }
     }
 
-    // TODO: This has poor readability. Improve.
+    /**
+     * Parses global CLI arguments from `$argv` into a `[flagName => [arg, arg, ...]]` map.
+     *
+     * Tokens prefixed with `--` are looked up in {@see CliCommandFlag}; everything else
+     * is appended to the most recently seen flag's argument list. Quoted spans (single
+     * or double quotes) are collapsed into a single argument, even when the closing
+     * quote sits on a later argv token. A missing closing quote absorbs tokens up to
+     * the next flag (or end of input).
+     *
+     * @return array<string, list<string>>
+     */
     private function parseGlobalArgs(): array
     {
         global $argv;
-        $flags = [];
         if (!isset($argv)) {
-            return $flags;
+            return [];
         }
 
-        $args = array_slice($argv, 1);
-        $count = count($args);
+        $tokens = $this->collapseQuotedSpans(array_slice($argv, 1));
+
+        $flags = [];
         $currentFlag = null;
-
-        for ($i = 0; $i < $count; $i++) {
-            $arg = $args[$i];
-
-            if (str_starts_with($arg, '--')) {
-                $flag = CliCommandFlag::tryFrom(substr($arg, 2));
+        foreach ($tokens as $token) {
+            $flag = $this->parseFlag($token);
+            if ($flag !== null) {
                 $currentFlag = $flag;
-                if ($flag !== null) {
-                    $flags[$flag->name] ??= [];
-                }
+                $flags[$flag->name] ??= [];
                 continue;
             }
-
             if ($currentFlag === null) {
                 continue;
             }
-
-            $flags[$currentFlag->name][] = $this->resolveQuotedArgument($args, $i, $count);
+            $flags[$currentFlag->name][] = $token;
         }
 
         return $flags;
     }
 
-    private function resolveQuotedArgument(array $args, int &$i, int $count): string
+    /**
+     * Returns the {@see CliCommandFlag} case matching the given `--flag` token,
+     * or `null` if the token is not a flag or not a known flag.
+     */
+    private function parseFlag(string $token): ?CliCommandFlag
     {
-        $arg = $args[$i];
-        $quote = $arg[0];
-
-        if ($quote !== "'" && $quote !== '"') {
-            return $arg;
+        if (!str_starts_with($token, '--')) {
+            return null;
         }
+        return CliCommandFlag::tryFrom(substr($token, 2));
+    }
 
-        if (str_ends_with($arg, $quote) && strlen($arg) > 1) {
-            return substr($arg, 1, -1);
-        }
-
-        $parts = [strlen($arg) > 1 ? substr($arg, 1) : ''];
-        $i++;
+    /**
+     * Walks `$tokens` and merges each quoted span (e.g. `'a b'` split across
+     * multiple argv tokens) into one unquoted token. A `--`-prefixed token
+     * ends the current span and stays in the output so {@see parseGlobalArgs()}
+     * can recognise it as a flag boundary.
+     *
+     * @param list<string> $tokens
+     * @return list<string>
+     */
+    private function collapseQuotedSpans(array $tokens): array
+    {
+        $result = [];
+        $count = count($tokens);
+        $i = 0;
         while ($i < $count) {
-            $next = $args[$i];
-            if (str_starts_with($next, '--')) {
-                $i--;
-                break;
+            $token = $tokens[$i];
+            if ($token !== '' && ($token[0] === "'" || $token[0] === '"')) {
+                [$merged, $nextIndex] = $this->consumeQuotedSpan($tokens, $i, $count);
+                $result[] = $merged;
+                $i = $nextIndex;
+                continue;
             }
-            if (str_ends_with($next, $quote)) {
-                $parts[] = substr($next, 0, -1);
-                break;
-            }
-            $parts[] = $next;
+            $result[] = $token;
             $i++;
         }
+        return $result;
+    }
 
-        return implode(' ', $parts);
+    /**
+     * Reads a quoted span beginning at `$start` and returns a `[value, nextIndex]`
+     * tuple. The value has the surrounding quotes stripped. The next index points
+     * to the first token after the consumed span (`$start + 1` for single-token
+     * spans, the index of the matching closing quote + 1 when found, the index
+     * of a `--` boundary token (which is left unconsumed), or the token count
+     * if the span runs to the end of the input).
+     *
+     * @param list<string> $tokens
+     * @return array{0: string, 1: int}
+     */
+    private function consumeQuotedSpan(array $tokens, int $start, int $count): array
+    {
+        $quote = $tokens[$start][0];
+        $first = $tokens[$start];
+
+        if (strlen($first) > 1 && str_ends_with($first, $quote)) {
+            return [substr($first, 1, -1), $start + 1];
+        }
+
+        $parts = [strlen($first) > 1 ? substr($first, 1) : ''];
+        $i = $start + 1;
+        while ($i < $count) {
+            $token = $tokens[$i];
+            if (str_starts_with($token, '--')) {
+                return [implode(' ', $parts), $i];
+            }
+            if (str_ends_with($token, $quote)) {
+                $parts[] = substr($token, 0, -1);
+                return [implode(' ', $parts), $i + 1];
+            }
+            $parts[] = $token;
+            $i++;
+        }
+        return [implode(' ', $parts), $i];
     }
 
     public function runCommand(): bool
