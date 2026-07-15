@@ -17,7 +17,7 @@ readonly class MainNavigationComponent implements Template
         $items = $this->walkItems($this->navItems);
 
         return <<<HTML
-        <nav id="main-nav">
+        <nav id="top-nav">
             {$items}
         </nav>
         HTML;
@@ -31,7 +31,7 @@ readonly class MainNavigationComponent implements Template
             if (is_array($item)) {
                 $html .= <<<HTML
                         <li>
-                            <span class='navItem'>$title</span>
+                            <span class='nav-item'>$title</span>
                             {$this->walkItems($item)}
                         </li>
                         HTML;

@@ -4,3 +4,53 @@
     margin: 0;
     font-family: Georgia, serif;
 }
+
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+header,
+footer {
+    border: 1px solid black;
+    padding: 0.5rem;
+}
+
+.top-nav,
+.bottom-nav {
+    display: flex;
+    gap: 1rem;
+}
+
+.layout {
+    display: flex;
+    flex: 1;
+    border: 1px solid black;
+}
+
+.sidebar {
+    width: 10rem;
+    border-right: 1px solid black;
+    padding: 0.5rem;
+}
+
+.tags {
+    list-style: none;
+}
+
+.content {
+    flex: 1;
+    padding: 0.5rem;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+}
+
+.tile {
+    border: 1px solid black;
+    aspect-ratio: 1 / 1;
+}
