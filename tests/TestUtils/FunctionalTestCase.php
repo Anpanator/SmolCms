@@ -60,10 +60,7 @@ class FunctionalTestCase extends SimpleTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            $_SESSION = [];
-            session_destroy();
-        }
+        $this->destroySessions();
         $this->initAutowires();
     }
 
@@ -78,6 +75,14 @@ class FunctionalTestCase extends SimpleTestCase
             $propertyTypeName = $reflectionProperty->getType()->getName();
             $service = self::$serviceBuilder->getService($propertyTypeName);
             $reflectionProperty->setValue($this, $service);
+        }
+    }
+
+    private static function destroySessions(): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $_SESSION = [];
+            session_destroy();
         }
     }
 
@@ -104,6 +109,7 @@ class FunctionalTestCase extends SimpleTestCase
 
     private static function initCore(): void
     {
+        self::destroySessions();
         self::$serviceBuilder = new ServiceBuilder(
             self::$serviceConfiguration,
             new ServiceRegistry()
