@@ -6,6 +6,7 @@ namespace SmolCms\Config;
 
 
 use SmolCms\Controller\AuthController;
+use SmolCms\Controller\ImageUploadController;
 use SmolCms\Controller\IndexController;
 use SmolCms\Controller\LoginController;
 use SmolCms\Controller\RegisterController;
@@ -65,6 +66,11 @@ class RoutingConfiguration
                 method: HttpMethod::POST,
                 controller: AuthController::class,
                 handler: 'logoutAction'
+            ),
+            'ImageUploadPostRoute' => new Route(
+                path: '/upload-image',
+                method: HttpMethod::POST,
+                controller: ImageUploadController::class,
             ),
             'IndexPostRoute' => new Route(
                 path: RouteEnum::START_PAGE->value,

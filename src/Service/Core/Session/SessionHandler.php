@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace SmolCms\Service\Core\Session;
 
+use DateTime;
 use RuntimeException;
 use SessionHandlerInterface;
 use SessionUpdateTimestampHandlerInterface;
@@ -59,7 +60,7 @@ readonly class SessionHandler implements SessionHandlerInterface, SessionUpdateT
             $session = new SessionEntity(
                 id: null,
                 sessionId: $id,
-                created: null,
+                created: new DateTime(),
                 data: $data
             );
         }

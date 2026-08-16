@@ -3,12 +3,9 @@ declare(strict_types=1);
 
 namespace SmolCms\Test\Controller;
 
-use DateTime;
 use SmolCms\Data\Business\Url;
-use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
-use SmolCms\Data\Persistence\UserEntity;
 use SmolCms\Data\Request\Request;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\UserService;
@@ -121,38 +118,5 @@ class UserSettingControllerTest extends FunctionalTestCase
         $response = $this->simulateRequest($request);
 
         $this->assertEquals(HttpStatus::BAD_REQUEST, $response->getStatus());
-    }
-
-    private function loginUser(string $loginName, string $displayName): void
-    {
-        $password = 'secure-password-123';
-
-        $user = new UserEntity(
-            id: null,
-            loginName: $loginName,
-            password: password_hash($password, PASSWORD_DEFAULT),
-            displayName: $displayName,
-            state: 'active',
-            registerDate: new DateTime(),
-            lastLoginDate: null,
-            accessLevel: AccessLevel::NOVICE,
-        );
-        $this->userService->saveAsNew($user);
-
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            $_SESSION = [];
-            session_destroy();
-        }
-
-        $loginUrl = new Url(protocol: 'https', host: 'localhost', path: '/login');
-        $loginRequest = new Request(
-            url: $loginUrl,
-            method: HttpMethod::POST,
-            postParams: [
-                'loginName' => $loginName,
-                'password' => $password,
-            ]
-        );
-        $this->simulateRequest($loginRequest);
     }
 }
