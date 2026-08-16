@@ -108,7 +108,7 @@ readonly class FileSystemAccessService
         return $resultFiles;
     }
 
-    private function isPathAllowed(string $path): bool
+    public function isPathAllowed(string $path): bool
     {
         $normalizedPath = realpath($path);
         if (!$normalizedPath) {

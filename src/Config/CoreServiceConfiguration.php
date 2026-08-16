@@ -22,9 +22,13 @@ use SmolCms\Service\Core\Startup\RegisterSessionHandlerStartupAction;
 use SmolCms\Service\Core\Startup\RestrictDirectoryAccessStartupAction;
 use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
 use SmolCms\Service\File\FileSystemAccessService;
+use SmolCms\Service\Image\AvifImageProcessor;
 use SmolCms\Service\Image\AvifImageTypeDetector;
+use SmolCms\Service\Image\ImageStorageService;
 use SmolCms\Service\Image\ImageTypeDetectionFacade;
+use SmolCms\Service\Image\JpegImageProcessor;
 use SmolCms\Service\Image\JpegImageTypeDetector;
+use SmolCms\Service\Image\PngImageProcessor;
 use SmolCms\Service\Image\PngImageTypeDetector;
 
 class CoreServiceConfiguration
@@ -85,6 +89,31 @@ class CoreServiceConfiguration
                     GenerateMigrationExecutor::class,
                     MigrationsExecutor::class,
                     ResetDbExecutor::class,
+                ]
+            ),
+            new Service(
+                identifier: ImageStorageService::class,
+                parameters: [
+                    IMAGE_STORAGE_DIR,
+                    FileSystemAccessService::class,
+                ]
+            ),
+            new Service(
+                identifier: PngImageProcessor::class,
+                parameters: [
+                    ImageStorageService::class,
+                ]
+            ),
+            new Service(
+                identifier: JpegImageProcessor::class,
+                parameters: [
+                    ImageStorageService::class,
+                ]
+            ),
+            new Service(
+                identifier: AvifImageProcessor::class,
+                parameters: [
+                    ImageStorageService::class,
                 ]
             ),
             new Service(

@@ -12,7 +12,11 @@ const FS_DIRECTORY_WHITELIST = [
 // FS_DIRECTORY_WHITELIST above. Also note that this config cannot be more permissive than FS_DIRECTORY_WHITELIST.
 // You may define individual files OR directories here.
 const FS_APP_LEVEL_WHITELIST = [
-    ROOT_DIR . '/private'
+    ROOT_DIR . '/private/init',
+    ROOT_DIR . '/private/sql',
+    ROOT_DIR . '/private/upload',
 ];
 
 const MIGRATION_DIR = ROOT_DIR . '/private/sql';
+
+const IMAGE_STORAGE_DIR = ROOT_DIR . '/private/upload/img';
