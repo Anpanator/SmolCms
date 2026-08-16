@@ -30,9 +30,9 @@ class RequestFactory
             url: $url,
             method: HttpMethod::from($_SERVER['REQUEST_METHOD']),
             headers: getallheaders() ?: null,
-            rawBody: file_get_contents('php://input') ?: null,
             postParams: $_POST ?: null,
-            getParams: $_GET ?: null
+            getParams: $_GET ?: null,
+            files: $_FILES ?: null,
         );
     }
 

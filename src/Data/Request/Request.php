@@ -15,9 +15,9 @@ readonly class Request
         public Url        $url,
         public HttpMethod $method,
         public array      $headers = [],
-        public ?string    $rawBody = null,
         public ?array     $postParams = null,
         public ?array     $getParams = null,
+        public ?array $files = null,
     )
     {
     }

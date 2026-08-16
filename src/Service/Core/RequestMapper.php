@@ -75,6 +75,11 @@ readonly class RequestMapper
             // POST params have higher priority in case of name conflicts
             $mappedParams[$name] = $request->postParams[$name] ?? $request->getParams[$name] ?? null;
         }
+
+        // Add files if present in the request
+        if ($request->files !== null) {
+            $mappedParams['files'] = $request->files;
+        }
         $class = $refClassOfClassToMap->getName();
         try {
             $mappedRequest = new $class(...$mappedParams);

@@ -22,6 +22,10 @@ use SmolCms\Service\Core\Startup\RegisterSessionHandlerStartupAction;
 use SmolCms\Service\Core\Startup\RestrictDirectoryAccessStartupAction;
 use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
 use SmolCms\Service\File\FileSystemAccessService;
+use SmolCms\Service\Image\AvifImageTypeDetector;
+use SmolCms\Service\Image\ImageTypeDetectionFacade;
+use SmolCms\Service\Image\JpegImageTypeDetector;
+use SmolCms\Service\Image\PngImageTypeDetector;
 
 class CoreServiceConfiguration
 {
@@ -82,6 +86,23 @@ class CoreServiceConfiguration
                     MigrationsExecutor::class,
                     ResetDbExecutor::class,
                 ]
+            ),
+            new Service(
+                identifier: ImageTypeDetectionFacade::class,
+                parameters: [
+                    PngImageTypeDetector::class,
+                    JpegImageTypeDetector::class,
+                    AvifImageTypeDetector::class,
+                ]
+            ),
+            new Service(
+                identifier: PngImageTypeDetector::class,
+            ),
+            new Service(
+                identifier: JpegImageTypeDetector::class,
+            ),
+            new Service(
+                identifier: AvifImageTypeDetector::class,
             ),
         ];
 
