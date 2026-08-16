@@ -6,7 +6,6 @@ namespace SmolCms\Config;
 
 
 use PDO;
-use SmolCms\Controller\ImageUploadController;
 use SmolCms\Data\Business\Service;
 use SmolCms\Exception\ServiceConflictException;
 use SmolCms\Service\Core\Action\AuthorizationPreControllerAction;
@@ -25,6 +24,7 @@ use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
 use SmolCms\Service\File\FileSystemAccessService;
 use SmolCms\Service\Image\AvifImageProcessor;
 use SmolCms\Service\Image\AvifImageTypeDetector;
+use SmolCms\Service\Image\ImageProcessorFacade;
 use SmolCms\Service\Image\ImageStorageService;
 use SmolCms\Service\Image\ImageTypeDetectionFacade;
 use SmolCms\Service\Image\JpegImageProcessor;
@@ -136,17 +136,17 @@ class CoreServiceConfiguration
                 identifier: AvifImageTypeDetector::class,
             ),
             new Service(
-                identifier: ImageUploadValidator::class,
+                identifier: ImageProcessorFacade::class,
                 parameters: [
-                    ImageTypeDetectionFacade::class,
+                    PngImageProcessor::class,
+                    JpegImageProcessor::class,
+                    AvifImageProcessor::class,
                 ]
             ),
             new Service(
-                identifier: ImageUploadController::class,
+                identifier: ImageUploadValidator::class,
                 parameters: [
-                    ImageUploadValidator::class,
                     ImageTypeDetectionFacade::class,
-                    JpegImageProcessor::class,
                 ]
             ),
         ];

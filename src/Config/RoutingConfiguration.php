@@ -67,8 +67,13 @@ class RoutingConfiguration
                 controller: AuthController::class,
                 handler: 'logoutAction'
             ),
+            RouteEnum::UPLOAD_IMAGE->name => new Route(
+                path: RouteEnum::UPLOAD_IMAGE->value,
+                method: HttpMethod::GET,
+                controller: ImageUploadController::class,
+            ),
             'ImageUploadPostRoute' => new Route(
-                path: '/upload-image',
+                path: RouteEnum::UPLOAD_IMAGE->value,
                 method: HttpMethod::POST,
                 controller: ImageUploadController::class,
             ),

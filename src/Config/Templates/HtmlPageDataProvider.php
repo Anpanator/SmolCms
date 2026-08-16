@@ -33,6 +33,7 @@ readonly class HtmlPageDataProvider
                 'Logout' => RouteEnum::LOGOUT,
             ],
             'Register' => RouteEnum::REGISTER,
+            'Upload Image' => RouteEnum::UPLOAD_IMAGE,
         ];
     }
 }

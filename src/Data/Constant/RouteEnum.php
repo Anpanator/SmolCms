@@ -10,4 +10,5 @@ enum RouteEnum: string
     case LOGOUT = '/logout';
     case REGISTER = '/register';
     case SETTINGS = '/settings';
+    case UPLOAD_IMAGE = '/upload-image';
 }
