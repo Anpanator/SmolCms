@@ -40,6 +40,15 @@ final readonly class ResetDbExecutor implements CliCommandExecutor
             default => throw new RuntimeException("Unsupported database driver: $driver"),
         };
 
+        if (!$noconfirm) {
+            echo "This will drop all tables and reinitialize the database. Proceed? [y/N] ";
+            $input = fgets(STDIN);
+            if (!is_string($input) || strtolower(trim($input)) !== 'y') {
+                echo "Aborted.\n";
+                return;
+            }
+        }
+
         if ($tableNames === []) {
             echo "No tables to drop.\n";
         }

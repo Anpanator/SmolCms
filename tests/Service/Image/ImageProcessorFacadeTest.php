@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace SmolCms\Test\Service\Image;
 
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\MockObject\MockObject;
 use SmolCms\Service\Image\ImageProcessorFacade;
 use SmolCms\Service\Image\ImageProcessorInterface;
@@ -48,6 +49,7 @@ class ImageProcessorFacadeTest extends SimpleTestCase
         $this->testee->processImage($imageData, $filename);
     }
 
+    #[AllowMockObjectsWithoutExpectations]
     public function testProcessImage_emptyArray_noErrors(): void
     {
         $testee = new ImageProcessorFacade();

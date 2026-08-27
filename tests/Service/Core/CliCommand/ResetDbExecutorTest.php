@@ -42,7 +42,7 @@ class ResetDbExecutorTest extends FunctionalTestCase
         )->fetchAll(PDO::FETCH_COLUMN);
         $this->assertGreaterThan(0, $tablesBefore);
         ob_start();
-        $this->resetDbExecutor->execute([]);
+        $this->resetDbExecutor->execute([], true);
         ob_end_clean();
 
         $tablesAfter = $this->pdo->query(
@@ -54,7 +54,7 @@ class ResetDbExecutorTest extends FunctionalTestCase
     public function testExecute_noTablesToDrop_outputsMessage(): void
     {
         ob_start();
-        $this->resetDbExecutor->execute([]);
+        $this->resetDbExecutor->execute([], true);
         ob_end_clean();
 
         $allTables = $this->pdo->query(
@@ -68,6 +68,6 @@ class ResetDbExecutorTest extends FunctionalTestCase
             . "Initialized database from: " . ROOT_DIR . "/private/init/init_sqlite.sql\n"
             . "Reset complete.\n";
         $this->expectOutputString($expectedOutput);
-        $this->resetDbExecutor->execute([]);
+        $this->resetDbExecutor->execute([], true);
     }
 }
