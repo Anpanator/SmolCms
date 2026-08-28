@@ -51,8 +51,10 @@ class QueryBuilder
 
         if ($qc->getLimit() !== null || $qc->getOffset() !== null) {
             $queryParts[] = 'LIMIT';
-            $queryParts[] = $qc->getOffset() ? $qc->getOffset() . ',' : '';
-            $queryParts[] = $qc->getLimit() ?: self::NO_LIMIT_NUM;
+            if ($qc->getOffset() !== null) {
+                $queryParts[] = $qc->getOffset() . ',';
+            }
+            $queryParts[] = $qc->getLimit() ?? self::NO_LIMIT_NUM;
         }
 
         return implode(' ', $queryParts);

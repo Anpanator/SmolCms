@@ -28,6 +28,10 @@ class UrlFactory
     public function createUrlFromUrlString(string $url): Url
     {
         $urlParts = parse_url($url);
+        if ($urlParts === false) {
+            throw new InvalidArgumentException('Invalid URL.');
+        }
+
         $urlObj = new Url(
             protocol: $urlParts['scheme'] ?? '',
             host: $urlParts['host'] ?? '',

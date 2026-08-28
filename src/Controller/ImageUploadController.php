@@ -53,6 +53,7 @@ readonly class ImageUploadController
     #[Authenticated(AccessLevel::NOVICE)]
     public function postAction(Request $request): Response
     {
+        // TODO: Move this type of validation to attribute, and receive ValidatedRequest instead?
         if (!$this->imageUploadValidator->validate($request)) {
             return new Response(HttpStatus::BAD_REQUEST);
         }

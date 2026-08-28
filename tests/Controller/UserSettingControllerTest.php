@@ -90,6 +90,20 @@ class UserSettingControllerTest extends FunctionalTestCase
         $response = $this->simulateRequest($request);
 
         $this->assertEquals(HttpStatus::UNAUTHORIZED, $response->getStatus());
+        $this->assertNull($this->sessionService->getUserData());
+    }
+
+    public function testPostAction_UnauthenticatedMalformedRequestIsRejectedBeforeValidation(): void
+    {
+        $request = new Request(
+            url: $this->settingsUrl,
+            method: HttpMethod::POST,
+            postParams: null
+        );
+
+        $response = $this->simulateRequest($request);
+
+        $this->assertSame(HttpStatus::UNAUTHORIZED, $response->getStatus());
     }
 
     public function testPostAction_EmptyDisplayName(): void

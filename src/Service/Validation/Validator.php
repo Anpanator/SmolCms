@@ -32,7 +32,7 @@ class Validator
                 $attribute = $reflectionAttribute->newInstance();
                 if ($attribute instanceof ValidateObject) {
                     if ($propertyValue === null) {
-                        $messages[$reflectionProperty->getName()] = 'Cannot run nested validation on null';
+                        continue;
                     }
                     $nestedValidationResult = $this->validate($propertyValue);
                     $isPropertyValid = $nestedValidationResult->isValid();

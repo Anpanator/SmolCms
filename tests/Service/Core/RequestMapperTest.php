@@ -82,9 +82,35 @@ class RequestMapperTest extends SimpleTestCase
         self::assertSame($request, $result->rawRequest);
     }
 
+    public function testMapRequest_mapsFilesIntoValidatedRequest(): void
+    {
+        $files = [
+            'image' => [
+                'name' => 'image.jpg',
+                'tmp_name' => '/tmp/image.jpg',
+            ],
+        ];
+        $request = $this->createRequest(files: $files);
+        $controller = new TestController();
+
+        $result = $this->requestMapper->mapRequest($request, $controller, 'filesAction');
+
+        self::assertInstanceOf(FilesTestRequest::class, $result);
+        self::assertSame($files, $result->files);
+    }
+
     public function testMapRequest_throwsBadRequestExceptionOnTypeError(): void
     {
         $request = $this->createRequest(postParams: []);
+        $controller = new TestController();
+
+        $this->expectException(BadRequestException::class);
+        $this->requestMapper->mapRequest($request, $controller, 'strictAction');
+    }
+
+    public function testMapRequest_throwsBadRequestExceptionOnMalformedMappedValue(): void
+    {
+        $request = $this->createRequest(postParams: ['required' => ['not a string']]);
         $controller = new TestController();
 
         $this->expectException(BadRequestException::class);
@@ -100,13 +126,18 @@ class RequestMapperTest extends SimpleTestCase
         $this->requestMapper->mapRequest($request, $controller, 'noRequestAction');
     }
 
-    private function createRequest(?array $postParams = null, ?array $getParams = null): Request
+    private function createRequest(
+        ?array $postParams = null,
+        ?array $getParams = null,
+        ?array $files = null,
+    ): Request
     {
         return new Request(
             url: new Url(protocol: 'https', host: 'example.com', path: '/test'),
             method: HttpMethod::POST,
             postParams: $postParams,
             getParams: $getParams,
+            files: $files,
         );
     }
 }
@@ -134,6 +165,17 @@ readonly class StrictTestRequest extends ValidatedRequest
     }
 }
 
+readonly class FilesTestRequest extends ValidatedRequest
+{
+    public function __construct(
+        Request      $rawRequest,
+        public array $files,
+    )
+    {
+        parent::__construct($rawRequest);
+    }
+}
+
 class PlainObject
 {
 }
@@ -149,6 +191,10 @@ class TestController
     }
 
     public function strictAction(StrictTestRequest $request): void
+    {
+    }
+
+    public function filesAction(FilesTestRequest $request): void
     {
     }
 

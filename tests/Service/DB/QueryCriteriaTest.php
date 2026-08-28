@@ -43,7 +43,7 @@ class QueryCriteriaTest extends SimpleTestCase
     public function testSelect_typeAlreadySet_throwsException(): void
     {
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Query type is already set to: SELECT');
+        $this->expectExceptionMessageIsOrContains('Query type is already set to: SELECT');
         $queryCriteria = new QueryCriteria();
         $queryCriteria
             ->select('TestEntity')
@@ -92,7 +92,7 @@ class QueryCriteriaTest extends SimpleTestCase
     public function testOrWhere_firstCondition_throwsException(): void
     {
         $this->expectException(InvalidStateException::class);
-        $this->expectExceptionMessage('Cannot use orWhere as the first where condition. Use andWhere instead.');
+        $this->expectExceptionMessageIsOrContains('Cannot use orWhere as the first where condition. Use andWhere instead.');
         $queryCriteria = new QueryCriteria();
         $queryCriteria
             ->select('TestEntity')

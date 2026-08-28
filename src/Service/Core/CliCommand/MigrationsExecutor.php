@@ -6,6 +6,7 @@ namespace SmolCms\Service\Core\CliCommand;
 
 use Exception;
 use PDO;
+use RuntimeException;
 use SmolCms\Data\Constant\CliCommandFlag;
 use SmolCms\Exception\FileAccessException;
 use SmolCms\Service\File\FileSystemAccessService;
@@ -35,7 +36,7 @@ final readonly class MigrationsExecutor implements CliCommandExecutor
         try {
             $migrationFiles = $this->fileSystemAccessService->listFiles($this->migrationDir);
         } catch (FileAccessException) {
-            echo "Migration directory not found: {${$this->migrationDir}}\n";
+            echo "Migration directory not found: {$this->migrationDir}" . PHP_EOL;
             return;
         }
 
@@ -89,7 +90,10 @@ final readonly class MigrationsExecutor implements CliCommandExecutor
             }
 
             try {
-                $this->pdo->exec($sql);
+                if ($this->pdo->exec($sql) === false) {
+                    $errorInfo = $this->pdo->errorInfo();
+                    throw new RuntimeException($errorInfo[2] ?? 'Database execution failed.');
+                }
                 $this->recordMigration($filename);
                 echo "Executed migration: $filename\n";
             } catch (Exception $e) {

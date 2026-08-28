@@ -41,7 +41,7 @@ class AuthControllerTest extends FunctionalTestCase
             state: 'active',
             registerDate: new DateTime(),
             lastLoginDate: null,
-            accessLevel: AccessLevel::NOVICE,
+            accessLevel: AccessLevel::FELLOW,
         );
         $this->userService->saveAsNew($user);
 
@@ -67,6 +67,12 @@ class AuthControllerTest extends FunctionalTestCase
         $this->assertEquals(HttpStatus::SEE_OTHER, $response->getStatus());
         $this->assertArrayHasKey('Location', $response->getHeaders());
         $this->assertSame('/', $response->getHeaders()['Location']);
+
+        $sessionUserData = $this->sessionService->getUserData();
+        $this->assertNotNull($sessionUserData);
+        $this->assertSame($user->getId(), $sessionUserData->id);
+        $this->assertSame($user->getDisplayName(), $sessionUserData->displayName);
+        $this->assertSame($user->getAccessLevel(), $sessionUserData->accessLevel);
     }
 
     public function testPostAction_NoErrorOnEmptyPostParams(): void
@@ -108,6 +114,38 @@ class AuthControllerTest extends FunctionalTestCase
         $response = $this->simulateRequest($request);
 
         $this->assertEquals(HttpStatus::UNAUTHORIZED->value, $response->getStatus()->value);
+    }
+
+    public function testPostAction_UnauthorizedOnWrongPasswordWithoutAuthenticatedSession(): void
+    {
+        $loginName = 'wrong-password-user';
+        $correctPassword = 'secure-password-123';
+
+        $user = new UserEntity(
+            id: null,
+            loginName: $loginName,
+            password: password_hash($correctPassword, PASSWORD_DEFAULT),
+            displayName: 'Wrong Password User',
+            state: 'active',
+            registerDate: new DateTime(),
+            lastLoginDate: null,
+            accessLevel: AccessLevel::NOVICE,
+        );
+        $this->userService->saveAsNew($user);
+
+        $request = new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: '/login'),
+            method: HttpMethod::POST,
+            postParams: [
+                'loginName' => $loginName,
+                'password' => 'incorrect-password',
+            ]
+        );
+
+        $response = $this->simulateRequest($request);
+
+        $this->assertSame(HttpStatus::UNAUTHORIZED, $response->getStatus());
+        $this->assertNull($this->sessionService->getUserData());
     }
 
     public function testLogoutAction_RedirectsToStartPage(): void
@@ -160,6 +198,21 @@ class AuthControllerTest extends FunctionalTestCase
         $response = $this->simulateRequest($logoutRequest);
 
         $this->assertEquals(HttpStatus::SEE_OTHER, $response->getStatus());
+        $this->assertArrayHasKey('Location', $response->getHeaders());
+        $this->assertSame('/', $response->getHeaders()['Location']);
+        $this->assertNull($this->sessionService->getUserData());
+    }
+
+    public function testLogoutAction_RedirectsToStartPageWithoutActiveSession(): void
+    {
+        $logoutRequest = new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: '/logout'),
+            method: HttpMethod::POST,
+        );
+
+        $response = $this->simulateRequest($logoutRequest);
+
+        $this->assertSame(HttpStatus::SEE_OTHER, $response->getStatus());
         $this->assertArrayHasKey('Location', $response->getHeaders());
         $this->assertSame('/', $response->getHeaders()['Location']);
         $this->assertNull($this->sessionService->getUserData());

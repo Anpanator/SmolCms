@@ -30,7 +30,7 @@ class Url
         $url .= $this->host ?: '';
         $url .= $this->port ? ":{$this->port}" : '';
         $url .= $this->path ?: '/';
-        $url .= $this->query ?: '';
+        $url .= $this->query !== null && $this->query !== '' ? "?$this->query" : '';
         return $url;
     }
 }

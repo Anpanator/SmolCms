@@ -10,6 +10,7 @@ use Exception;
 use PDO;
 use PDOStatement;
 use ReflectionClass;
+use ReflectionEnum;
 use ReflectionException;
 use ReflectionNamedType;
 use SmolCms\Exception\PersistenceException;
@@ -62,7 +63,12 @@ abstract readonly class EntityService
             if (is_a($propType->getName(), DateTime::class, true) && isset($mappedData[$propName])) {
                 $entityProps[$propName] = new DateTime($mappedData[$propName]) ?? null;
             } elseif (is_a($propType->getName(), BackedEnum::class, true) && isset($mappedData[$propName])) {
-                $entityProps[$propName] = $propType->getName()::from($mappedData[$propName]);
+                $enumValue = $mappedData[$propName];
+                $enumReflection = new ReflectionEnum($propType->getName());
+                if ($enumReflection->getBackingType()->getName() === 'int') {
+                    $enumValue = (int)$enumValue;
+                }
+                $entityProps[$propName] = $propType->getName()::from($enumValue);
             } else {
                 $entityProps[$propName] = $mappedData[$propName] ?? null;
             }

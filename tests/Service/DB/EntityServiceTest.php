@@ -7,6 +7,8 @@ use DateTime;
 use PDO;
 use PDOStatement;
 use PHPUnit\Framework\MockObject\MockObject;
+use RuntimeException;
+use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Exception\PersistenceException;
 use SmolCms\Service\Core\CaseConverter;
 use SmolCms\Service\DB\EntityAttributeProcessor;
@@ -79,10 +81,44 @@ class EntityServiceTest extends SimpleTestCase
         self::assertInstanceOf(TestData::class, $result);
         self::assertSame('!!!', $result->testFieldOne);
         self::assertSame(100, $result->testFieldNumberTwo);
+        self::assertSame('2023-01-01 00:12:13', $result->testDateField->format('Y-m-d H:i:s'));
         self::assertNull($result->optional);
     }
 
-    public function testSaveAsNew_success()
+    public function testMapResultToEntity_mapsEnumAndDateTime(): void
+    {
+        $this->pdo
+            ->expects($this->never())
+            ->method('prepare')
+            ->seal();
+        $this->PDOStatement
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+
+        $testData = [
+            'created' => '2024-02-03 04:05:06',
+            'access_level' => (string)AccessLevel::MASTER->value,
+        ];
+
+        $this->caseConverter
+            ->method('snakeCaseToCamelCase')
+            ->willReturnMap(
+                [
+                    ['created', 'created'],
+                    ['access_level', 'accessLevel'],
+                ]
+            )
+            ->seal();
+
+        /** @var TestDataWithEnumAndDateTime $result */
+        $result = $this->entityService->mapResultToEntity($testData, TestDataWithEnumAndDateTime::class);
+
+        self::assertSame('2024-02-03 04:05:06', $result->getCreated()->format('Y-m-d H:i:s'));
+        self::assertSame(AccessLevel::MASTER, $result->getAccessLevel());
+    }
+
+    public function testSaveAsNew_success(): void
     {
         $this->caseConverter
             ->method('camelCaseToSnakeCase')
@@ -115,7 +151,7 @@ class EntityServiceTest extends SimpleTestCase
         self::assertSame(123456, $entity->testFieldNumberTwo);
     }
 
-    public function testSaveAsNew_successWithDateTimeFields()
+    public function testSaveAsNew_successWithDateTimeFields(): void
     {
         $dateFieldName = 'dateTime';
         $dbFieldName = 'date_time';
@@ -154,7 +190,130 @@ class EntityServiceTest extends SimpleTestCase
         self::assertSame($expectedDateStr, $capturedParams[$dbFieldName]);
     }
 
-    public function testUpdate_failureWithoutIdInEntity()
+    public function testUpdate_success(): void
+    {
+        $expectedDate = new DateTime('2000-01-01 12:00:00');
+        $entity = new TestData('updated', 123, $expectedDate, 'optional');
+
+        $this->caseConverter
+            ->method('camelCaseToSnakeCase')
+            ->willReturnMap(
+                [
+                    ['testFieldOne', 'test_field_one'],
+                    ['testFieldNumberTwo', 'test_field_number_two'],
+                    ['testDateField', 'test_date_field'],
+                    ['optional', 'optional'],
+                ]
+            )
+            ->seal();
+        $this->entityAttributeProcessor
+            ->method('getEntityIdFieldName')
+            ->willReturn('testFieldNumberTwo')
+            ->seal();
+        $this->queryBuilder
+            ->method('buildQuery')
+            ->willReturn('UPDATE test_table SET test_field_one = :test_field_one')
+            ->seal();
+        $this->pdo
+            ->method('prepare')
+            ->willReturn($this->PDOStatement)
+            ->seal();
+        $this->PDOStatement
+            ->expects($this->once())
+            ->method('execute')
+            ->with(
+                [
+                    'test_field_one' => 'updated',
+                    'test_field_number_two' => 123,
+                    'test_date_field' => '2000-01-01 12:00:00',
+                    'optional' => 'optional',
+                ]
+            )
+            ->seal();
+
+        $this->entityService->update($entity);
+    }
+
+    public function testSaveAsNew_databaseFailure_isWrapped(): void
+    {
+        $databaseException = new RuntimeException('database unavailable');
+        $entity = new TestEntityWithDateField(new DateTime('2000-01-01 12:00:00'));
+
+        $this->caseConverter
+            ->method('camelCaseToSnakeCase')
+            ->willReturnMap(
+                [
+                    ['dateTime', 'date_time'],
+                ]
+            )
+            ->seal();
+        $this->queryBuilder
+            ->method('buildInsertQuery')
+            ->willReturn('INSERT INTO test_table (date_time) VALUES (:date_time)')
+            ->seal();
+        $this->pdo
+            ->method('prepare')
+            ->willReturn($this->PDOStatement)
+            ->seal();
+        $this->PDOStatement
+            ->expects($this->once())
+            ->method('execute')
+            ->willThrowException($databaseException)
+            ->seal();
+
+        try {
+            $this->entityService->saveAsNew($entity);
+            self::fail('Expected saveAsNew() to throw a PersistenceException.');
+        } catch (PersistenceException $exception) {
+            self::assertSame('Failed to save new entity: ' . $entity::class, $exception->getMessage());
+            self::assertSame($databaseException, $exception->getPrevious());
+        }
+    }
+
+    public function testUpdate_databaseFailure_isWrapped(): void
+    {
+        $databaseException = new RuntimeException('database unavailable');
+        $entity = new TestData('updated', 123, new DateTime('2000-01-01 12:00:00'), null);
+
+        $this->caseConverter
+            ->method('camelCaseToSnakeCase')
+            ->willReturnMap(
+                [
+                    ['testFieldOne', 'test_field_one'],
+                    ['testFieldNumberTwo', 'test_field_number_two'],
+                    ['testDateField', 'test_date_field'],
+                    ['optional', 'optional'],
+                ]
+            )
+            ->seal();
+        $this->entityAttributeProcessor
+            ->method('getEntityIdFieldName')
+            ->willReturn('testFieldNumberTwo')
+            ->seal();
+        $this->queryBuilder
+            ->method('buildQuery')
+            ->willReturn('UPDATE test_table SET test_field_one = :test_field_one')
+            ->seal();
+        $this->pdo
+            ->method('prepare')
+            ->willReturn($this->PDOStatement)
+            ->seal();
+        $this->PDOStatement
+            ->expects($this->once())
+            ->method('execute')
+            ->willThrowException($databaseException)
+            ->seal();
+
+        try {
+            $this->entityService->update($entity);
+            self::fail('Expected update() to throw a PersistenceException.');
+        } catch (PersistenceException $exception) {
+            self::assertSame('Failed to update entity: ' . $entity::class, $exception->getMessage());
+            self::assertSame($databaseException, $exception->getPrevious());
+        }
+    }
+
+    public function testUpdate_failureWithoutIdInEntity(): void
     {
         $this->pdo
             ->expects($this->never())
@@ -208,6 +367,26 @@ class TestEntityWithDateField
     public function setDateTime(DateTime $dateTime): void
     {
         $this->dateTime = $dateTime;
+    }
+}
+
+class TestDataWithEnumAndDateTime
+{
+    public function __construct(
+        private DateTime    $created,
+        private AccessLevel $accessLevel,
+    )
+    {
+    }
+
+    public function getCreated(): DateTime
+    {
+        return $this->created;
+    }
+
+    public function getAccessLevel(): AccessLevel
+    {
+        return $this->accessLevel;
     }
 }
 

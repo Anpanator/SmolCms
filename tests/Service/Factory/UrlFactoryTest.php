@@ -32,6 +32,7 @@ class UrlFactoryTest extends SimpleTestCase
         self::assertSame(80, $url->port);
         self::assertSame('/some/fancy/path', $url->path);
         self::assertSame('queryParam1=test', $url->query);
+        self::assertSame($urlString, (string)$url);
     }
 
     public function testCreateUrlFromUrlString_failureValidationThrowsInvalidArgumentException()
@@ -44,6 +45,50 @@ class UrlFactoryTest extends SimpleTestCase
             ->seal();
         $urlString = 'https://example.com:80/some/fancy/path?queryParam1=test';
         $this->urlFactory->createUrlFromUrlString($urlString);
+    }
+
+    public function testCreateUrlFromUrlString_malformedUrlThrowsInvalidArgumentException(): void
+    {
+        $this->validator
+            ->expects(self::never())
+            ->method('validate')
+            ->seal();
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->urlFactory->createUrlFromUrlString('https://example.com:65536');
+    }
+
+    public function testCreateUrlFromUrlString_invalidProtocolThrowsInvalidArgumentException(): void
+    {
+        $this->validator
+            ->expects(self::never())
+            ->method('validate')
+            ->seal();
+        $this->expectException(InvalidArgumentException::class);
+
+        (new UrlFactory(new Validator()))->createUrlFromUrlString('ftp://example.com/');
+    }
+
+    public function testCreateUrlFromUrlString_invalidHostThrowsInvalidArgumentException(): void
+    {
+        $this->validator
+            ->expects(self::never())
+            ->method('validate')
+            ->seal();
+        $this->expectException(InvalidArgumentException::class);
+
+        (new UrlFactory(new Validator()))->createUrlFromUrlString('https://invalid host/');
+    }
+
+    public function testCreateUrlFromUrlString_invalidPortThrowsInvalidArgumentException(): void
+    {
+        $this->validator
+            ->expects(self::never())
+            ->method('validate')
+            ->seal();
+        $this->expectException(InvalidArgumentException::class);
+
+        (new UrlFactory(new Validator()))->createUrlFromUrlString('https://example.com:0/');
     }
 
     protected function setUp(): void

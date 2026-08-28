@@ -23,7 +23,7 @@ class RequestFactory
 
     public function buildRequestFromGlobals(): Request
     {
-        $isHttps = $_SERVER['HTTPS'] ?? '' === 'on';
+        $isHttps = ($_SERVER['HTTPS'] ?? '') === 'on';
         $urlString = $this->getRequestUrl($_SERVER['HTTP_HOST'] ?? '', $_SERVER['REQUEST_URI'] ?? '', $isHttps);
         $url = $this->urlFactory->createUrlFromUrlString($urlString);
         return new Request(

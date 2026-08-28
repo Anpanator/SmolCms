@@ -78,6 +78,43 @@ class QueryBuilderTest extends SimpleTestCase
         self::assertSame($expectedQuery, strtolower($resultQuery));
     }
 
+    public function testBuildDeleteQuery_successWithWhere(): void
+    {
+        $expectedQuery = 'delete from test_table where 1 and id = :id';
+        $queryCriteria = new QueryCriteria();
+        $queryCriteria
+            ->delete(TestEntity::class)
+            ->andWhere('id = :id');
+
+        $resultQuery = $this->queryBuilder->buildQuery($queryCriteria);
+
+        self::assertSame($expectedQuery, strtolower($resultQuery));
+    }
+
+    public function testBuildSelectQuery_successWithoutWhereClause(): void
+    {
+        $expectedQuery = 'select id, test_field from test_table';
+        $queryCriteria = new QueryCriteria();
+        $queryCriteria->select(TestEntity::class);
+
+        $resultQuery = $this->queryBuilder->buildQuery($queryCriteria);
+
+        self::assertSame($expectedQuery, strtolower($resultQuery));
+    }
+
+    public function testBuildSelectQuery_preservesZeroLimit(): void
+    {
+        $expectedQuery = 'select id, test_field from test_table limit 0';
+        $queryCriteria = new QueryCriteria();
+        $queryCriteria
+            ->select(TestEntity::class)
+            ->maxResults(0);
+
+        $resultQuery = $this->queryBuilder->buildQuery($queryCriteria);
+
+        self::assertSame($expectedQuery, strtolower($resultQuery));
+    }
+
     public function testBuildUpdateQuery_success(): void
     {
         $expectedQuery = 'update test_table set id = :id,test_field = :test_field';
