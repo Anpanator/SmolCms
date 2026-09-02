@@ -2,98 +2,188 @@
 :toc: macro
 :icons: font
 
-This is a learning project for me using PHP8. Since I haven't decided on a license yet, I don't accept contributions at the moment.
-If you want to use any code you'll have to ask for permission for the same reason.
+SmolCms is a small PHP web application learning project with routing, templating, user registration and authentication, SQLite persistence, and experimental image uploads.
+It requires PHP 8.5 or newer and the `PDO`, `mbstring`, `PDO_SQLite`, and `GD` extensions.
+
+The project currently has no declared open-source license, and contributions are not currently accepted.
+Third-party dependencies retain their own licenses.
 
 toc::[]
 
+== Installation and setup
+
+Install the Composer dependencies from the repository root:
+
+[source,shell]
+----
+composer install
+----
+
+The application expects these directories to exist:
+
+* `private/db` for the SQLite database
+* `private/sql` for migration files
+* `private/upload` and `private/upload/img` for image storage
+
+The PHP user needs read access to the application files and write access to the database, migration, and image-storage directories.
+The SQLite database file `private/db/smolcms.sq3` is ignored by Git.
+
+Initialize or reinitialize the database with the destructive reset command:
+
+[source,shell]
+----
+php src/app.php --reset-db
+----
+
+Use `--noconfirm` only when the reset should not prompt for confirmation.
+The command loads the driver-specific schema from `private/init/`.
+
+== Running the application
+
+The canonical entry point is `src/app.php`.
+The application uses CLI mode for the commands documented in <<_cli_commands>>.
+For HTTP requests, use a web server with PHP-FPM or another CGI-compatible PHP runtime.
+
+`private/references/nginx.conf` contains a reference Nginx configuration.
+Adapt its document root and PHP-FPM socket for the target system.
+It serves `/public/` as static files and forwards other requests to `src/app.php`.
+
 == Project constants
 
-Global constants are defined in `constants.php` at the project root.
-These constants will always be available (even in testing).
-It is not recommended to use them for configuration purposes, such as credentials.
+The root-level `constants.php` defines the global `ROOT_DIR` constant.
+The production entry point loads it before `config.php` and Composer's autoloader.
+Tests extending `SimpleTestCase` explicitly load both files.
+
+`config.php` defines the path configuration constants.
+Not intended for storing credentials.
 
 == Early startup configuration
 
-If you need to run bootstrapping code very early in the application startup, you can utilise the `ApplicationStartupHandler` service.
-
-In its service definition, it will take any number of `StartupAction` parameters, which will be run, in order, when the application starts.
+To run code during application initialization, define a concrete class implementing `StartupAction` with a `runAction(): void` method and add its service identifier to the `ApplicationStartupHandler` definition in `CoreServiceConfiguration`.
+The configured actions are resolved and executed in the order listed when `ApplicationCore::init()` is called.
 
 [source,php]
 ----
+// Inside CoreServiceConfiguration::__construct(), in the $services array:
 new Service(
     identifier: ApplicationStartupHandler::class,
     parameters: [
+        RestrictDirectoryAccessStartupAction::class,
+        RegisterSessionHandlerStartupAction::class,
+        ResumeSessionStartupAction::class,
         MyStartupAction::class,
         FancyStartupAction::class,
-    ]
-)
+    ],
+),
 ----
+
+The `parameters` entries are service identifiers, not instantiated actions.
+Actions with only class-typed dependencies can be autowired.
+Actions with scalar, array, or other non-autowireable dependencies require their own `Service` definition.
+The normal bootstrap runs these actions after service construction and before CLI or CGI handling.
+Calling `init()` again runs them again.
 
 [#_directory_access_restrictions]
 == Directory Access Restrictions
 
-During early application bootstrapping, access to directories from php is restricted via `open_basedir` runtime `ini_set`.
-The whitelist can be changed in `config.php`.
+During `ApplicationCore::init()`, the first configured startup action calls `ini_set('open_basedir', ...)` with `FS_DIRECTORY_WHITELIST` from `config.php`.
+With the default configuration on Unix-like systems, PHP filesystem operations after that point are limited to `ROOT_DIR/private` and `ROOT_DIR/src`.
 
-Note:: When the startup action is run, relevant includes already happened, so it is unnecessary to add `/src` or the project root to the allow list.
+The bootstrap files and service graph are loaded or constructed before `ApplicationCore::init()`, so this is not process-start protection.
+Keep `ROOT_DIR/src` in the whitelist because Composer may autoload route controllers and other services after startup.
+The project root itself is not required by the current entry point after bootstrap, but any later include, autoload, or native filesystem path must be permitted.
+
+`ini_set()` changes the setting only for the current execution or request.
+It can only tighten an existing `open_basedir`; if it fails, it returns `false`, and the current startup action does not check that result.
+Ensure the PHP host configuration permits all required paths.
+
+This is defense in depth, not a sandbox or a substitute for OS permissions, input validation, or web-server access controls.
+Do not expose `private/` or `src/` directly through the web server.
+
+The whitelist does not create directories or grant filesystem permissions.
+Before first use, provision `private/db`, `private/sql`, `private/upload`, and `private/upload/img`, and ensure the PHP-FPM and CLI users have the required permissions.
+For uploads, PHP's upload temporary directory must also be covered by `FS_DIRECTORY_WHITELIST` because the uploaded file is read after `open_basedir` is applied.
+
+The current startup action joins whitelist entries with `:`, so it assumes a Unix-like runtime.
 
 == Configuring services
 
-Check the `CoreServiceConfiguration` class.
-For now, it's just hard-coded in the constructor.
-Configuration of a new service is only necessary if:
+The application passes a `CoreServiceConfiguration` and a `ServiceRegistry` to `ServiceBuilder`.
+The core configuration creates its initial `Service` definitions in its constructor.
+Additional definitions can be added with `addService()`; duplicate identifiers require the replacement flag.
 
-* You need multiple instances
-* You have scalar/array type dependencies
+A service definition has an identifier, an optional class, and positional constructor parameters.
+The identifier is the lookup key.
+If `class` is omitted, it defaults to the identifier, so omission is valid only when the identifier is an existing class name.
+Arbitrary identifiers require an explicit class.
 
-Everything else will be autowired.
+`ServiceBuilder` first checks its registry, then a configured definition, and only then attempts recursive autowiring.
+Autowiring requires an instantiable class and resolvable constructor dependencies.
+Builtin types, untyped parameters, union types, and intersection types are not autowired.
+Interfaces are not searched for an implementation, and consequently are not possible to autowire.
 
-If you manually configure a service, and it depends on another service that does *not* have a service configuration, you can set the fully qualified classname of the service instead (e.g. `MyService::class`).
-If you have a service definition, you can set the identifier of the service you want to inject.
-The `parameters` array needs to have the same order as the constructor parameters.
+Configuration is required when raw constructor values are needed, when an arbitrary identifier or alternate implementation is needed, or when multiple independent instances of a class are required.
+Each identifier is cached separately by the service registry.
 
-Variadic parameters in the form of `MyService ...$services` are supported for services with a configuration, but not for autowiring.
+The `parameters` array is positional; its keys are ignored.
+For a named, non-builtin class parameter, provide the service identifier to inject.
+A fully qualified class name can be used: an existing definition for that identifier takes precedence, otherwise a new instance is autowired.
+Other parameter values are passed through unchanged.
 
-The `class` parameter can be omitted if the identifier is the fully qualified class name.
+Variadic constructor parameters are partially supported: Autowiring does not discover multiple variadic services; these require explicit configuration.
 
 == File system access
 
-The `FileSystemAccessService` provides secure file system operations restricted to a configured set of allowed directories.
+The `FileSystemAccessService` centralizes application-level file operations.
+Its configured paths come from `FS_APP_LEVEL_WHITELIST` in `config.php` and are passed to the service in `CoreServiceConfiguration`.
+The default app-level paths are `private/init`, `private/sql`, and `private/upload`.
 
-Configuration for allowed paths lives in `config.php` as the `FS_APP_LEVEL_WHITELIST` constant, and is wired into the service parameters in `CoreServiceConfiguration`.
-This sits on top of the `open_basedir` whitelist (`FS_DIRECTORY_WHITELIST` in the same file) — see <<_directory_access_restrictions>>.
+This policy is separate from the `open_basedir` whitelist (`FS_DIRECTORY_WHITELIST`).
+Native PHP filesystem calls are governed by `open_basedir`, while this service applies the narrower app-level policy.
+Every configured allowed directory must exist when the service is constructed and must also be inside the `open_basedir` whitelist.
 
-All paths are resolved via `realpath()` before any operation, preventing directory traversal attacks.
-If a path does not resolve or falls outside the allowed directories, a `FileAccessException` is thrown.
-
-Available methods:
-
-* `readFile(string $path): string` — reads and returns file content
-* `fileExists(string $path): bool` — checks whether a file exists
-* `deleteFile(string $path): void` — deletes a file
-* `listFiles(string $path): array` — returns file names in a directory (skips symlinks pointing outside allowed paths)
+Existing paths are canonicalized with `realpath()`, which handles ordinary `..` traversal and resolves symlinks for most operations.
+This is not a complete security boundary: the app-level check uses a raw string prefix, and write operations validate the parent but not an existing final-component symlink.
+Do not rely on this service alone for attacker-controlled paths.
 
 == Routing
 
-You can define routes in the `RoutingConfiguration` class, similar to the service configuration.
-
-Controllers are treated like services.
-So in the simplest case, you use the fully qualified classname for the controller, e.g. `MyController::class`.
-Alternatively, you can use the controllers service identifier.
-
-Routes can contain path parameters in the form of `/some/path/with/\{parameter\}`.
-Every path parameter must exist in the handler function with the same name (either untyped, mixed or type string, which is recommended).
-
-A handler *must* also have a `$request` parameter.
-The order of all these parameters is irrelevant.
-If the handler configuration is omitted, the handler name is assumed to be `HTTP Method + 'Action'`, e.g. `getAction`, `postAction`, etc.
-
-So with the example path above and a POST request, you'd need a handler method like this:
+Routes are defined as `Route` objects in the `$routes` array constructed by `RoutingConfiguration`.
+Each route has a path, an `HttpMethod` enum, a controller service identifier, and an optional handler.
+The array keys are not used for matching.
 
 [source,php]
 ----
-class SomeController {
+new Route(
+    path: '/some/path/with/{parameter}',
+    method: HttpMethod::POST,
+    controller: SomeController::class,
+    // If omitted, the handler defaults to postAction.
+),
+----
+
+The controller value is passed to `ServiceBuilder::getService()`.
+A fully qualified class name is autowired.
+A custom service identifier must already be registered in the service configuration or service registry.
+
+Routes match the HTTP method and URL path.
+Literal path segments must match exactly, while a segment written as `{name}` matches one path segment.
+Matching does not use the host, protocol, or query string, and it provides no regular-expression constraints or type conversion.
+Placeholder values are passed to the handler as strings.
+Trailing slashes and spaces are removed before matching, and the first matching route wins.
+
+The placeholder name is passed as a named handler argument, so the controller method must have a parameter with the same name.
+Handler parameter order is irrelevant.
+
+A handler must be a public method with a parameter literally named `$request`, typed as `Request` or a readonly subtype of `ValidatedRequest`.
+It must return a `Response` or a subclass.
+
+If the handler is omitted, its name is the lowercase HTTP method followed by `Action`: `getAction`, `postAction`, `putAction`, `deleteAction`, or `optionsAction`.
+
+[source,php]
+----
+class SomeController
+{
     public function postAction(Request $request, string $parameter): Response
     {
         // ...
@@ -101,31 +191,44 @@ class SomeController {
 }
 ----
 
-=== Request Mapping
+A path with no matching route returns an empty `404 NOT_FOUND` response.
+Invalid handler configuration generally becomes a `500 INTERNAL_SERVER_ERROR` response.
 
-The `$request` parameter in Controller actions can either be of type `Request` or a subtype of `ValidatedRequest`.
+=== Current HTTP routes
 
-Request::
-Contains raw parameters and headers of the request.
+The current configuration contains these user-facing routes:
 
-Subtype of ValidatedRequest::
-If a custom subtype of ValidatedRequest is used instead of the plain `Request` class, all `POST` and `GET` parameters will be mapped into the properties of this class with the same name.
-When there are both query and post parameters of the same name, the post one will be used.
-+
-The mapping will be done through the class constructor, so all parameters that should be mapped need to be present as a constructor parameter, including one called `$rawRequest`, which will be filled with the standard `Request` object.
-+
-Finally, any validation attributes present on the mapped properties will be evaluated.
-For details, refer to the <<_validation>> section.
+|===
+| Method | Path | Handler | Authentication
+
+| `GET` | `/` | `IndexController::getAction` | None
+| `GET` | `/login` | `LoginController::getAction` | None
+| `POST` | `/login` | `AuthController::postAction` | None
+| `GET` | `/register` | `RegisterController::getAction` | None
+| `POST` | `/register` | `RegisterController::postAction` | None
+| `GET` | `/settings` | `UserSettingController::getAction` | None
+| `POST` | `/settings` | `UserSettingController::postAction` | `NOVICE` or higher
+| `POST` | `/logout` | `AuthController::logoutAction` | None
+| `GET` | `/upload-image` | `ImageUploadController::getAction` | `NOVICE` or higher
+| `POST` | `/upload-image` | `ImageUploadController::postAction` | `NOVICE` or higher
+|===
+
+The configuration also contains `POST /`, which resolves to the missing `IndexController::postAction`, and `POST /{coolParam}/{fancyParam}`, which names the missing `IndexController::pathParamAction`.
+Matching either unfinished route currently results in an internal server error.
 
 == PreControllerAction Chain
 
-Before a controller handler is invoked, the `PreControllerActionFacade` runs an ordered chain of `PreControllerAction` implementations.
-Each action can modify the handler arguments or short-circuit the request by returning a `Response` (e.g. a 401).
+Before a controller handler is invoked, `PreControllerActionFacade` runs an ordered chain of `PreControllerAction` implementations.
+Each action receives the handler-argument array by reference.
+Mutations remain available to later actions and are used for the controller call.
+The facade itself receives the initial array by value.
+
+Returning `null` continues the chain.
+Any non-null `Response`, including a successful response, stops the remaining actions and the controller, and becomes the request response.
 
 === Configuration
 
-Register actions in `CoreServiceConfiguration` as parameters to
-`PreControllerActionFacade`, mirroring the `ApplicationStartupHandler` pattern:
+Register actions in `CoreServiceConfiguration` as positional parameters to `PreControllerActionFacade`:
 
 [source,php]
 ----
@@ -135,21 +238,32 @@ new Service(
         AuthorizationPreControllerAction::class,
         RequestMappingPreControllerAction::class,
         ValidationPreControllerAction::class,
-    ]
-)
+    ],
+),
 ----
+
+Actions are not auto-discovered.
+If no actions are configured, the facade invokes the controller directly.
+In the default configuration, authorization runs first, followed by request mapping and validation.
+The built-in validation action aborts invalid requests by throwing `BadRequestException`, which the application converts to a `400 BAD_REQUEST` response.
 
 === Authentication
 
-To require authentication for a controller handler, add the `#[Authenticated]` attribute to the handler method.
-It accepts an optional `AccessLevel` parameter.
+To require authentication for a controller handler, add `#[Authenticated(AccessLevel::NOVICE)]` to the actual route-resolved handler method.
+The `AccessLevel` argument is required.
+The attribute targets methods, not classes.
 
-The `AuthorizationPreControllerAction` (registered in the `PreControllerActionFacade` chain) checks for this attribute on the target method at runtime:
+The `AuthorizationPreControllerAction` checks the attribute at runtime:
 
-* If the attribute is absent, the endpoint is openly accessible.
-* If present and the user is not logged in, a `401 UNAUTHORIZED` response is returned.
-* If present and the user's access level is below the required level, a `403 FORBIDDEN` response is returned.
-* Otherwise, the request proceeds.
+* If the attribute is absent, the endpoint is not blocked by this action.
+* If present and no session user exists, a `401 UNAUTHORIZED` response is returned.
+* If the session user's access level is below the required level, a `403 FORBIDDEN` response is returned.
+* If the level is sufficient, authorization passes and request mapping and validation still run.
+
+The access levels are ordered from `NOVICE` (100) through `ADMIN` (600): `FELLOW`, `MASTER`, `WIZARD`, and `MOD` are between them.
+Newly registered users are active `NOVICE` users.
+Authorization reads the user data stored in the session and does not reload the user from the database.
+The current authentication flow does not enforce the database's `disabled` or `banned` states.
 
 [source,php]
 ----
@@ -160,139 +274,272 @@ public function postAction(UserSettingsUpdateRequest $request): Response
 }
 ----
 
-== Templates
+These responses do not redirect to `/login` or add a `WWW-Authenticate` header.
 
-If you want to generate responses from templates, you can do so by using the `TemplateService` together with `HtmlPageConfigFactory` in a controller action.
-Before calling `wrap()`, set any context values (such as the page title) via `ContextService`:
+=== Request Mapping
+
+Every controller handler must declare a `$request` parameter typed as `Request` or as a concrete subclass of `ValidatedRequest`.
+The request-mapping action stores the result under the handler argument named `request`, so the parameter must be named `$request`.
+
+`Request` receives the original request object unchanged.
+It contains the URL, HTTP method, raw headers, GET and POST parameters, and optional uploaded files.
+
+A `ValidatedRequest` subclass is constructed before the controller runs.
+Its effective constructor must accept `Request $rawRequest`; the inherited constructor from `ValidatedRequest` is sufficient.
+For every other constructor parameter, the mapper looks up a value using the parameter name:
 
 [source,php]
 ----
-public function getAction(Request $request): Response
+$request->postParams[$name] ?? $request->getParams[$name] ?? null
+----
+
+A non-null POST value takes precedence over GET.
+Only matching constructor parameter names are mapped; unrelated GET and POST keys are ignored.
+Missing values are passed as `null`, even when the constructor parameter has a default value.
+The mapper performs no scalar type conversion and passes values unchanged.
+Incompatible constructor types result in a `BadRequestException`.
+
+If uploaded files are present, the complete files array is also passed as `$files`; declare a compatible `$files` constructor parameter when accepting uploads.
+Mapped request classes must be declared `readonly`.
+
+In the default pre-controller chain, authorization runs first, followed by request mapping and then validation.
+`ValidationPreControllerAction` skips plain `Request` objects and invokes `Validator` for `ValidatedRequest` objects.
+Property attributes implementing `ValidationAttribute` are evaluated; failed validation raises `BadRequestException`.
+
+== Templates
+
+`TemplateService` can render any `TemplateConfig` directly.
+Use `HtmlPageConfigFactory::wrap()` when the standard `HtmlTemplate` page shell is desired.
+Before calling `wrap()`, set `ContextKey::PAGE_TITLE` to a non-null string through `ContextService`; `wrap()` reads the value immediately.
+
+[source,php]
+----
+use SmolCms\Config\Templates\HtmlPageConfigFactory;
+use SmolCms\Config\Templates\SimpleContentComponentConfig;
+use SmolCms\Data\Constant\ContextKey;
+use SmolCms\Data\Request\Request;
+use SmolCms\Data\Response\Response;
+use SmolCms\Service\Core\ContextService;
+use SmolCms\Service\Core\TemplateService;
+
+readonly class ExampleController
 {
-    $this->contextService->setContext(ContextKey::PAGE_TITLE, "My Page Title");
-    return $this->templateService->generateResponse(
-        $this->htmlPageConfigFactory->wrap(
-            new ArticleTemplateConfig(articleContent: "Page content here"),
-        )
-    );
+    public function __construct(
+        private TemplateService $templateService,
+        private HtmlPageConfigFactory $htmlPageConfigFactory,
+        private ContextService $contextService,
+    ) {
+    }
+
+    public function getAction(Request $request): Response
+    {
+        $this->contextService->setContext(ContextKey::PAGE_TITLE, 'Example page');
+
+        return $this->templateService->generateResponse(
+            $this->htmlPageConfigFactory->wrap(
+                new SimpleContentComponentConfig(content: 'Page content here'),
+            ),
+        );
+    }
 }
 ----
 
-`HtmlPageConfigFactory::wrap()` assembles the full HTML page by combining the given content config with global context (language, navigation routes, page title) sourced from `HtmlPageDataProvider`.
-This means content configs only need to carry page-specific data.
+`HtmlPageConfigFactory::wrap()` obtains the page title from `ContextService`; it currently supplies the fixed language `en` and fixed navigation routes from `HtmlPageDataProvider`.
+Content configurations only need to carry page-specific data.
 
-Your content config is a class implementing the `TemplateConfig` interface:
+Your content config is a class implementing `TemplateConfig`:
 
 [source,php]
 ----
-readonly class ArticleTemplateConfig implements TemplateConfig
+use SmolCms\Config\Templates\TemplateConfig;
+use SmolCms\Template\Component\SimpleContentComponent;
+
+readonly class SimpleContentPageConfig implements TemplateConfig
 {
-    public function __construct(private string $articleContent) {}
+    public function __construct(private string $content)
+    {
+    }
 
     public function getConfig(): array
     {
-        return [ArticleComponent::class => [$this->articleContent]];
+        return [SimpleContentComponent::class => [$this->content]];
     }
 }
 ----
 
-This will ensure that autocompletion and proper typing will be available.
+A typed config class provides typing for its own constructor properties, but `getConfig()` remains a positional, runtime-processed array tree.
+String keys that are class names identify nested templates; their values must be arrays of constructor parameters.
 
-Every template and component needs to implement the `Template` interface.
+Every template and component must implement `Template` and provide `render(): string`:
 
 [source,php]
 ----
-readonly class HeadComponent implements Template
+readonly class ExampleComponent implements Template
 {
-
-    public function __construct(
-        private string $pageTitle
-    )
-    {
-    }
-
     public function render(): string
     {
-        return <<<HTML
-        <head>
-            <title>$this->pageTitle</title>
-            <link type="text/css" rel="stylesheet" href="/public/css/main.css">
-        </head>
-        HTML;
+        return '<p>Example content</p>';
     }
 }
 ----
+
+Template rendering does not escape values automatically.
+Escape untrusted text and attribute values with the appropriate context, such as `htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')`; only render trusted HTML raw.
+
+Successful template responses use HTTP 200 and contain the rendered string.
+The current CGI adapter sends the status code and body but does not emit `Response` headers, including redirect `Location` headers or an explicit content type.
 
 [#_validation]
 == Validation
 
-For validation on object properties, the generic `Validator` service can be used.
-The object to validate is simply passed into its `validate()` method.
-For validation to work, you will need to add attributes implementing the `PropertyValidationAttribute` interface on the object properties (multiple are supported).
-If you want to have nested object validation, simply add the `ValidateObject` attribute to the property.
+`Validator::validate(object $objectToValidate): ValidationResult` reflects over the object's properties and evaluates PHP attributes implementing `ValidationAttribute`.
+Normal property rules implement `PropertyValidationAttribute`, whose `validate(mixed $value): bool` returns the pass or fail result.
+Multiple different validation attributes may be applied to one property.
+
+`ValidateObject` is a special marker that recursively validates a non-null nested object.
+A null nested object is skipped; combine it with `ValidateNotNull` when null must be rejected.
+Nested arrays are not traversed.
+
+The built-in validation attributes include:
+
+* `ValidateRange(float $min, float $max)` for inclusive integer and float bounds
+* `ValidateAllowList(array $allowValues = [])` using strict comparison
+* `ValidateDenyList(array $denyValues = [])` using strict comparison
+* `ValidateEmail` using `FILTER_VALIDATE_EMAIL`
+* `ValidateHost` for IPv4, IPv6, and domain values
+* `ValidateNotNull` for rejecting only `null`
+* `ValidateStringSize` for character length using `mb_strlen`
+* `ValidateStringSizeBytes` for byte length using `strlen`
+* `ValidateObject` for recursive nested-object validation
+
+Most property validators allow `null`; `ValidateNotNull` is the exception.
+Non-string values fail `ValidateStringSize`; values passed to `ValidateStringSizeBytes` should be strings.
 
 Usage:
 
 [source,php]
 ----
-class Foo {
+use SmolCms\Service\Validation\Attribute\ValidateAllowList;
+use SmolCms\Service\Validation\Attribute\ValidateDenyList;
+use SmolCms\Service\Validation\Attribute\ValidateRange;
+use SmolCms\Service\Validation\Validator;
+
+class Foo
+{
     public function __construct(
-    #[ValidateRange(min: 10, max: 100)]
-    private float $floatVal,
-    #[ValidateRange(min: -10, max: 0)]
-    private int $intVal,
-    #[ValidateAllowList(['ALLOWED', 1, true])]
-    private mixed $mixedAllow,
-    #[ValidateDenyList(['DENIED', 'ALSO_DENIED'])]
-    private string $stringDeny,
-) {
-}
+        #[ValidateRange(min: 10, max: 100)]
+        private float $floatVal,
+        #[ValidateRange(min: -10, max: 0)]
+        private int $intVal,
+        #[ValidateAllowList(['ALLOWED', 1, true])]
+        private mixed $mixedAllow,
+        #[ValidateDenyList(['DENIED', 'ALSO_DENIED'])]
+        private string $stringDeny,
+    ) {
+    }
 }
 
+$validator = new Validator();
 $foo = new Foo(
     floatVal: 15.0,
     intVal: -1,
     mixedAllow: 'ALLOWED',
-    stringDeny: 'Not denied'
+    stringDeny: 'Not denied',
 );
 $result = $validator->validate($foo);
-var_dump($result);
+var_dump($result->isValid());     // true
+var_dump($result->getMessages()); // []
 ----
 
-To support a new validation attribute, you only need to create it and have it implement the `PropertyValidationAttribute` interface.
-The validator will then use it automatically.
+`ValidationResult::isValid()` is true only when all evaluated rules pass.
+`getMessages()` returns an array keyed by property name.
+A failed property rule produces a validation message; a failed nested object produces its nested message array under that property.
+`getMessagesAsString()` formats the messages with `print_r`.
+If multiple rules fail for one property, the last failure overwrites that property's message.
+
+To add a normal validation attribute, declare a PHP attribute targeting properties, implement `PropertyValidationAttribute`, provide `validate(mixed $value): bool` and `getErrorMessage(): string`, and no validator registration is required.
+The validator discovers it through reflection.
+Implementing `ValidationAttribute` alone is not sufficient unless the validator explicitly handles the attribute, as it does for `ValidateObject`.
+
+== Database and persistence
+
+The default runtime database is SQLite at `private/db/smolcms.sq3`.
+The active SQLite schema in `private/init/init_sqlite.sql` contains `user`, `session`, `article`, and `migration` tables.
+`private/init/init.sql` is a MySQL reference schema; using MySQL requires changing the `PDO` service configuration and installing the appropriate PDO driver.
+The default configuration does not use MySQL.
+
+Persisted entities use `#[Entity]` and `#[Id]`.
+Database snake_case fields map to camelCase entity properties, and entity construction requires the mapped fields to be constructor parameters.
+Saving currently requires getters and setters for entity fields.
+The `Article` entity and table exist, but article CRUD methods, controllers, routes, and UI are not implemented.
+
+== Image uploads
+
+Authenticated users can submit a multipart upload under the `image` field at `POST /upload-image`.
+The type detector recognizes PNG, JPEG, and AVIF signatures.
+Processed files are stored under `private/upload/img` using the basename supplied by the client, and successful uploads redirect to `/`.
+
+The upload validator currently checks that a file was supplied and that PHP considers it uploaded; it does not enforce upload size limits or all standard upload error conditions.
+There is no public image-delivery route or upload quota.
+The configured `ImageProcessorFacade` invokes its PNG, JPEG, and AVIF processors for each accepted upload, so image handling should be treated as experimental.
+GD support for the required formats, including AVIF where used, is required.
 
 == Testing
 
-For ease of testing, the `Mock` and `Stub` attributes, plus the `SimpleTestCase` and `FunctionalTestCase` base classes, have been introduced.
+Tests require PHP `>=8.5`, Composer, and the `pdo`, `mbstring`, `pdo_sqlite`, and `gd` extensions.
+Install dependencies and run the full suite from the repository root:
 
-In `SimpleTestCase::setUp()`, properties tagged with `#[Mock(...)]` are populated with a PHPUnit mock (created via `getMockBuilder(...)->disableOriginalConstructor()->getMock()`), while `#[Stub(...)]` properties receive a pre-configured PHPUnit stub (via `createStub(...)`).
+[source,shell]
+----
+composer install
+vendor/bin/phpunit
+----
 
-Usage:
+Focused runs are also supported:
+
+[source,shell]
+----
+vendor/bin/phpunit --filter TestName
+vendor/bin/phpunit tests/Service/Core
+----
+
+`SimpleTestCase::setUp()` populates properties tagged with `#[Mock(...)]` using PHPUnit mocks and properties tagged with `#[Stub(...)]` using PHPUnit stubs.
+These attributes only populate test-object properties; they do not replace services in the application container.
+A property type is optional for these attributes, but a declared type must accept the generated double.
 
 [source,php]
 ----
+use PHPUnit\Framework\MockObject\MockObject;
+use SmolCms\Config\CoreServiceConfiguration;
+use SmolCms\Data\Business\Service;
+use SmolCms\Data\Business\ServiceRegistry;
+use SmolCms\Service\Core\ServiceBuilder;
+use SmolCms\TestUtils\SimpleTestCase;
+use SmolCms\TestUtils\Attributes\Mock;
+use SmolCms\TestUtils\Attributes\Stub;
+
 class ServiceBuilderTest extends SimpleTestCase
 {
     private ServiceBuilder $serviceBuilder;
-    #[Mock(ServiceConfiguration::class)]
-    private ServiceConfiguration|MockObject $serviceConfiguration;
-    #[Mock(ServiceRegistry::class)]
-    private ServiceRegistry|MockObject $serviceRegistry;
-//...
+
+    #[Mock(CoreServiceConfiguration::class)]
+    private CoreServiceConfiguration|MockObject $serviceConfiguration;
+
+    #[Stub(ServiceRegistry::class)]
+    private ServiceRegistry $serviceRegistry;
 }
 ----
 
-Note: The property type hinting is not necessary and just used for convenient autocompletion.
+`FunctionalTestCase` builds a functional application environment with `sqlite::memory:`, loads `private/init/init_sqlite.sql`, replaces `ContextService` with a test implementation, and permits `open_basedir=/`.
+Use its protected `simulateRequest(Request): Response` method to test requests without a web server.
+The in-memory database is shared by test methods within a functional test class; setup clears sessions but does not isolate database rows per method.
 
-Additionally, the `FunctionalTestCase` class will provide an `ApplicationCore` that will allow you to simulate requests even without a web server.
-This is useful when you want to create automated tests for JSON api endpoints for instance.
+`#[Autowire]` requires a typed property with one named class type.
+It resolves that type through the functional test service container.
+Subclasses overriding `setUp()` must call `parent::setUp()`.
 
-`FunctionalTestCase::setUp()` additionally scans for `#[Autowire]` properties and resolves them through the test container, so you can inject fully built services directly into the test class without going through `Mock` or `Stub`.
-
-To override a service for a specific test class, call `self::registerTestServices()` in `setUpBeforeClass()` after `parent::setUpBeforeClass()`.
-This replaces the service in the container and reinitialises the `ApplicationCore`, so all tests in the class will use the new service.
-`FunctionalTestCase` itself already uses this mechanism to replace `PDO` with an SQLite in-memory instance.
+To override a service for a test class, call `self::registerTestServices()` in `setUpBeforeClass()` after `parent::setUpBeforeClass()`.
+This replaces service definitions and rebuilds the service builder, registry, application core, and in-memory database:
 
 [source,php]
 ----
@@ -303,45 +550,91 @@ public static function setUpBeforeClass(): void
         new Service(
             identifier: MyExternalClient::class,
             parameters: ['http://localhost:9999'],
-        )
+        ),
     );
 }
 ----
 
+The PHPUnit configuration runs the `tests/` directory with strict output and issue reporting.
+Output, deprecations, warnings, notices, and other PHPUnit issues are surfaced by the test run and should be resolved.
+
+[#_cli_commands]
 == CLI Commands
 
-The application supports CLI commands.
+The application supports CLI commands through `php src/app.php`.
+Flags use a `--` prefix.
+Arguments following a flag are passed to that command's executor, and arguments are separated by spaces.
+Recognized command executors are registered positionally as parameters to `CliCommandHandler` in `CoreServiceConfiguration`.
 
-Flags are specified with a `--` prefix.
-Arguments following a flag are passed to the corresponding executor.
-Flag arguments are separated by spaces.
-
-All commands are registered as `CliCommandExecutor` parameters in the `CliCommandHandler` service definition.
+To add a command, add a case to the `CliCommandFlag` enum, create a class implementing `CliCommandExecutor`, and add the executor to the `CliCommandHandler` service definition.
+`--noconfirm` is a global modifier consumed by the handler; it is not an executor.
 
 === Available commands
 
 |===
 | Flag | Description
 
+| `--generate-migration "<description>"`
+a|Creates a timestamped migration skeleton in `private/sql`, named `YYYY-MM-DD_HH-MM-SS__<sanitized-description>.sql`.
+The description is required and generation does not execute the migration.
+
 | `--migrations`
-| Reads `.sql` files from `private/sql/`, compares them against an internal `migration` table, and executes any pending migrations in sorted order. Skips already-executed files. Prompts for confirmation unless `--noconfirm` is also specified.
+a|Scans `private/sql` for lowercase `.sql` files, sorts them by filename, and executes files not recorded in the `migration` table.
+Successful migrations are recorded; already-recorded files are skipped, and empty files are skipped without being recorded.
+Confirmation is required only when pending files exist, unless `--noconfirm` is supplied.
+A failed migration is not recorded and stops further processing.
 
 | `--reset-db`
-| Drops all user tables in the database (SQLite or MySQL). For MySQL, temporarily disables foreign key checks to avoid constraint errors. Prompts for confirmation unless `--noconfirm` is also specified.
+a|Destructively drops all non-internal tables and reloads the driver-specific schema.
+The default SQLite configuration reloads `private/init/init_sqlite.sql`.
+The executor also contains a MySQL branch that temporarily disables foreign-key checks and loads `private/init/init.sql`.
+Confirmation is required unless `--noconfirm` is supplied.
 
 | `--noconfirm`
-| Suppresses interactive confirmation prompts. Can be combined with other flags (e.g. `--migrations --noconfirm`).
+a|Modifier for `--migrations` and `--reset-db`; suppresses their confirmation prompts.
+It does not execute by itself and has no effect on `--generate-migration`.
 |===
 
 === Usage examples
 
-Run pending migrations with confirmation::
+Generate a migration file:
+
+`php src/app.php --generate-migration "add users table"`
+
+Edit the generated SQL file, then run pending migrations with confirmation:
+
 `php src/app.php --migrations`
 
-Run pending migrations without confirmation::
+Run pending migrations without confirmation:
+
 `php src/app.php --migrations --noconfirm`
 
-Reset the database::
+Reset the database with confirmation:
+
 `php src/app.php --reset-db`
 
-If no recognized flag is provided, the handler prints the list of available flags.
+Reset the database without confirmation:
+
+`php src/app.php --reset-db --noconfirm`
+
+`--noconfirm` may appear before or after the command.
+If no executable command flag is provided, such as with no arguments, an unknown flag, or only `--noconfirm`, the handler prints the available-command list.
+Unknown flags and non-flag tokens are ignored.
+
+== Security considerations
+
+The project is a learning project and is not production-hardened.
+Before deployment, review at least the following:
+
+* Use HTTPS and enable secure session cookies.
+The current session configuration has `cookie_secure` set to `false`.
+* Add CSRF protection to state-changing forms and endpoints.
+* Escape untrusted values before inserting them into HTML.
+Template rendering currently interpolates values without automatic escaping.
+* Configure upload size and error handling, validate image content, and use safe unique storage names.
+The current upload path is based on the client-provided basename.
+* Do not treat `open_basedir` or `FileSystemAccessService` as a complete sandbox.
+The current app-level path check has a prefix-boundary weakness and write operations have final-symlink caveats.
+* Keep `private/` and `src/` out of direct web-server file serving.
+* Decide how `disabled` and `banned` accounts should behave.
+The current login and authorization flow does not reject them.
