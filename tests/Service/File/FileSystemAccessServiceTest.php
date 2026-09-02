@@ -14,6 +14,8 @@ class FileSystemAccessServiceTest extends SimpleTestCase
     private const string TEST_FILE = '/private/test-fs-access/test.txt';
     private const string FORBIDDEN_PATH = '/etc/passwd';
     private const string FORBIDDEN_FILE_THAT_EXISTS = ROOT_DIR . '/tests/TestUtils/TestFiles/forbidden.txt';
+    private const string SIBLING_DIR = '/private_test_sibling';
+    private const string SIBLING_FILE = '/private_test_sibling/secret.txt';
 
     private FileSystemAccessService $testee;
 
@@ -24,11 +26,14 @@ class FileSystemAccessServiceTest extends SimpleTestCase
         @mkdir(ROOT_DIR . self::EMPTY_DIR, 0777, true);
         file_put_contents(ROOT_DIR . self::TEST_FILE, 'hello world');
         file_put_contents(self::FORBIDDEN_FILE_THAT_EXISTS, 'I exist');
+        @mkdir(ROOT_DIR . self::SIBLING_DIR, 0777, true);
+        file_put_contents(ROOT_DIR . self::SIBLING_FILE, 'sibling secret');
     }
 
     protected function tearDown(): void
     {
         self::rmDirRecursive(ROOT_DIR . self::TEST_DIR);
+        self::rmDirRecursive(ROOT_DIR . self::SIBLING_DIR);
     }
 
     private static function rmDirRecursive(string $path): void
@@ -184,5 +189,76 @@ class FileSystemAccessServiceTest extends SimpleTestCase
     {
         $this->expectException(FileAccessException::class);
         $this->testee->writeFile('/etc/test-write.txt', 'content');
+    }
+
+    public function testReadFile_rejectsSiblingWithSharedPrefix(): void
+    {
+        $this->expectException(FileAccessException::class);
+        $this->testee->readFile(ROOT_DIR . self::SIBLING_FILE);
+    }
+
+    public function testFileExists_rejectsSiblingWithSharedPrefix(): void
+    {
+        $this->expectException(FileAccessException::class);
+        $this->testee->fileExists(ROOT_DIR . self::SIBLING_FILE);
+    }
+
+    public function testDeleteFile_rejectsSiblingWithSharedPrefix(): void
+    {
+        $this->expectException(FileAccessException::class);
+        $this->testee->deleteFile(ROOT_DIR . self::SIBLING_FILE);
+    }
+
+    public function testListFiles_rejectsSiblingWithSharedPrefix(): void
+    {
+        $this->expectException(FileAccessException::class);
+        $this->testee->listFiles(ROOT_DIR . self::SIBLING_DIR);
+    }
+
+    public function testWriteFile_throwsWhenWritingThroughSymlinkToDisallowedTarget(): void
+    {
+        $symlinkPath = ROOT_DIR . self::TEST_DIR . '/escape-write.link';
+        symlink(self::FORBIDDEN_FILE_THAT_EXISTS, $symlinkPath);
+
+        $this->expectException(FileAccessException::class);
+        try {
+            $this->testee->writeFile($symlinkPath, 'overwritten');
+        } finally {
+            self::assertStringEqualsFile(self::FORBIDDEN_FILE_THAT_EXISTS, 'I exist');
+            @unlink($symlinkPath);
+        }
+    }
+
+    public function testWriteFile_throwsWhenWritingThroughDanglingSymlink(): void
+    {
+        $symlinkPath = ROOT_DIR . self::TEST_DIR . '/dangling-write.link';
+        symlink('/nonexistent-target-12345', $symlinkPath);
+
+        $this->expectException(FileAccessException::class);
+        try {
+            $this->testee->writeFile($symlinkPath, 'content');
+        } finally {
+            @unlink($symlinkPath);
+        }
+    }
+
+    public function testWriteFile_canOverwriteExistingRegularFileInAllowedDir(): void
+    {
+        $file = ROOT_DIR . self::TEST_DIR . '/overwrite.txt';
+        file_put_contents($file, 'original');
+
+        $this->testee->writeFile($file, 'updated');
+
+        self::assertStringEqualsFile($file, 'updated');
+    }
+
+    public function testIsPathAllowed_rejectsSiblingWithSharedPrefix(): void
+    {
+        self::assertFalse($this->testee->isPathAllowed(ROOT_DIR . self::SIBLING_FILE));
+    }
+
+    public function testIsPathAllowed_acceptsExactAllowedDirectory(): void
+    {
+        self::assertTrue($this->testee->isPathAllowed(ROOT_DIR . '/private'));
     }
 }

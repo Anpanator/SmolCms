@@ -58,6 +58,13 @@ readonly class FileSystemAccessService
             throw new FileAccessException("Could not resolve directory for path '$path'.");
         }
         $this->isPathAllowed($resolvedDir) ?: $this->throwNotAllowed($path);
+        if (is_link($path)) {
+            throw new FileAccessException("Refusing to write through symlink at path '$path'.");
+        }
+        $resolvedPath = realpath($path);
+        if ($resolvedPath !== false) {
+            $this->isPathAllowed($resolvedPath) ?: $this->throwNotAllowed($path);
+        }
         if (file_put_contents("$resolvedDir/$filename", $content) === false) {
             throw new FileAccessException("Could not write file at path '$path'.");
         }
@@ -114,7 +121,11 @@ readonly class FileSystemAccessService
         if (!$normalizedPath) {
             throw new FileAccessException("Could not resolve path '$path'.");
         }
-        return array_any($this->resolvedAllowedDirectories, fn($allowedDir) => str_starts_with($normalizedPath, $allowedDir));
+        return array_any(
+            $this->resolvedAllowedDirectories,
+            fn($allowedDir) => $normalizedPath === $allowedDir
+                || str_starts_with($normalizedPath, $allowedDir . DIRECTORY_SEPARATOR)
+        );
     }
 
     private function throwNotAllowed(string $path)
