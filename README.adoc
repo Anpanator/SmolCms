@@ -134,17 +134,20 @@ Variadic constructor parameters are partially supported: Autowiring does not dis
 
 == File system access
 
-The `FileSystemAccessService` centralizes application-level file operations.
+The `FileSystemAccessService` provides the application-level allowlist and file-operation helpers.
 Its configured paths come from `FS_APP_LEVEL_WHITELIST` in `config.php` and are passed to the service in `CoreServiceConfiguration`.
 The default app-level paths are `private/init`, `private/sql`, and `private/upload`.
 
 This policy is separate from the `open_basedir` whitelist (`FS_DIRECTORY_WHITELIST`).
 Native PHP filesystem calls are governed by `open_basedir`, while this service applies the narrower app-level policy.
-Every configured allowed directory must exist when the service is constructed and must also be inside the `open_basedir` whitelist.
+Every configured allowed path must already exist when the service is constructed; the service accepts individual files as well as directories.
+Keep the app-level paths inside the `open_basedir` whitelist as a configuration requirement.
+The service does not validate that relationship itself, and `open_basedir` can still block a native filesystem operation.
 
-Existing paths are canonicalized with `realpath()`, which handles ordinary `..` traversal and resolves symlinks for most operations.
-This is not a complete security boundary: the app-level check uses a raw string prefix, and write operations validate the parent but not an existing final-component symlink.
-Do not rely on this service alone for attacker-controlled paths.
+Existing paths and directory entries are canonicalized with `realpath()`, which handles ordinary `..` traversal and resolves symlinks for path checks.
+`writeFile()` validates the resolved parent, rejects a final path that is currently a symlink, and checks an existing target before writing.
+
+This service is meant as a safeguard against accidental writes to wrong paths, so it cannot be relied upon as the only safeguard against attackers.
 
 == Routing
 
@@ -167,7 +170,7 @@ A fully qualified class name is autowired.
 A custom service identifier must already be registered in the service configuration or service registry.
 
 Routes match the HTTP method and URL path.
-Literal path segments must match exactly, while a segment written as `{name}` matches one path segment.
+Literal path segments must match exactly, while a segment written as `\{name}` matches one path segment.
 Matching does not use the host, protocol, or query string, and it provides no regular-expression constraints or type conversion.
 Placeholder values are passed to the handler as strings.
 Trailing slashes and spaces are removed before matching, and the first matching route wins.
@@ -175,7 +178,7 @@ Trailing slashes and spaces are removed before matching, and the first matching 
 The placeholder name is passed as a named handler argument, so the controller method must have a parameter with the same name.
 Handler parameter order is irrelevant.
 
-A handler must be a public method with a parameter literally named `$request`, typed as `Request` or a readonly subtype of `ValidatedRequest`.
+A handler must be a public method with a parameter named `$request`, typed as `Request` or a readonly subtype of `ValidatedRequest`.
 It must return a `Response` or a subclass.
 
 If the handler is omitted, its name is the lowercase HTTP method followed by `Action`: `getAction`, `postAction`, `putAction`, `deleteAction`, or `optionsAction`.
@@ -212,9 +215,6 @@ The current configuration contains these user-facing routes:
 | `GET` | `/upload-image` | `ImageUploadController::getAction` | `NOVICE` or higher
 | `POST` | `/upload-image` | `ImageUploadController::postAction` | `NOVICE` or higher
 |===
-
-The configuration also contains `POST /`, which resolves to the missing `IndexController::postAction`, and `POST /{coolParam}/{fancyParam}`, which names the missing `IndexController::pathParamAction`.
-Matching either unfinished route currently results in an internal server error.
 
 == PreControllerAction Chain
 
@@ -397,8 +397,6 @@ Normal property rules implement `PropertyValidationAttribute`, whose `validate(m
 Multiple different validation attributes may be applied to one property.
 
 `ValidateObject` is a special marker that recursively validates a non-null nested object.
-A null nested object is skipped; combine it with `ValidateNotNull` when null must be rejected.
-Nested arrays are not traversed.
 
 The built-in validation attributes include:
 
@@ -412,8 +410,7 @@ The built-in validation attributes include:
 * `ValidateStringSizeBytes` for byte length using `strlen`
 * `ValidateObject` for recursive nested-object validation
 
-Most property validators allow `null`; `ValidateNotNull` is the exception.
-Non-string values fail `ValidateStringSize`; values passed to `ValidateStringSizeBytes` should be strings.
+Validators allow `null`; `ValidateNotNull` needs to be applied additionally to reject null values.
 
 Usage:
 
@@ -451,15 +448,7 @@ var_dump($result->isValid());     // true
 var_dump($result->getMessages()); // []
 ----
 
-`ValidationResult::isValid()` is true only when all evaluated rules pass.
-`getMessages()` returns an array keyed by property name.
-A failed property rule produces a validation message; a failed nested object produces its nested message array under that property.
-`getMessagesAsString()` formats the messages with `print_r`.
-If multiple rules fail for one property, the last failure overwrites that property's message.
-
-To add a normal validation attribute, declare a PHP attribute targeting properties, implement `PropertyValidationAttribute`, provide `validate(mixed $value): bool` and `getErrorMessage(): string`, and no validator registration is required.
-The validator discovers it through reflection.
-Implementing `ValidationAttribute` alone is not sufficient unless the validator explicitly handles the attribute, as it does for `ValidateObject`.
+To add a validation attribute, declare a PHP attribute targeting properties, implement `PropertyValidationAttribute`, no validator registration is required.
 
 == Database and persistence
 
@@ -471,7 +460,6 @@ The default configuration does not use MySQL.
 Persisted entities use `#[Entity]` and `#[Id]`.
 Database snake_case fields map to camelCase entity properties, and entity construction requires the mapped fields to be constructor parameters.
 Saving currently requires getters and setters for entity fields.
-The `Article` entity and table exist, but article CRUD methods, controllers, routes, and UI are not implemented.
 
 == Image uploads
 
@@ -486,7 +474,6 @@ GD support for the required formats, including AVIF where used, is required.
 
 == Testing
 
-Tests require PHP `>=8.5`, Composer, and the `pdo`, `mbstring`, `pdo_sqlite`, and `gd` extensions.
 Install dependencies and run the full suite from the repository root:
 
 [source,shell]
@@ -495,17 +482,8 @@ composer install
 vendor/bin/phpunit
 ----
 
-Focused runs are also supported:
-
-[source,shell]
-----
-vendor/bin/phpunit --filter TestName
-vendor/bin/phpunit tests/Service/Core
-----
-
 `SimpleTestCase::setUp()` populates properties tagged with `#[Mock(...)]` using PHPUnit mocks and properties tagged with `#[Stub(...)]` using PHPUnit stubs.
 These attributes only populate test-object properties; they do not replace services in the application container.
-A property type is optional for these attributes, but a declared type must accept the generated double.
 
 [source,php]
 ----
@@ -624,17 +602,3 @@ Unknown flags and non-flag tokens are ignored.
 == Security considerations
 
 The project is a learning project and is not production-hardened.
-Before deployment, review at least the following:
-
-* Use HTTPS and enable secure session cookies.
-The current session configuration has `cookie_secure` set to `false`.
-* Add CSRF protection to state-changing forms and endpoints.
-* Escape untrusted values before inserting them into HTML.
-Template rendering currently interpolates values without automatic escaping.
-* Configure upload size and error handling, validate image content, and use safe unique storage names.
-The current upload path is based on the client-provided basename.
-* Do not treat `open_basedir` or `FileSystemAccessService` as a complete sandbox.
-The current app-level path check has a prefix-boundary weakness and write operations have final-symlink caveats.
-* Keep `private/` and `src/` out of direct web-server file serving.
-* Decide how `disabled` and `banned` accounts should behave.
-The current login and authorization flow does not reject them.

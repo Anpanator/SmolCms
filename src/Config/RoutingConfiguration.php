@@ -77,17 +77,6 @@ class RoutingConfiguration
                 method: HttpMethod::POST,
                 controller: ImageUploadController::class,
             ),
-            'IndexPostRoute' => new Route(
-                path: RouteEnum::START_PAGE->value,
-                method: HttpMethod::POST,
-                controller: IndexController::class
-            ),
-            'IndexPathParamRoute' => new Route(
-                path: '/{coolParam}/{fancyParam}',
-                method: HttpMethod::POST,
-                controller: IndexController::class,
-                handler: 'pathParamAction'
-            ),
         ];
     }
 
