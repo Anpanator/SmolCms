@@ -19,7 +19,7 @@ Install the Composer dependencies from the repository root:
 composer install
 ----
 
-The application expects these directories to exist:
+The application requires these directories; they ship with the repository via `.gitkeep` placeholder files:
 
 * `private/db` for the SQLite database
 * `private/sql` for migration files
@@ -48,6 +48,9 @@ For HTTP requests, use a web server with PHP-FPM or another CGI-compatible PHP r
 Adapt its document root and PHP-FPM socket for the target system.
 It serves `/public/` as static files and forwards other requests to `src/app.php`.
 
+The `public/` directory contains only static assets (currently only `public/css/main.css`) and a `layout_reference.html` reference layout; it has no PHP entry point.
+Uploaded images are stored under `private/` and are not publicly served.
+
 == Project constants
 
 The root-level `constants.php` defines the global `ROOT_DIR` constant.
@@ -60,11 +63,13 @@ Not intended for storing credentials.
 == Early startup configuration
 
 To run code during application initialization, define a concrete class implementing `StartupAction` with a `runAction(): void` method and add its service identifier to the `ApplicationStartupHandler` definition in `CoreServiceConfiguration`.
-The configured actions are resolved and executed in the order listed when `ApplicationCore::init()` is called.
+The configured actions are resolved when the service graph is constructed and are executed in the listed order when `ApplicationCore::init()` is called.
 
 [source,php]
 ----
-// Inside CoreServiceConfiguration::__construct(), in the $services array:
+// Inside CoreServiceConfiguration::__construct(), in the $services array.
+// The first three actions are the default configuration;
+// MyStartupAction and FancyStartupAction are placeholders for your own additions.
 new Service(
     identifier: ApplicationStartupHandler::class,
     parameters: [
@@ -131,6 +136,8 @@ A fully qualified class name can be used: an existing definition for that identi
 Other parameter values are passed through unchanged.
 
 Variadic constructor parameters are partially supported: Autowiring does not discover multiple variadic services; these require explicit configuration.
+
+Service identifiers are arbitrary strings or class names; the `ServiceNames` enum in `src/Config/ServiceNames.php` is an empty placeholder intended to hold canonical identifier constants.
 
 == File system access
 
@@ -276,6 +283,16 @@ public function postAction(UserSettingsUpdateRequest $request): Response
 
 These responses do not redirect to `/login` or add a `WWW-Authenticate` header.
 
+=== Login and logout
+
+`POST /login` looks up the user by login name and verifies the password.
+An unknown login name and a wrong password both return a bare `401 UNAUTHORIZED` response without disclosing which check failed.
+On success, the controller starts a session, stores the session user data, and returns a redirect.
+
+`AuthenticationService` delegates password checking to `PasswordService::verifyAndRehashIfNeeded()`, which verifies with `password_verify()` and, when the stored hash no longer matches the current `PASSWORD_DEFAULT` algorithm, rehashes the password and persists the new hash.
+
+`POST /logout` destroys the session and returns a redirect.
+
 === Request Mapping
 
 Every controller handler must declare a `$request` parameter typed as `Request` or as a concrete subclass of `ValidatedRequest`.
@@ -306,11 +323,27 @@ In the default pre-controller chain, authorization runs first, followed by reque
 `ValidationPreControllerAction` skips plain `Request` objects and invokes `Validator` for `ValidatedRequest` objects.
 Property attributes implementing `ValidationAttribute` are evaluated; failed validation raises `BadRequestException`.
 
+== Session handling
+
+Sessions are stored in the `session` database table.
+`RegisterSessionHandlerStartupAction` registers `SessionHandler` as PHP's session save handler during startup.
+`SessionHandler` implements `SessionHandlerInterface` and `SessionUpdateTimestampHandlerInterface`, reads and writes session rows through `SessionEntityService`, deletes rows on destroy and garbage collection, and validates incoming session IDs against the table.
+Session data size is limited to 16 MiB through a `ValidateStringSizeBytes` attribute on `SessionEntity`.
+The `open()` and `close()` handler methods currently implement no locking.
+
+`SessionService` configures the session cookie and lifecycle: cookie name `session`, a `cookie_lifetime` of 3600, `httponly` and `SameSite=Strict` cookies, strict mode, and `cookie_secure=false`, which is marked as needing a change for production.
+`resumeSession()` starts a session only when a session cookie is present, while `startSession()` starts one unconditionally.
+`destroySession()` clears the session data, expires the session cookie, and calls `session_destroy()`.
+
+A successful login starts a session and stores a `SessionUserData` DTO (user id, display name, access level) under `$_SESSION['user']`; this is the data `AuthorizationPreControllerAction` reads.
+Registration does not start a session; it redirects to `/login`.
+
 == Templates
 
 `TemplateService` can render any `TemplateConfig` directly.
 Use `HtmlPageConfigFactory::wrap()` when the standard `HtmlTemplate` page shell is desired.
 Before calling `wrap()`, set `ContextKey::PAGE_TITLE` to a non-null string through `ContextService`; `wrap()` reads the value immediately.
+`ContextService` type-checks context values: each `ContextKey` case declares the expected `gettype()` result as its backed value, and `setContext()` throws when a non-null value's type differs.
 
 [source,php]
 ----
@@ -395,6 +428,7 @@ The current CGI adapter sends the status code and body but does not emit `Respon
 `Validator::validate(object $objectToValidate): ValidationResult` reflects over the object's properties and evaluates PHP attributes implementing `ValidationAttribute`.
 Normal property rules implement `PropertyValidationAttribute`, whose `validate(mixed $value): bool` returns the pass or fail result.
 Multiple different validation attributes may be applied to one property.
+Validation messages are collected per property, so when several attributes on one property fail, only the last failing attribute's message is kept.
 
 `ValidateObject` is a special marker that recursively validates a non-null nested object.
 
@@ -448,7 +482,7 @@ var_dump($result->isValid());     // true
 var_dump($result->getMessages()); // []
 ----
 
-To add a validation attribute, declare a PHP attribute targeting properties, implement `PropertyValidationAttribute`, no validator registration is required.
+To add a validation attribute, declare a PHP attribute targeting properties, implement `PropertyValidationAttribute` (and the `getErrorMessage(): string` method inherited from `ValidationAttribute`), no validator registration is required.
 
 == Database and persistence
 
@@ -460,6 +494,12 @@ The default configuration does not use MySQL.
 Persisted entities use `#[Entity]` and `#[Id]`.
 Database snake_case fields map to camelCase entity properties, and entity construction requires the mapped fields to be constructor parameters.
 Saving currently requires getters and setters for entity fields.
+
+Beyond the case conversion, `EntityService` maps `DateTime` properties and backed enum properties automatically in both directions: database values hydrate into `DateTime` objects or enum instances, and entities serialize `DateTime` as `Y-m-d H:i:s` strings and enums as their backing values for storage.
+
+Queries are built with `QueryCriteria` and `QueryBuilder`.
+`select()`, `update()`, and `delete()` start a criteria and fix its query type; conditions are collected with `andWhere()` and `orWhere()`, where the first condition must be an `andWhere()`, `withParameters()` supplies bound values, and `maxResults()` and `skipResults()` translate into a `LIMIT` clause (a maximal count is substituted when only an offset is set).
+Select criteria enumerate all entity fields, update criteria set all entity fields, and criteria cannot express inserts; `EntityService` builds insert statements from the entity's field values instead.
 
 == Image uploads
 
@@ -543,6 +583,7 @@ The application supports CLI commands through `php src/app.php`.
 Flags use a `--` prefix.
 Arguments following a flag are passed to that command's executor, and arguments are separated by spaces.
 Recognized command executors are registered positionally as parameters to `CliCommandHandler` in `CoreServiceConfiguration`.
+A single invocation may contain several command flags; every recognized executor runs in the order its flag first appears on the command line.
 
 To add a command, add a case to the `CliCommandFlag` enum, create a class implementing `CliCommandExecutor`, and add the executor to the `CliCommandHandler` service definition.
 `--noconfirm` is a global modifier consumed by the handler; it is not an executor.
