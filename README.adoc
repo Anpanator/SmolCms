@@ -2,11 +2,12 @@
 :toc: macro
 :icons: font
 
-SmolCms is a small PHP web application learning project with routing, templating, user registration and authentication, SQLite persistence, and experimental image uploads.
-It requires PHP 8.5 or newer and the `PDO`, `mbstring`, `PDO_SQLite`, and `GD` extensions.
+SmolCms is a small PHP web application learning project with routing, templating, user registration and authentication, SQLite persistence (default; MySQL schema included), and experimental image uploads.
+It requires PHP 8.5 or newer and the `PDO`, `mbstring`, `PDO_SQLite`, and `GD` extensions (see `composer.json` `require`).
+The requirement is enforced by `composer.json` at `composer install` time; `src/app.php` performs no runtime version check.
 
-The project currently has no declared open-source license, and contributions are not currently accepted.
-Third-party dependencies retain their own licenses.
+The project has no `LICENSE` file and no `license` field in `composer.json` (all rights reserved), and contributions are not currently accepted.
+Third-party Composer dependencies (currently dev-only via `phpunit/phpunit`) retain their own licenses.
 
 toc::[]
 
@@ -19,24 +20,37 @@ Install the Composer dependencies from the repository root:
 composer install
 ----
 
-The application requires these directories; they ship with the repository via `.gitkeep` placeholder files:
+The application requires these directories:
 
 * `private/db` for the SQLite database
 * `private/sql` for migration files
 * `private/upload` and `private/upload/img` for image storage
+* `private/init` for the driver-specific schema files
 
-The PHP user needs read access to the application files and write access to the database, migration, and image-storage directories.
-The SQLite database file `private/db/smolcms.sq3` is ignored by Git.
+`private/db`, `private/sql`, and `private/upload/img` ship via `.gitkeep` placeholder files.
+`private/upload` ships implicitly as the parent of `private/upload/img/.gitkeep` and has no `.gitkeep` of its own.
+`private/init` ships via its tracked `init.sql` and `init_sqlite.sql` files.
+All listed directories must exist before `FileSystemAccessService` construction or database/image operations.
 
-Initialize or reinitialize the database with the destructive reset command:
+The CLI and PHP-FPM users need read access to the application files, including `private/init`.
+The CLI user needs write access to `private/db` for `--reset-db` and `--migrations`, and to `private/sql` for `--generate-migration`.
+The PHP-FPM user needs write access to `private/db` and to `private/upload/img`.
+`private/sql` needs only read access for `--migrations` execution, and `private/upload` itself needs only existence/traverse permission.
+PHP's upload temporary directory must additionally be readable and covered by `FS_DIRECTORY_WHITELIST` in `config.php`.
+
+Ignored by Git (see `.gitignore`): `/vendor`, `/composer.lock`, `/.phpunit.cache/`, `/private/db/smolcms.sq3`.
+`composer.json` is the tracked dependency source.
+
+Initialize or reinitialize the database with the destructive reset command, which drops tables (not the SQLite file itself) and does not run pending migrations:
 
 [source,shell]
 ----
 php src/app.php --reset-db
 ----
 
-Use `--noconfirm` only when the reset should not prompt for confirmation.
-The command loads the driver-specific schema from `private/init/`.
+The command prompts for confirmation even when no tables exist.
+Add `--noconfirm` before or after the command to suppress the prompt; `--noconfirm` is a global modifier that also suppresses the `--migrations` prompt and does nothing by itself.
+The command loads `private/init/init_sqlite.sql` for SQLite (the default) and `private/init/init.sql` for MySQL; other drivers are rejected.
 
 == Running the application
 
@@ -45,25 +59,33 @@ The application uses CLI mode for the commands documented in <<_cli_commands>>.
 For HTTP requests, use a web server with PHP-FPM or another CGI-compatible PHP runtime.
 
 `private/references/nginx.conf` contains a reference Nginx configuration.
-Adapt its document root and PHP-FPM socket for the target system.
-It serves `/public/` as static files and forwards other requests to `src/app.php`.
+Adapt its document roots and PHP-FPM socket for the target system.
+It serves `/public/` as static files, denies `/private/` with 403, and forwards other requests to `src/app.php` via FastCGI.
 
-The `public/` directory contains only static assets (currently only `public/css/main.css`) and a `layout_reference.html` reference layout; it has no PHP entry point.
+The `public/` directory contains only static assets (tracked files are currently only `public/css/main.css` and a `layout_reference.html` reference layout; the working tree may also contain empty untracked `public/img/` and `public/js/` directories); it has no PHP entry point.
 Uploaded images are stored under `private/` and are not publicly served.
+
+== Deployment
+
+There is no CI.
+`./deploy.sh` runs `composer dump`, then a privileged `rsync --delete-during` from `~/workspace/SmolCms/` to `/usr/share/nginx/html/` with `--chown=http:http`, then `chmod -R +x` on the destination.
+It is destructive and must be run intentionally; adapt the Nginx `root` and `fastcgi_pass` from `private/references/nginx.conf` for the target system.
 
 == Project constants
 
-The root-level `constants.php` defines the global `ROOT_DIR` constant.
-The production entry point loads it before `config.php` and Composer's autoloader.
-Tests extending `SimpleTestCase` explicitly load both files.
+Root-level `constants.php` defines only the global `ROOT_DIR` constant (`__DIR__`).
+Root-level `config.php` defines four global path constants derived from `ROOT_DIR`: `FS_DIRECTORY_WHITELIST`, `FS_APP_LEVEL_WHITELIST`, `MIGRATION_DIR`, and `IMAGE_STORAGE_DIR`; it currently holds no credentials.
 
-`config.php` defines the path configuration constants.
-Not intended for storing credentials.
+The production entry point `src/app.php` requires, in order, `constants.php` (via `dirname(__DIR__)`), then `config.php`, then `vendor/autoload.php` via `ROOT_DIR`.
+`tests/TestUtils/SimpleTestCase.php` requires `constants.php` then `config.php` at file scope; direct and indirect subclasses (including `FunctionalTestCase`) inherit them via that inclusion, not via per-test requires.
+Under PHPUnit, `vendor/autoload.php` loads first via the `phpunit.xml` bootstrap, unlike `src/app.php`.
+
+Note that `config.php` is not the sole place for paths: `GenerateMigrationExecutor` duplicates the migration directory as a private constant, and the `PDO` DSN in `CoreServiceConfiguration` builds the `private/db` path directly from `ROOT_DIR`.
 
 == Early startup configuration
 
-To run code during application initialization, define a concrete class implementing `StartupAction` with a `runAction(): void` method and add its service identifier to the `ApplicationStartupHandler` definition in `CoreServiceConfiguration`.
-The configured actions are resolved when the service graph is constructed and are executed in the listed order when `ApplicationCore::init()` is called.
+To run code during application initialization, define an instantiable class implementing `SmolCms\Service\Core\Startup\StartupAction` with a `runAction(): void` method and append its service identifier (usually `::class`) to the `parameters` list of the `ApplicationStartupHandler` `Service` defined in the `CoreServiceConfiguration::__construct()` `$services` array; use `addService(..., replace: true)` if replacing programmatically.
+`ApplicationStartupHandler::__construct()` is `StartupAction ...$actions`, so non-implementors fail at construction.
 
 [source,php]
 ----
@@ -82,79 +104,87 @@ new Service(
 ),
 ----
 
-The `parameters` entries are service identifiers, not instantiated actions.
-Actions with only class-typed dependencies can be autowired.
-Actions with scalar, array, or other non-autowireable dependencies require their own `Service` definition.
-The normal bootstrap runs these actions after service construction and before CLI or CGI handling.
-Calling `init()` again runs them again.
+The `parameters` entries must be resolvable service identifier strings, not instantiated actions.
+Actions are autowired per the rules in <<_configuring_services>>; an action with builtin or otherwise unresolvable constructor parameters needs an explicit `Service` definition with raw values, as `RestrictDirectoryAccessStartupAction` has for its `string ...$directoryWhitelist`.
+Custom non-class identifiers also need an explicit `Service(class: ...)` definition.
+
+Identifiers are resolved transitively when `$serviceBuilder->getService(ApplicationCore::class)` builds `ApplicationStartupHandler` (not in `new ServiceBuilder`, not in `init()`), via `ServiceBuilder::getService()` including variadic-tail handling, and are executed in listed order by `ApplicationCore::init()->runActions()`.
+The normal bootstrap order in `src/app.php` is `getService(ApplicationCore)` → `init()` → `runCli()` → `runCgi()`; only `ApplicationCore` dependencies are built before `init()`, while route controllers and other lazy services are built later.
+`init()` has no guard; each call re-runs `runAction()` on the same cached instances.
 
 [#_directory_access_restrictions]
 == Directory Access Restrictions
 
-During `ApplicationCore::init()`, the first configured startup action calls `ini_set('open_basedir', ...)` with `FS_DIRECTORY_WHITELIST` from `config.php`.
-With the default configuration on Unix-like systems, PHP filesystem operations after that point are limited to `ROOT_DIR/private` and `ROOT_DIR/src`.
+During `ApplicationCore::init()` (via `ApplicationStartupHandler::runActions()`), the first default startup action `RestrictDirectoryAccessStartupAction::runAction()` calls `ini_set('open_basedir', ...)` with `FS_DIRECTORY_WHITELIST` spread into it by `CoreServiceConfiguration`.
+With the default `config.php` on Unix-like systems, file accesses subject to `open_basedir` after that point are limited to the trees `ROOT_DIR/private` and `ROOT_DIR/src` (symlinks resolved; the parent `ROOT_DIR` itself need not be listed).
 
-The bootstrap files and service graph are loaded or constructed before `ApplicationCore::init()`, so this is not process-start protection.
-Keep `ROOT_DIR/src` in the whitelist because Composer may autoload route controllers and other services after startup.
-The project root itself is not required by the current entry point after bootstrap, but any later include, autoload, or native filesystem path must be permitted.
+`src/app.php` requires `constants.php`, `config.php`, and `vendor/autoload.php`, then constructs the service graph (`ApplicationCore`, `PDO`, `FileSystemAccessService`, startup actions, CLI handlers) via `ServiceBuilder::getService()` before `init()`, so this is not process-start protection.
+Keep `ROOT_DIR/src` whitelisted because route controllers and other services are autowired and lazy-loaded with Composer PSR-4 `SmolCms\` → `src` after startup (`ApplicationCore::handleRequest()` plus `ServiceBuilder`).
+`vendor/` is currently not whitelisted and needs no post-startup include (there are no runtime Composer dependencies); adding one requires a whitelist and host-config update.
+No filesystem access to `ROOT_DIR` itself is needed after bootstrap, but every later include, autoload, and native path (database, migrations, init SQL, image storage) must resolve inside the whitelist.
 
-`ini_set()` changes the setting only for the current execution or request.
-It can only tighten an existing `open_basedir`; if it fails, it returns `false`, and the current startup action does not check that result.
-Ensure the PHP host configuration permits all required paths.
+`ini_set()` affects only the current CLI execution or FPM request.
+If the host `open_basedir` is unset, it sets the initial restriction; if already set, it can only narrow it, never widen it, and returns `false` on failure.
+The current action ignores that return value.
+The host `php.ini` or pool configuration must therefore be unset or a superset of all required paths, including the upload temporary directory.
 
-This is defense in depth, not a sandbox or a substitute for OS permissions, input validation, or web-server access controls.
-Do not expose `private/` or `src/` directly through the web server.
+`open_basedir` neither creates directories nor grants OS permissions.
+`private/init`, `private/sql`, and `private/upload` must resolve at `FileSystemAccessService` construction; `private/db` and `private/upload/img` are required by database and image operations.
+The default `FS_DIRECTORY_WHITELIST` does not cover PHP's `upload_tmp_dir` (default system tmp); image uploads fail unless the temporary directory is relocated inside the whitelist or the whitelist is extended.
 
-The whitelist does not create directories or grant filesystem permissions.
-Before first use, provision `private/db`, `private/sql`, `private/upload`, and `private/upload/img`, and ensure the PHP-FPM and CLI users have the required permissions.
-For uploads, PHP's upload temporary directory must also be covered by `FS_DIRECTORY_WHITELIST` because the uploaded file is read after `open_basedir` is applied.
+The action joins the whitelist with `implode(':')`, not `PATH_SEPARATOR`; the code assumes a Unix-like runtime.
 
-The current startup action joins whitelist entries with `:`, so it assumes a Unix-like runtime.
-
+[#_configuring_services]
 == Configuring services
 
-The application passes a `CoreServiceConfiguration` and a `ServiceRegistry` to `ServiceBuilder`.
+The application passes a `CoreServiceConfiguration` and a `ServiceRegistry` to `ServiceBuilder` (see `src/app.php`).
+`ServiceBuilder` pre-registers itself, the registry, and the configuration in the registry.
 The core configuration creates its initial `Service` definitions in its constructor.
-Additional definitions can be added with `addService()`; duplicate identifiers require the replacement flag.
+Additional definitions can be added with `CoreServiceConfiguration::addService()`; duplicate identifiers throw `ServiceConflictException` unless the `$replace = true` flag is passed.
+This is distinct from `ServiceRegistry::addService()`, which has no replacement flag and always throws on a duplicate key.
 
-A service definition has an identifier, an optional class, and positional constructor parameters.
-The identifier is the lookup key.
-If `class` is omitted, it defaults to the identifier, so omission is valid only when the identifier is an existing class name.
-Arbitrary identifiers require an explicit class.
+A service definition has an identifier (`string`), an optional class (`?string`), and constructor parameters (`array`).
+The identifier is the lookup and cache key in both the configuration and the registry.
+If `class` is omitted, it defaults to the identifier, so omission succeeds only when `class_exists(identifier)` is true; interfaces fail this check and arbitrary strings require an explicit existing class.
 
-`ServiceBuilder` first checks its registry, then a configured definition, and only then attempts recursive autowiring.
-Autowiring requires an instantiable class and resolvable constructor dependencies.
-Builtin types, untyped parameters, union types, and intersection types are not autowired.
-Interfaces are not searched for an implementation, and consequently are not possible to autowire.
+`ServiceBuilder::getService(string)` checks the registry, then a configured definition, and only then attempts `autowireService()`; both configured and autowired construction recurse through `getService()`.
+Each identifier is cached separately, so the same identifier returns the same instance and multiple independent instances of one class require multiple identifiers.
+Configuration (or pre-registration) is required when raw or builtin values are needed, when an arbitrary identifier, interface identifier, or alternate implementation is needed, or when multiple instances are required.
 
-Configuration is required when raw constructor values are needed, when an arbitrary identifier or alternate implementation is needed, or when multiple independent instances of a class are required.
-Each identifier is cached separately by the service registry.
+Autowiring requires `class_exists()` and, for every constructor parameter, a non-builtin `ReflectionNamedType` resolvable via `getService()`:
 
-The `parameters` array is positional; its keys are ignored.
-For a named, non-builtin class parameter, provide the service identifier to inject.
-A fully qualified class name can be used: an existing definition for that identifier takes precedence, otherwise a new instance is autowired.
-Other parameter values are passed through unchanged.
+* Builtin, untyped (`null` type), union, and intersection types throw `AutowireException`; defaults and nullability are not consulted.
+* There is no `isInstantiable` check: abstract classes and enums pass `class_exists()` and fail later at `new`.
+* Interfaces are never searched for an implementation: an unconfigured interface fails with `InvalidArgumentException`, but can be requested when explicitly configured to a concrete class.
 
-Variadic constructor parameters are partially supported: Autowiring does not discover multiple variadic services; these require explicit configuration.
+The configured `parameters` array is positional: `array_values()` is applied, keys are ignored, and the result is spread with `...`:
 
-Service identifiers are arbitrary strings or class names; the `ServiceNames` enum in `src/Config/ServiceNames.php` is an empty placeholder intended to hold canonical identifier constants.
+* Positions with a named non-builtin type (class, interface, or enum) must receive a `string` service identifier (a fully qualified class name works), resolved via the full `getService()` order (registry → configured definition → autowire); missing or non-string values cause undefined-key access or `TypeError`, and missing required values cause `ArgumentCountError` at instantiation.
+* All other positions (builtin, untyped, union, intersection) pass values through unchanged; union and intersection types therefore throw when autowired but pass through when explicitly configured.
+
+Variadic parameters require explicit configuration for multiple values; autowiring never discovers multiple services:
+
+* Autowired: a builtin variadic (`string ...`) throws `AutowireException`; a named non-builtin variadic resolves at most one service by type name (interface-typed variadics fail unless configured).
+* Configured: builtin variadics pass all values through as raw values; named non-builtin variadics resolve the value at the variadic position plus every trailing value as service identifiers.
+
+Service identifiers are arbitrary strings or class names; the `ServiceNames` string-backed enum in `src/Config/ServiceNames.php` is currently empty and unused.
+`#[StatefulService]` on `ContextService` is currently a marker attribute with no runtime effect.
 
 == File system access
 
-The `FileSystemAccessService` provides the application-level allowlist and file-operation helpers.
+The `FileSystemAccessService` provides the application-level allowlist and file-operation helpers (`readFile`, `fileExists`, `writeFile`, `deleteFile`, `listFiles`, `isPathAllowed`).
 Its configured paths come from `FS_APP_LEVEL_WHITELIST` in `config.php` and are passed to the service in `CoreServiceConfiguration`.
 The default app-level paths are `private/init`, `private/sql`, and `private/upload`.
 
-This policy is separate from the `open_basedir` whitelist (`FS_DIRECTORY_WHITELIST`).
-Native PHP filesystem calls are governed by `open_basedir`, while this service applies the narrower app-level policy.
-Every configured allowed path must already exist when the service is constructed; the service accepts individual files as well as directories.
-Keep the app-level paths inside the `open_basedir` whitelist as a configuration requirement.
-The service does not validate that relationship itself, and `open_basedir` can still block a native filesystem operation.
+This policy is separate from the `open_basedir` whitelist (`FS_DIRECTORY_WHITELIST` in `config.php`, applied by `RestrictDirectoryAccessStartupAction` via `ini_set`).
+After `ApplicationCore::init()`, native calls — including those inside this service — are still enforced by `open_basedir`; this service adds a further allowlist check.
+By default it is narrower (`private/*` under `private`), but narrowness is configuration, not enforced in code.
 
-Existing paths and directory entries are canonicalized with `realpath()`, which handles ordinary `..` traversal and resolves symlinks for path checks.
-`writeFile()` validates the resolved parent, rejects a final path that is currently a symlink, and checks an existing target before writing.
+Every configured path must resolve via `realpath()` at construction or construction throws; any existing file or directory is accepted there, but only `readFile`, `deleteFile`, and `isPathAllowed` work with exact file entries — `fileExists` and `writeFile` also require the resolved parent directory to be allowed.
+Keep the app-level entries inside `open_basedir`; the service never compares the two lists.
 
-This service is meant as a safeguard against accidental writes to wrong paths, so it cannot be relied upon as the only safeguard against attackers.
+`realpath()` canonicalizes allowed entries, existing targets and parents, and each `listFiles` entry (broken, disallowed, or non-file entries are silently skipped), handling ordinary `..` traversal and symlink resolution; prefix matching requires `DIRECTORY_SEPARATOR`.
+`writeFile()` checks `realpath(dirname)`, rejects `is_link(path)`, checks `realpath(path)` when it exists, then writes to `resolvedDir/basename(path)`.
 
 == Routing
 
@@ -164,6 +194,7 @@ The array keys are not used for matching.
 
 [source,php]
 ----
+// Illustrative example; no current production route uses placeholders.
 new Route(
     path: '/some/path/with/{parameter}',
     method: HttpMethod::POST,
@@ -173,20 +204,26 @@ new Route(
 ----
 
 The controller value is passed to `ServiceBuilder::getService()`.
-A fully qualified class name is autowired.
-A custom service identifier must already be registered in the service configuration or service registry.
+Lookup order is `ServiceRegistry`, then `CoreServiceConfiguration`, then autowiring; the result is cached.
+Autowiring requires an existing class whose constructor parameters are all resolvable class types.
+A non-class identifier that is in neither store fails in `autowireService()`.
 
-Routes match the HTTP method and URL path.
-Literal path segments must match exactly, while a segment written as `\{name}` matches one path segment.
-Matching does not use the host, protocol, or query string, and it provides no regular-expression constraints or type conversion.
-Placeholder values are passed to the handler as strings.
-Trailing slashes and spaces are removed before matching, and the first matching route wins.
+Both the URL path and the route pattern are trimmed with `rtrim(..., ' /')` (any trailing `/` and space combination) and split with `explode('/')`; segment counts must match.
+A route segment starting with `{` matches any one URL segment (including an empty middle segment); an empty pattern segment also matches anything.
+Otherwise, non-empty literal segments must match with `===` (case-sensitive).
+The host, protocol, port, and query string are ignored.
+Extraction uses `trim('/')` and `trim('{}')` with no regular-expression constraints or type conversion; values remain strings.
+The first route in `getRoutes()` order wins.
+A null or empty path never matches.
 
 The placeholder name is passed as a named handler argument, so the controller method must have a parameter with the same name.
 Handler parameter order is irrelevant.
 
-A handler must be a public method with a parameter named `$request`, typed as `Request` or a readonly subtype of `ValidatedRequest`.
-It must return a `Response` or a subclass.
+A handler must be a public method with a parameter named `$request`.
+`Request` is matched by exact `=== Request::class` (subclasses of `Request` are not accepted); `ValidatedRequest` subtypes may be direct or indirect but must be `readonly` concrete classes (not abstract `ValidatedRequest` itself).
+`RequestMapper` finds the candidate by type, but the facade injects it as the named argument `request`, so the parameter must be named `$request`.
+Only one request parameter is supported.
+The handler must return a `Response` or a subclass.
 
 If the handler is omitted, its name is the lowercase HTTP method followed by `Action`: `getAction`, `postAction`, `putAction`, `deleteAction`, or `optionsAction`.
 
@@ -201,8 +238,9 @@ class SomeController
 }
 ----
 
-A path with no matching route returns an empty `404 NOT_FOUND` response.
-Invalid handler configuration generally becomes a `500 INTERNAL_SERVER_ERROR` response.
+A path with no matching route returns `new Response(NOT_FOUND)` with `null` content.
+Most `Throwable` values from `PreControllerActionFacade::process()` become an empty `500 INTERNAL_SERVER_ERROR` response; `BadRequestException` (request-mapping `TypeError`, validation failure) becomes an empty `400 BAD_REQUEST` response.
+Controller-resolution and path-parameter count failures thrown before the `try` block propagate uncaught.
 
 === Current HTTP routes
 
@@ -222,6 +260,24 @@ The current configuration contains these user-facing routes:
 | `GET` | `/upload-image` | `ImageUploadController::getAction` | `NOVICE` or higher
 | `POST` | `/upload-image` | `ImageUploadController::postAction` | `NOVICE` or higher
 |===
+
+=== Request construction
+
+`RequestFactory::buildRequestFromGlobals()` maps `$_SERVER['HTTPS']`, `$_SERVER['HTTP_HOST']`, `$_SERVER['REQUEST_URI']`, and `$_SERVER['REQUEST_METHOD']` plus `getallheaders()`, `$_POST`, `$_GET`, and `$_FILES` into a `Request`.
+`UrlFactory` parses the URL with `parse_url()` and validates the resulting `Url`: protocol must be `http` or `https`, host must pass `ValidateHost`, port must be within `1..65535`, while path and query are unvalidated.
+`InvalidArgumentException` (unparseable or invalid URL) and `ValueError` (unknown `HttpMethod::from()` value) during `buildRequestFromGlobals()` happen in `runCgi()` before the `handleRequest()` try block, so they escape `ExceptionResponseService` as FPM fatals rather than `Response` objects.
+
+== Error handling and responses
+
+`ApplicationCore::handleRequest()` catches `Throwable` around the pre-controller chain and the controller.
+`BadRequestException` becomes an empty `400` response and any other exception becomes an empty `500` response via `ExceptionResponseService`.
+No route match, or a falsy controller result, becomes an empty `404` response via `generateDefaultResponse()`.
+Validation messages exist only in the exception text, never in the response body; there is no logger.
+
+`Response(status, content, headers)` defaults to `OK`, `null`, and `[]`.
+`RedirectResponse(?RouteEnum)` is always `303 SEE_OTHER` with a `Location` header (defaulting to `/`).
+`simulateRequest()` preserves headers so tests can assert `Location`, but `ApplicationCore::output()` in `runCgi()` only calls `http_response_code()` and `echo`, never `header()` — redirects and content types currently do not reach browsers.
+No `Content-Type` is set anywhere.
 
 == PreControllerAction Chain
 
@@ -250,9 +306,9 @@ new Service(
 ----
 
 Actions are not auto-discovered.
-If no actions are configured, the facade invokes the controller directly.
+A `PreControllerActionFacade` constructed with zero actions invokes the controller directly (the `foreach` is a no-op), but `CoreServiceConfiguration` must still list at least one action identifier; an empty or missing entry does not produce an empty chain via `ServiceBuilder` — it throws.
 In the default configuration, authorization runs first, followed by request mapping and validation.
-The built-in validation action aborts invalid requests by throwing `BadRequestException`, which the application converts to a `400 BAD_REQUEST` response.
+Both `RequestMappingPreControllerAction` (mapping `TypeError` → `BadRequestException`) and `ValidationPreControllerAction` abort via `BadRequestException`, caught in `ApplicationCore` and mapped to a bare `400` response with a `null` body; validation messages survive only in the exception message, not in the response.
 
 === Authentication
 
@@ -268,6 +324,8 @@ The `AuthorizationPreControllerAction` checks the attribute at runtime:
 * If the level is sufficient, authorization passes and request mapping and validation still run.
 
 The access levels are ordered from `NOVICE` (100) through `ADMIN` (600): `FELLOW`, `MASTER`, `WIZARD`, and `MOD` are between them.
+Comparison is on the integer `value` with `<`, so an equal level passes.
+All current gates require `NOVICE`; `FELLOW`, `MASTER`, `WIZARD`, `MOD`, and `ADMIN` exist only as ordered values, no route requires them, and no UI changes levels — update `user.access_level` manually to promote users.
 Newly registered users are active `NOVICE` users.
 Authorization reads the user data stored in the session and does not reload the user from the database.
 The current authentication flow does not enforce the database's `disabled` or `banned` states.
@@ -285,24 +343,56 @@ These responses do not redirect to `/login` or add a `WWW-Authenticate` header.
 
 === Login and logout
 
-`POST /login` looks up the user by login name and verifies the password.
+`POST /login` uses the `LoginRequest` validated request, so request mapping and validation run before the controller: missing or too-short fields yield a bare `400` response via `ValidationPreControllerAction`.
+Once validation passes, the controller looks up the user by login name and verifies the password.
 An unknown login name and a wrong password both return a bare `401 UNAUTHORIZED` response without disclosing which check failed.
-On success, the controller starts a session, stores the session user data, and returns a redirect.
+On success, the controller calls `startSession()` (which throws `InvalidStateException` when a session is already active, so re-login without logout fails with `500`), stores the session user data, and returns `303 SEE_OTHER` to `/`.
+A successful login does not update `lastLoginDate`, and the session ID is never regenerated.
 
 `AuthenticationService` delegates password checking to `PasswordService::verifyAndRehashIfNeeded()`, which verifies with `password_verify()` and, when the stored hash no longer matches the current `PASSWORD_DEFAULT` algorithm, rehashes the password and persists the new hash.
 
-`POST /logout` destroys the session and returns a redirect.
+`POST /logout` has no authentication check: it always clears `$_SESSION` (even without an active session) and returns `303` to `/`.
+`GET /login` and `GET /register` always return `200`; when already logged in they render the page with an empty form area instead of the login or registration form.
+
+=== Registration
+
+`POST /register` validates a `RegisterRequest`, returns a bare `400` on password mismatch and a bare `409 CONFLICT` on a duplicate `loginName` (which reveals that the name exists), and otherwise creates an active `NOVICE` user (`registerDate` set to now, `lastLoginDate` set to `null`) and returns `303` to `/login` without starting a session.
+The validated `email` field is discarded — no column or entity property stores it.
+
+=== User settings
+
+`POST /settings` requires `NOVICE` or higher (`401` when anonymous; authorization runs before validation), validates `displayName` (`1..69` characters, not null), updates the user row and `$_SESSION['user']`, and returns `303` to `/settings`.
+
+=== Password and field policy
+
+|===
+| Field | Constraints
+
+| `email` | `1..255` characters, valid email
+| `loginName` | `1..255` characters
+| `displayName` | `1..69` characters
+| `password` | `10..72` characters and at most `72` bytes
+| `passwordRepeat` | `10..72` characters (no byte check)
+|===
+
+All listed fields additionally reject `null`.
+Password constructor parameters use `#[SensitiveParameter]`.
+Passwords are hashed with `password_hash(PASSWORD_DEFAULT)`; verification transparently rehashes and persists when `password_needs_rehash()` reports a stale hash.
+The `user.password` column is `VARCHAR(128)`.
+Short or null login passwords yield `400` (validation) rather than `401`.
+The form components mirror these limits with `minlength` and `maxlength` attributes.
 
 === Request Mapping
 
 Every controller handler must declare a `$request` parameter typed as `Request` or as a concrete subclass of `ValidatedRequest`.
-The request-mapping action stores the result under the handler argument named `request`, so the parameter must be named `$request`.
+The mapper detects the candidate by type, but the request-mapping action stores the result under the handler argument named `request`, so the parameter must be named `$request` (a `ValidatedRequest $foo` parameter would map and then fail binding with an unknown named parameter).
+A missing or non-matching request parameter throws `RuntimeException`, which becomes `500`, not `400`.
 
-`Request` receives the original request object unchanged.
-It contains the URL, HTTP method, raw headers, GET and POST parameters, and optional uploaded files.
+`Request` receives the original request object unchanged (same instance).
+It contains the URL, HTTP method, headers (`getallheaders()`), GET and POST parameters (`$_GET`/`$_POST` or `null` when empty), and optional uploaded files (`$_FILES` or `null`).
 
 A `ValidatedRequest` subclass is constructed before the controller runs.
-Its effective constructor must accept `Request $rawRequest`; the inherited constructor from `ValidatedRequest` is sufficient.
+Its effective constructor must accept the parameter named `rawRequest` typed as `Request $rawRequest`; the inherited constructor from `ValidatedRequest` is sufficient, and a differently named `Request` parameter fails with `Error` (mapped to `500`).
 For every other constructor parameter, the mapper looks up a value using the parameter name:
 
 [source,php]
@@ -310,40 +400,48 @@ For every other constructor parameter, the mapper looks up a value using the par
 $request->postParams[$name] ?? $request->getParams[$name] ?? null
 ----
 
-A non-null POST value takes precedence over GET.
-Only matching constructor parameter names are mapped; unrelated GET and POST keys are ignored.
-Missing values are passed as `null`, even when the constructor parameter has a default value.
-The mapper performs no scalar type conversion and passes values unchanged.
-Incompatible constructor types result in a `BadRequestException`.
+A non-null POST value takes precedence over GET; a null POST value falls through to GET.
+* Only matching constructor parameter names are mapped; unrelated GET and POST keys are ignored.
+* Missing values are passed explicitly as `null`, even when the constructor parameter has a default value, so non-null defaults never apply.
+* No scalar type conversion: values pass unchanged, so with `strict_types`, `"123"` does not satisfy an `int` parameter.
+* Only `TypeError` during construction becomes `BadRequestException`; other failures become `500`: `Error` for unknown `files` or `rawRequest` parameters, `RuntimeException` for a missing parameter or a non-readonly class.
 
-If uploaded files are present, the complete files array is also passed as `$files`; declare a compatible `$files` constructor parameter when accepting uploads.
-Mapped request classes must be declared `readonly`.
+If uploaded files are present, the complete files array is also passed as `$files`; declare `?array $files = null` when optional or `array $files` when required.
+A request carrying `$_FILES` without such a parameter fails with an unknown named parameter (`Error` → `500`); a DTO requiring `array $files` without files in the request fails with `TypeError` (→ `400`).
+Mapped request classes must be declared `readonly`; otherwise a `RuntimeException` (→ `500`) is thrown.
 
 In the default pre-controller chain, authorization runs first, followed by request mapping and then validation.
-`ValidationPreControllerAction` skips plain `Request` objects and invokes `Validator` for `ValidatedRequest` objects.
-Property attributes implementing `ValidationAttribute` are evaluated; failed validation raises `BadRequestException`.
+`ValidationPreControllerAction` skips plain `Request` objects and invokes `Validator` for `ValidatedRequest` objects; it depends on mapping having populated `handlerArguments['request']`.
+Property attributes implementing `ValidationAttribute` are evaluated (including recursive `ValidateObject` handling); failed validation raises `BadRequestException` whose message is discarded by the bare `400` response.
 
 == Session handling
 
-Sessions are stored in the `session` database table.
-`RegisterSessionHandlerStartupAction` registers `SessionHandler` as PHP's session save handler during startup.
-`SessionHandler` implements `SessionHandlerInterface` and `SessionUpdateTimestampHandlerInterface`, reads and writes session rows through `SessionEntityService`, deletes rows on destroy and garbage collection, and validates incoming session IDs against the table.
-Session data size is limited to 16 MiB through a `ValidateStringSizeBytes` attribute on `SessionEntity`.
-The `open()` and `close()` handler methods currently implement no locking.
+Sessions are stored in the `session` table (`private/init/init_sqlite.sql`, `private/init/init.sql`, `#[Entity('session')]` in `src/Data/Persistence/SessionEntity.php`).
+`RegisterSessionHandlerStartupAction` calls `session_set_save_handler($handler)` during `ApplicationCore::init()` (second of the three default startup actions, before `ResumeSessionStartupAction`).
+`SessionHandler` implements `SessionHandlerInterface` and `SessionUpdateTimestampHandlerInterface`, uses `SessionEntityService::findOneBySessionId` and `saveOrUpdate` for `read` and `write` (`read` returns `''` when no row exists), `deleteBySessionId` for `destroy`, `deleteOlderThan(max_lifetime)` (`DELETE WHERE created < now - max_lifetime`) for `gc`, and `sessionIdExists` for `validateId`.
+`write()` validates via `Validator` and throws `RuntimeException` on failure; `updateTimestamp()` currently does nothing and returns `true`.
+`open()` and `close()` return `true` with only `TODO` locking comments; no locking is implemented.
+Garbage collection uses `created` (the insert time, never refreshed on `write`), so a long-lived session can be collected `max_lifetime` after creation even when active; `gc_maxlifetime` itself is not set in `SESSION_OPTIONS`.
 
-`SessionService` configures the session cookie and lifecycle: cookie name `session`, a `cookie_lifetime` of 3600, `httponly` and `SameSite=Strict` cookies, strict mode, and `cookie_secure=false`, which is marked as needing a change for production.
-`resumeSession()` starts a session only when a session cookie is present, while `startSession()` starts one unconditionally.
-`destroySession()` clears the session data, expires the session cookie, and calls `session_destroy()`.
+`SessionEntity::$data` has `#[ValidateStringSizeBytes(max: 2 ** 24 - 1)]` (`16777215` bytes, the `MEDIUMTEXT` maximum, `16 MiB - 1` byte) and `::$sessionId` has `max: 64`; both also carry `#[ValidateNotNull]`.
+Enforcement happens in `SessionHandler::write()`; the SQLite `TEXT` column alone does not enforce the limit.
 
-A successful login starts a session and stores a `SessionUserData` DTO (user id, display name, access level) under `$_SESSION['user']`; this is the data `AuthorizationPreControllerAction` reads.
-Registration does not start a session; it redirects to `/login`.
+`SessionService::SESSION_OPTIONS` passed to `session_start()`: `name = 'session'`, `cookie_lifetime = 3600`, `cookie_secure = false` (`// TODO: Change for live`), `cookie_httponly = true`, `cookie_samesite = 'Strict'`, `use_strict_mode = true`, `use_only_cookies = true`.
+`resumeSession()` (called by `ResumeSessionStartupAction`) throws `InvalidStateException` when a session is active, returns without starting when `$_COOKIE['session']` is unset, and otherwise calls `session_start()`.
+`startSession()` throws when a session is active and otherwise calls `session_start()` unconditionally.
+`destroySession()` always clears `$_SESSION`, then returns early when inactive; when active and `session.use_cookies` is set, it clears the `session` cookie via `setcookie('session', '', 0, path, domain, secure, httponly)` (no `samesite`, expiry `0` rather than a past timestamp) and then calls `session_destroy()`.
+
+On login success, the controller stores `SessionUserData(id, displayName, accessLevel)` as `$_SESSION['user']`; `AuthorizationPreControllerAction` (as well as `UserSettingController`, `LoginController`, and `RegisterController::getAction`) reads it via `SessionService::getUserData()`.
 
 == Templates
 
 `TemplateService` can render any `TemplateConfig` directly.
 Use `HtmlPageConfigFactory::wrap()` when the standard `HtmlTemplate` page shell is desired.
-Before calling `wrap()`, set `ContextKey::PAGE_TITLE` to a non-null string through `ContextService`; `wrap()` reads the value immediately.
-`ContextService` type-checks context values: each `ContextKey` case declares the expected `gettype()` result as its backed value, and `setContext()` throws when a non-null value's type differs.
+Before calling `wrap()`, set `ContextKey::PAGE_TITLE` to a `string` via `ContextService::setContext()`.
+`wrap()` synchronously calls `HtmlPageDataProvider::getPageTitle(): string`, which returns `getContext(PAGE_TITLE)`; an unset or `null` title causes a `TypeError`.
+An already-wrapped config keeps its copied title.
+`ContextService` type-checks context values: each `ContextKey` backed value is the expected `gettype()` result (currently only `PAGE_TITLE = 'string'`).
+`setContext()` stores `null` as-is; for non-null values with a differing type it throws `InvalidArgumentException`.
 
 [source,php]
 ----
@@ -377,10 +475,11 @@ readonly class ExampleController
 }
 ----
 
-`HtmlPageConfigFactory::wrap()` obtains the page title from `ContextService`; it currently supplies the fixed language `en` and fixed navigation routes from `HtmlPageDataProvider`.
-Content configurations only need to carry page-specific data.
+`HtmlPageConfigFactory::wrap()` delegates to `HtmlPageDataProvider`: the page title comes from `ContextService`, the language is hardcoded as `getLanguage() = 'en'`, and the navigation is a hardcoded `getNavigationRoutes()` map of `RouteEnum` values.
+The content `TemplateConfig` must return a single-root `[ContentClass => params]` tree that can be built into a `Template` for `HtmlTemplate::$contentSlot` (only the first entry is kept); it only needs to carry page-specific data and parameters.
 
-Your content config is a class implementing `TemplateConfig`:
+A content config is a (readonly) class implementing `TemplateConfig`.
+Simplified illustration (`SimpleContentPageConfig` exists only here; the codebase ships `SimpleContentComponentConfig(content, extraComponents = [])` with the same structure plus spread `extraComponents` for nested forms):
 
 [source,php]
 ----
@@ -400,13 +499,17 @@ readonly class SimpleContentPageConfig implements TemplateConfig
 }
 ----
 
-A typed config class provides typing for its own constructor properties, but `getConfig()` remains a positional, runtime-processed array tree.
-String keys that are class names identify nested templates; their values must be arrays of constructor parameters.
+A typed config class provides typing for its own constructor properties, but `getConfig()` returns a positional, runtime-processed tree that is spread into the constructor.
+Only string keys with `class_exists($key) === true` recurse as nested `Template` values; their value must be an `array` or a `TemplateException` is thrown.
+Other entries are passed as-is in order.
+The top level uses `array_key_first()` as the root template class.
 
-Every template and component must implement `Template` and provide `render(): string`:
+Every template and component must implement `Template` and provide `render(): string` (enforced via the `buildTemplateFromConfig(): Template` return type plus the `render()` call; a non-`Template` class causes a `TypeError`, not a `TemplateException`):
 
 [source,php]
 ----
+use SmolCms\Template\Template;
+
 readonly class ExampleComponent implements Template
 {
     public function render(): string
@@ -416,35 +519,33 @@ readonly class ExampleComponent implements Template
 }
 ----
 
-Template rendering does not escape values automatically.
-Escape untrusted text and attribute values with the appropriate context, such as `htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')`; only render trusted HTML raw.
+Template rendering does not escape values automatically, and the current `Head`, `SimpleContent`, `UserSettings`, and navigation components interpolate values raw, including user-controlled display names.
 
 Successful template responses use HTTP 200 and contain the rendered string.
-The current CGI adapter sends the status code and body but does not emit `Response` headers, including redirect `Location` headers or an explicit content type.
 
 [#_validation]
 == Validation
 
-`Validator::validate(object $objectToValidate): ValidationResult` reflects over the object's properties and evaluates PHP attributes implementing `ValidationAttribute`.
-Normal property rules implement `PropertyValidationAttribute`, whose `validate(mixed $value): bool` returns the pass or fail result.
-Multiple different validation attributes may be applied to one property.
-Validation messages are collected per property, so when several attributes on one property fail, only the last failing attribute's message is kept.
+`Validator::validate(object $objectToValidate): ValidationResult` reflects over all properties (including private ones) and instantiates attributes that are `instanceof ValidationAttribute`.
+`PropertyValidationAttribute::validate(mixed $value): bool` rules return the pass or fail result and `ValidateObject` recurses into nested objects; other direct `ValidationAttribute` implementations are silently ignored.
+Different attribute classes may stack on one property; the same class cannot repeat because none of the built-in attributes is `IS_REPEATABLE`.
+Messages are keyed by property name and the last failing attribute overwrites: a `string` (`'Failed validation: <Class> - <getErrorMessage()>'`) for property rules, or an `array` of nested messages for `ValidateObject`.
 
-`ValidateObject` is a special marker that recursively validates a non-null nested object.
+`ValidateObject()` skips `null`, otherwise requires an `object` and validates it recursively; a non-object, non-null value causes a `TypeError` (the `validate()` parameter is typed `object`), and its `getErrorMessage()` is never used by the `Validator`.
 
-The built-in validation attributes include:
+The built-in validation attributes (all `TARGET_PROPERTY`) are:
 
-* `ValidateRange(float $min, float $max)` for inclusive integer and float bounds
-* `ValidateAllowList(array $allowValues = [])` using strict comparison
-* `ValidateDenyList(array $denyValues = [])` using strict comparison
-* `ValidateEmail` using `FILTER_VALIDATE_EMAIL`
-* `ValidateHost` for IPv4, IPv6, and domain values
-* `ValidateNotNull` for rejecting only `null`
-* `ValidateStringSize` for character length using `mb_strlen`
-* `ValidateStringSizeBytes` for byte length using `strlen`
-* `ValidateObject` for recursive nested-object validation
+* `ValidateRange(float $min, float $max)`: `null` passes, non-`int`/`float` values (including numeric strings) fail, otherwise inclusive bounds
+* `ValidateAllowList(array $allowValues = [])` using strict `in_array` comparison; `null` passes
+* `ValidateDenyList(array $denyValues = [])` using strict `!in_array` comparison; `null` passes unless `null` is denied
+* `ValidateEmail()` using `FILTER_VALIDATE_EMAIL`; `null` passes
+* `ValidateHost(int $type = ALLOW_ALL)` with the `IPV4 = 1`, `IPV6 = 2`, `DOMAIN = 4` bitmask via `FILTER_VALIDATE_IP`/`FILTER_VALIDATE_DOMAIN`; `null` passes
+* `ValidateNotNull()` rejecting only `null` (`!== null`)
+* `ValidateStringSize(int $minLength = 0, ?int $maxLength = null)`: `null` passes, non-strings fail, `mb_strlen` bounds are inclusive, a `null` max means no upper limit
+* `ValidateStringSizeBytes(int $max)`: `null` passes, `strlen($value) <= $max`, max-only, with no `is_string` guard (non-strings may throw `TypeError`)
+* `ValidateObject()` for recursive nested-object validation
 
-Validators allow `null`; `ValidateNotNull` needs to be applied additionally to reject null values.
+Except for `ValidateNotNull` (and `ValidateDenyList([null])`), all validators pass `null`.
 
 Usage:
 
@@ -482,35 +583,49 @@ var_dump($result->isValid());     // true
 var_dump($result->getMessages()); // []
 ----
 
-To add a validation attribute, declare a PHP attribute targeting properties, implement `PropertyValidationAttribute` (and the `getErrorMessage(): string` method inherited from `ValidationAttribute`), no validator registration is required.
+To add a validation attribute, declare a PHP attribute targeting properties and implement `PropertyValidationAttribute` (both `validate(mixed $value): bool` and the `getErrorMessage(): string` method inherited from `ValidationAttribute`); no validator registration is required.
+A bare `ValidationAttribute` without `Validator` support is ignored; add `IS_REPEATABLE` when the same rule type must repeat on one property.
 
 == Database and persistence
 
 The default runtime database is SQLite at `private/db/smolcms.sq3`.
 The active SQLite schema in `private/init/init_sqlite.sql` contains `user`, `session`, `article`, and `migration` tables.
-`private/init/init.sql` is a MySQL reference schema; using MySQL requires changing the `PDO` service configuration and installing the appropriate PDO driver.
+`private/init/init.sql` is the MySQL schema (used by `--reset-db` when the PDO driver is `mysql`); using MySQL requires changing the `PDO` service DSN in `CoreServiceConfiguration` and installing `pdo_mysql`.
 The default configuration does not use MySQL.
 
-Persisted entities use `#[Entity]` and `#[Id]`.
-Database snake_case fields map to camelCase entity properties, and entity construction requires the mapped fields to be constructor parameters.
-Saving currently requires getters and setters for entity fields.
+Persisted entities use `#[Entity(table: ...)]` and `#[Id]`.
+Database snake_case columns map to camelCase entity properties in both directions via `CaseConverter`, and hydration calls `new $entityClass(...$entityProps)`, so every entity property must be an accepted (named) constructor parameter; unknown columns are dropped and missing values become `null`.
+Saving via `EntityService` currently requires `get<Prop>()` for every entity property and `set<IdProp>()` for the `#[Id]` property to backfill `lastInsertId`.
 
 Beyond the case conversion, `EntityService` maps `DateTime` properties and backed enum properties automatically in both directions: database values hydrate into `DateTime` objects or enum instances, and entities serialize `DateTime` as `Y-m-d H:i:s` strings and enums as their backing values for storage.
+Only `DateTime` is supported (not `DateTimeImmutable` or `DateTimeInterface`); null or missing values stay `null`, and an invalid enum value throws from `::from()`.
 
 Queries are built with `QueryCriteria` and `QueryBuilder`.
-`select()`, `update()`, and `delete()` start a criteria and fix its query type; conditions are collected with `andWhere()` and `orWhere()`, where the first condition must be an `andWhere()`, `withParameters()` supplies bound values, and `maxResults()` and `skipResults()` translate into a `LIMIT` clause (a maximal count is substituted when only an offset is set).
-Select criteria enumerate all entity fields, update criteria set all entity fields, and criteria cannot express inserts; `EntityService` builds insert statements from the entity's field values instead.
+`select()`, `update()`, and `delete()` start a criteria and fix its query type; conditions are collected with `andWhere()` and `orWhere()`, where the first condition must be an `andWhere()`; `withParameters()` supplies (and overwrites) bound values; `maxResults()` and `skipResults()` translate into a `LIMIT` clause emitted as `LIMIT [offset,] count` with `PHP_INT_MAX` substituted when only an offset is set.
+`WHERE` is emitted as `WHERE 1 AND/OR ...`.
+Select criteria enumerate all entity fields, update criteria set all entity fields (including the id column), and criteria cannot express inserts; `EntityService` builds insert statements from the entity's field values instead.
+
+The `article` table, entity, and service exist (`slug`, `title`, `state`, `content`, `created`, `updated`) but are currently unreferenced — no routes or controllers implement article listing or editing.
+`UserEntity::$lastLoginDate` is always `NULL` because login never writes it; `state` is hardcoded to `active` on registration.
 
 == Image uploads
 
-Authenticated users can submit a multipart upload under the `image` field at `POST /upload-image`.
-The type detector recognizes PNG, JPEG, and AVIF signatures.
-Processed files are stored under `private/upload/img` using the basename supplied by the client, and successful uploads redirect to `/`.
+Users with `NOVICE` or higher (`401` when anonymous, `403` when below the level) can submit a multipart `POST /upload-image` with the field `image`; `GET /upload-image` renders the form.
+`ImageUploadController::postAction` manually runs `ImageUploadValidator` (it is not a `ValidatedRequest`): the validator requires `files['image']` to be an array with `tmp_name` and `name` and requires `is_uploaded_file()`, ignoring the `error`, `size`, and MIME fields entirely; failure returns `400`.
 
-The upload validator currently checks that a file was supplied and that PHP considers it uploaded; it does not enforce upload size limits or all standard upload error conditions.
-There is no public image-delivery route or upload quota.
-The configured `ImageProcessorFacade` invokes its PNG, JPEG, and AVIF processors for each accepted upload, so image handling should be treated as experimental.
-GD support for the required formats, including AVIF where used, is required.
+On success the controller runs `file_get_contents(tmp_name)` (`false` returns `500`; the upload temporary directory must be in `FS_DIRECTORY_WHITELIST`), then gates on `ImageTypeDetectionFacade` (`Png`, `Jpeg`, `Avif` detectors, first match wins; `null` returns `400`).
+PNG checks the first 4 bytes for `89504E47`, JPEG checks `FFD8FF`, and AVIF checks `ftypavif` or `ftypavis` at offset 4.
+The detected type is otherwise discarded.
+
+Accepted uploads call `ImageProcessorFacade` (`Png`, `Jpeg`, `Avif`, in that order) with `basename()` of the client-supplied name; each processor runs generic `imagecreatefromstring()` and then `ImageStorageService::storeImage()` with its fixed type into `IMAGE_STORAGE_DIR` (`private/upload/img`) under that basename.
+That is three sequential overwrites of one path (`imagepng` quality 9, `imagejpeg` quality 100, `imageavif` quality 100): the final bytes are AVIF while the original basename and extension are preserved.
+A same-name re-upload overwrites silently; a missing or disallowed directory, or an `imagecreatefromstring()` failure, throws and becomes `500`.
+Success returns `303` to `/`.
+There is no public image-delivery route, upload quota, deduplication, or extension normalization; `private/` is not web-exposed.
+
+`ext-gd` with PNG, JPEG, and AVIF support is required — AVIF support is required for every successful upload under the current configuration, not only "where used".
+Image handling should be treated as experimental.
+Functional tests must stub `ImageUploadValidator` because `is_uploaded_file()` fails outside real uploads.
 
 == Testing
 
@@ -529,14 +644,13 @@ These attributes only populate test-object properties; they do not replace servi
 ----
 use PHPUnit\Framework\MockObject\MockObject;
 use SmolCms\Config\CoreServiceConfiguration;
-use SmolCms\Data\Business\Service;
 use SmolCms\Data\Business\ServiceRegistry;
 use SmolCms\Service\Core\ServiceBuilder;
 use SmolCms\TestUtils\SimpleTestCase;
 use SmolCms\TestUtils\Attributes\Mock;
 use SmolCms\TestUtils\Attributes\Stub;
 
-class ServiceBuilderTest extends SimpleTestCase
+class ServiceBuilderUnitTest extends SimpleTestCase
 {
     private ServiceBuilder $serviceBuilder;
 
@@ -544,20 +658,30 @@ class ServiceBuilderTest extends SimpleTestCase
     private CoreServiceConfiguration|MockObject $serviceConfiguration;
 
     #[Stub(ServiceRegistry::class)]
-    private ServiceRegistry $serviceRegistry;
+    private ServiceRegistry|MockObject $serviceRegistry;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->serviceBuilder = new ServiceBuilder($this->serviceConfiguration, $this->serviceRegistry);
+    }
 }
 ----
 
-`FunctionalTestCase` builds a functional application environment with `sqlite::memory:`, loads `private/init/init_sqlite.sql`, replaces `ContextService` with a test implementation, and permits `open_basedir=/`.
+The `|MockObject` union is the convention used throughout the suite, and `parent::setUp()` is required to populate the doubles.
+
+`FunctionalTestCase` builds a functional application environment with `sqlite::memory:`, loads `private/init/init_sqlite.sql`, replaces `ContextService` with `TestContextService`, and permits `open_basedir=/` by overriding the `RestrictDirectoryAccessStartupAction` parameters to `['/']` before `ApplicationCore::init()`.
 Use its protected `simulateRequest(Request): Response` method to test requests without a web server.
 The in-memory database is shared by test methods within a functional test class; setup clears sessions but does not isolate database rows per method.
+`FileSystemAccessService` still enforces `FS_APP_LEVEL_WHITELIST` in functional tests; keep test files under `private/init`, `private/sql`, or `private/upload`.
 
-`#[Autowire]` requires a typed property with one named class type.
-It resolves that type through the functional test service container.
-Subclasses overriding `setUp()` must call `parent::setUp()`.
+`#[Autowire]` requires a typed property with one named class type (untyped, union, or intersection properties fail); it resolves that type through the functional test service container.
+Subclasses of `SimpleTestCase` or `FunctionalTestCase` overriding `setUp()` must call `parent::setUp()` — otherwise `Mock`/`Stub`/`Autowire` population and (functional) session clearing are skipped.
+
+`loginUser($loginName, $displayName)` creates a `NOVICE` user with password `secure-password-123` when missing and logs in via `POST /login`; call it per test because sessions are cleared while database rows persist across methods in a class.
 
 To override a service for a test class, call `self::registerTestServices()` in `setUpBeforeClass()` after `parent::setUpBeforeClass()`.
-This replaces service definitions and rebuilds the service builder, registry, application core, and in-memory database:
+This replaces service definitions and rebuilds the service builder, registry, application core, and in-memory database (`MyExternalClient` below is a placeholder for a real existing class; `parameters` are positional — see <<_configuring_services>>):
 
 [source,php]
 ----
@@ -573,19 +697,28 @@ public static function setUpBeforeClass(): void
 }
 ----
 
-The PHPUnit configuration runs the `tests/` directory with strict output and issue reporting.
-Output, deprecations, warnings, notices, and other PHPUnit issues are surfaced by the test run and should be resolved.
+`phpunit.xml` runs the `tests/` directory with `beStrictAboutOutputDuringTests`, `failOnAllIssues`, `displayDetailsOnAllIssues`, and `beStrictAboutCoverageMetadata`; output, deprecations, warnings, notices, risky tests, and other PHPUnit issues fail the run and must be fixed.
+Execution order is `depends,defects`.
 
 [#_cli_commands]
 == CLI Commands
 
 The application supports CLI commands through `php src/app.php`.
 Flags use a `--` prefix.
-Arguments following a flag are passed to that command's executor, and arguments are separated by spaces.
+Non-flag tokens following a recognized flag are collected as that flag's `$arguments` array in `$argv` order and passed to `execute()`; separate arguments with spaces and quote values containing spaces.
+Currently only `--generate-migration` uses `arguments[0]`; `--migrations` and `--reset-db` ignore arguments.
 Recognized command executors are registered positionally as parameters to `CliCommandHandler` in `CoreServiceConfiguration`.
-A single invocation may contain several command flags; every recognized executor runs in the order its flag first appears on the command line.
+A single invocation may contain several distinct flags; each executor whose flag is present runs at most once, in the order its flag first appears on the command line.
+Repeating a flag does not re-run it; the last occurrence's arguments win.
+`--noconfirm` never runs as an executor.
+
+`runCli()` exits `0` whenever `PHP_SAPI` is `cli` (even when only printing the command list for unknown flags), so `runCgi()` only runs under a non-CLI SAPI.
+Functional tests use `TestContextService` and force non-CLI mode for `simulateRequest()`.
 
 To add a command, add a case to the `CliCommandFlag` enum, create a class implementing `CliCommandExecutor`, and add the executor to the `CliCommandHandler` service definition.
+The enum `value` is the literal flag text without `--`.
+The executor's `handles()` must return the new case and `helptext()` supplies the command-list output.
+When the executor has builtin or string constructor dependencies, add its own `Service` definition, as done for `MigrationsExecutor`.
 `--noconfirm` is a global modifier consumed by the handler; it is not an executor.
 
 === Available commands
@@ -594,20 +727,26 @@ To add a command, add a case to the `CliCommandFlag` enum, create a class implem
 | Flag | Description
 
 | `--generate-migration "<description>"`
-a|Creates a timestamped migration skeleton in `private/sql`, named `YYYY-MM-DD_HH-MM-SS__<sanitized-description>.sql`.
-The description is required and generation does not execute the migration.
+a|Creates a timestamped migration skeleton in `private/sql`, named `YYYY-MM-DD_HH-MM-SS__<sanitized-description>.sql`, where `<sanitized-description>` replaces every `[^a-zA-Z0-9_-]` character with `_`, trims leading and trailing `_`, and falls back to `migration`.
+The file content is `-- Migration: <original description>\n`.
+Only the first argument is used; extra tokens are ignored.
+An empty or missing description prints the usage text and creates nothing.
+Generation does not execute the migration.
 
 | `--migrations`
-a|Scans `private/sql` for lowercase `.sql` files, sorts them by filename, and executes files not recorded in the `migration` table.
-Successful migrations are recorded; already-recorded files are skipped, and empty files are skipped without being recorded.
-Confirmation is required only when pending files exist, unless `--noconfirm` is supplied.
-A failed migration is not recorded and stops further processing.
+a|Scans `private/sql` non-recursively via `FileSystemAccessService::listFiles` for regular allowed files ending case-sensitively in `.sql`, sorts them by filename, and executes files not recorded in the `migration` table.
+Comparison and recording use the `basename()` against `migration.filename`.
+Successful migrations are recorded; already-recorded files are skipped, and empty files (including whitespace-only files) are skipped without being recorded but still count as pending for the confirmation prompt.
+Confirmation lists the pending basenames and is required only when pending files exist, unless `--noconfirm` is supplied; any answer other than `y` aborts.
+A failed migration is not recorded, later files are not attempted, and `Migrations complete.` is not printed.
+Arguments to `--migrations` are ignored, and a missing directory prints an error.
 
 | `--reset-db`
-a|Destructively drops all non-internal tables and reloads the driver-specific schema.
+a|Destructively drops tables and reloads the driver-specific schema: SQLite drops all tables except `sqlite_%`, while MySQL drops all tables in `DATABASE()`.
 The default SQLite configuration reloads `private/init/init_sqlite.sql`.
-The executor also contains a MySQL branch that temporarily disables foreign-key checks and loads `private/init/init.sql`.
+The MySQL branch sets `FOREIGN_KEY_CHECKS = 0` before the drops and re-enables it to `1` after the drops and before reloading `private/init/init.sql`.
 Confirmation is required unless `--noconfirm` is supplied.
+Unlike `--migrations`, the prompt is unconditional even with no tables; with no tables it prints `No tables to drop.` and still reloads the schema.
 
 | `--noconfirm`
 a|Modifier for `--migrations` and `--reset-db`; suppresses their confirmation prompts.
@@ -636,10 +775,35 @@ Reset the database without confirmation:
 
 `php src/app.php --reset-db --noconfirm`
 
-`--noconfirm` may appear before or after the command.
+`--noconfirm` may appear before or after the command; its position does not affect suppression, but non-flag tokens immediately after `--noconfirm` are consumed as its ignored arguments.
 If no executable command flag is provided, such as with no arguments, an unknown flag, or only `--noconfirm`, the handler prints the available-command list.
-Unknown flags and non-flag tokens are ignored.
+Unknown `--` flags are ignored and reset the current flag, so following bare tokens are also ignored until the next recognized flag.
+Bare tokens before any recognized flag (or after an unknown flag) are ignored; bare tokens after a recognized flag become that flag's arguments.
+
+== Development rules
+
+Every PHP file must start with `declare(strict_types=1);`.
+Do not use `@` to suppress warnings or notices, and do not use deprecated functionality.
+Tests must have no failures, errors, warnings, notices, risky tests, or skipped tests.
+No build, lint, typecheck, or code-generation task is configured; `phpunit.xml` is the verification config.
 
 == Security considerations
 
-The project is a learning project and is not production-hardened.
+The project is a learning project and is not production-hardened; do not deploy it to production as-is.
+Known gaps:
+
+* `cookie_secure = false`
+* no session locking
+* session IDs that are never regenerated
+* minimal upload validation with fan-out PNG/JPEG/AVIF processing
+* no automatic template escaping (user-controlled display names render raw)
+* best-effort `open_basedir` restriction — defense in depth, not a substitute for OS permissions or web-server access controls
+* a file-system allowlist that guards against wrong-path writes but not against check-then-use races, symlink swaps, or direct native-call bypasses
+* CGI output that drops headers, so redirects do not reach browsers
+* no CSRF tokens on `POST /login`, `/register`, `/settings`, `/logout`, or `/upload-image` (`SameSite=Strict` is the only cross-site mitigation)
+* no rate limiting
+* a `409` on duplicate registration that enables login-name enumeration
+* no static-serving deny for `/src/` — do not serve `private/` or `src/` statically
+* unenforced `disabled` and `banned` user states
+
+See <<#_directory_access_restrictions,Directory Access Restrictions>>, Session handling, Image uploads, and Templates for details.
