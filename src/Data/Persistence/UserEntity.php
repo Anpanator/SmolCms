@@ -5,6 +5,7 @@ namespace SmolCms\Data\Persistence;
 
 
 use DateTime;
+use SensitiveParameter;
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Service\DB\Attribute\Entity;
 use SmolCms\Service\DB\Attribute\Id;
@@ -16,6 +17,7 @@ class UserEntity
         #[Id]
         private ?int     $id,
         private string   $loginName,
+        #[SensitiveParameter]
         private string   $password,
         private string   $displayName,
         private string   $state,
