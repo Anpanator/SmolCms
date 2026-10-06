@@ -4,7 +4,7 @@
 
 SmolCms is a small PHP web application learning project with routing, templating, user registration and authentication, SQLite persistence (default; MySQL schema included), and experimental image uploads.
 It requires PHP 8.5 or newer and the `PDO`, `mbstring`, `PDO_SQLite`, and `GD` extensions (see `composer.json` `require`).
-The requirement is enforced by `composer.json` at `composer install` time; `src/app.php` performs no runtime version check.
+The requirement is enforced by `composer.json` at `composer install` time and at runtime via Composer's generated platform check, which `src/app.php` loads through `vendor/autoload.php`.
 
 The project has no `LICENSE` file and no `license` field in `composer.json` (all rights reserved), and contributions are not currently accepted.
 Third-party Composer dependencies (currently dev-only via `phpunit/phpunit`) retain their own licenses.
@@ -30,7 +30,7 @@ The application requires these directories:
 `private/db`, `private/sql`, and `private/upload/img` ship via `.gitkeep` placeholder files.
 `private/upload` ships implicitly as the parent of `private/upload/img/.gitkeep` and has no `.gitkeep` of its own.
 `private/init` ships via its tracked `init.sql` and `init_sqlite.sql` files.
-All listed directories must exist before `FileSystemAccessService` construction or database/image operations.
+The `FS_APP_LEVEL_WHITELIST` directories (`private/init`, `private/sql`, `private/upload`) must exist before `FileSystemAccessService` construction; `private/db` and `private/upload/img` must exist before database and image operations, respectively.
 
 The CLI and PHP-FPM users need read access to the application files, including `private/init`.
 The CLI user needs write access to `private/db` for `--reset-db` and `--migrations`, and to `private/sql` for `--generate-migration`.
@@ -62,14 +62,19 @@ For HTTP requests, use a web server with PHP-FPM or another CGI-compatible PHP r
 Adapt its document roots and PHP-FPM socket for the target system.
 It serves `/public/` as static files, denies `/private/` with 403, and forwards other requests to `src/app.php` via FastCGI.
 
-The `public/` directory contains only static assets (tracked files are currently only `public/css/main.css` and a `layout_reference.html` reference layout; the working tree may also contain empty untracked `public/img/` and `public/js/` directories); it has no PHP entry point.
+The `public/` directory contains only static assets; it has no PHP entry point.
 Uploaded images are stored under `private/` and are not publicly served.
 
-== Deployment
+== Application flow
 
-There is no CI.
-`./deploy.sh` runs `composer dump`, then a privileged `rsync --delete-during` from `~/workspace/SmolCms/` to `/usr/share/nginx/html/` with `--chown=http:http`, then `chmod -R +x` on the destination.
-It is destructive and must be run intentionally; adapt the Nginx `root` and `fastcgi_pass` from `private/references/nginx.conf` for the target system.
+The high-level flow of a request (or CLI invocation) is:
+
+. `src/app.php` loads `constants.php`, `config.php`, and `vendor/autoload.php`, builds the service graph via `ServiceBuilder::getService(ApplicationCore::class)`, and calls `ApplicationCore::init()`.
+. `init()` runs the startup actions in order: restrict directory access (`open_basedir`), register the DB-backed session handler, and resume the session.
+. Under the CLI SAPI, `runCli()` executes the documented commands and exits; under a web SAPI, `runCgi()` builds a `Request` from the PHP globals via `RequestFactory`.
+. `handleRequest()` matches the URL path against the configured routes, resolves the controller through the service container, extracts path parameters, and runs the pre-controller chain: authorization, request mapping, then validation.
+. The controller handler runs and returns a `Response`; a missing route or a falsy result becomes a `404`, and `Throwable`s from the chain or the controller become empty `400`/`500` responses via `ExceptionResponseService`.
+. `output()` sends the response: the status code via `http_response_code()` and the body via `echo`; response headers (such as `Location`) are not sent.
 
 == Project constants
 
@@ -108,7 +113,7 @@ The `parameters` entries must be resolvable service identifier strings, not inst
 Actions are autowired per the rules in <<_configuring_services>>; an action with builtin or otherwise unresolvable constructor parameters needs an explicit `Service` definition with raw values, as `RestrictDirectoryAccessStartupAction` has for its `string ...$directoryWhitelist`.
 Custom non-class identifiers also need an explicit `Service(class: ...)` definition.
 
-Identifiers are resolved transitively when `$serviceBuilder->getService(ApplicationCore::class)` builds `ApplicationStartupHandler` (not in `new ServiceBuilder`, not in `init()`), via `ServiceBuilder::getService()` including variadic-tail handling, and are executed in listed order by `ApplicationCore::init()->runActions()`.
+Identifiers are resolved transitively when `$serviceBuilder->getService(ApplicationCore::class)` builds `ApplicationStartupHandler` (not in `new ServiceBuilder`, not in `init()`), via `ServiceBuilder::getService()` including variadic-tail handling, and are executed in listed order when `ApplicationCore::init()` calls `ApplicationStartupHandler::runActions()`.
 The normal bootstrap order in `src/app.php` is `getService(ApplicationCore)` → `init()` → `runCli()` → `runCgi()`; only `ApplicationCore` dependencies are built before `init()`, while route controllers and other lazy services are built later.
 `init()` has no guard; each call re-runs `runAction()` on the same cached instances.
 
@@ -167,8 +172,7 @@ Variadic parameters require explicit configuration for multiple values; autowiri
 * Autowired: a builtin variadic (`string ...`) throws `AutowireException`; a named non-builtin variadic resolves at most one service by type name (interface-typed variadics fail unless configured).
 * Configured: builtin variadics pass all values through as raw values; named non-builtin variadics resolve the value at the variadic position plus every trailing value as service identifiers.
 
-Service identifiers are arbitrary strings or class names; the `ServiceNames` string-backed enum in `src/Config/ServiceNames.php` is currently empty and unused.
-`#[StatefulService]` on `ContextService` is currently a marker attribute with no runtime effect.
+Service identifiers are arbitrary strings or class names.
 
 == File system access
 
@@ -221,7 +225,7 @@ Handler parameter order is irrelevant.
 
 A handler must be a public method with a parameter named `$request`.
 `Request` is matched by exact `=== Request::class` (subclasses of `Request` are not accepted); `ValidatedRequest` subtypes may be direct or indirect but must be `readonly` concrete classes (not abstract `ValidatedRequest` itself).
-`RequestMapper` finds the candidate by type, but the facade injects it as the named argument `request`, so the parameter must be named `$request`.
+`RequestMapper` finds the candidate by type, but the request-mapping action stores it under the handler argument named `request`, and the facade invokes the handler with those named arguments, so the parameter must be named `$request`.
 Only one request parameter is supported.
 The handler must return a `Response` or a subclass.
 
@@ -264,8 +268,18 @@ The current configuration contains these user-facing routes:
 === Request construction
 
 `RequestFactory::buildRequestFromGlobals()` maps `$_SERVER['HTTPS']`, `$_SERVER['HTTP_HOST']`, `$_SERVER['REQUEST_URI']`, and `$_SERVER['REQUEST_METHOD']` plus `getallheaders()`, `$_POST`, `$_GET`, and `$_FILES` into a `Request`.
-`UrlFactory` parses the URL with `parse_url()` and validates the resulting `Url`: protocol must be `http` or `https`, host must pass `ValidateHost`, port must be within `1..65535`, while path and query are unvalidated.
-`InvalidArgumentException` (unparseable or invalid URL) and `ValueError` (unknown `HttpMethod::from()` value) during `buildRequestFromGlobals()` happen in `runCgi()` before the `handleRequest()` try block, so they escape `ExceptionResponseService` as FPM fatals rather than `Response` objects.
+`UrlFactory` parses the URL with `parse_url()` and validates the resulting `Url`: protocol must be `http` or `https`, host must pass `ValidateHost`, a present port must be within `1..65535`, while path and query are unvalidated.
+`InvalidArgumentException` (unparseable or invalid URL) and `ValueError` (unknown `HttpMethod::from()` value) during `buildRequestFromGlobals()` happen in `runCgi()` before the `handleRequest()` try block, so they are uncaught — `ExceptionResponseService` never converts them into `Response` objects.
+
+=== Adding a page
+
+To add a user-facing page:
+
+. Add a case to `RouteEnum` (`src/Data/Constant/RouteEnum.php`): route paths in `RoutingConfiguration`, `RedirectResponse` targets, and the navigation links in `HtmlPageDataProvider::getNavigationRoutes()` all derive from it, so paths are never hardcoded.
+. Register a `Route` for the new path in `RoutingConfiguration`, pointing at the controller service identifier.
+. Add the controller with a `getAction(Request $request): Response` handler that sets `ContextKey::PAGE_TITLE`, wraps its content config with `HtmlPageConfigFactory::wrap()`, and returns `TemplateService::generateResponse(...)` (see the Templates section for the full pattern).
+. Add the page to the hardcoded `getNavigationRoutes()` map in `HtmlPageDataProvider` when it should appear in the navigation; nested arrays render as submenus.
+. Gate the handler with `#[Authenticated(...)]` when it requires a logged-in user, and use a `ValidatedRequest` DTO for `POST` input.
 
 == Error handling and responses
 
@@ -323,9 +337,8 @@ The `AuthorizationPreControllerAction` checks the attribute at runtime:
 * If the session user's access level is below the required level, a `403 FORBIDDEN` response is returned.
 * If the level is sufficient, authorization passes and request mapping and validation still run.
 
-The access levels are ordered from `NOVICE` (100) through `ADMIN` (600): `FELLOW`, `MASTER`, `WIZARD`, and `MOD` are between them.
-Comparison is on the integer `value` with `<`, so an equal level passes.
-All current gates require `NOVICE`; `FELLOW`, `MASTER`, `WIZARD`, `MOD`, and `ADMIN` exist only as ordered values, no route requires them, and no UI changes levels — update `user.access_level` manually to promote users.
+`AccessLevel` is an ordered int-backed enum ranging from `NOVICE` to `ADMIN`; comparison is on the integer `value` with `<`, so an equal level passes.
+All current gates require the lowest level, `NOVICE`; higher levels exist only as ordered values — no route requires them and no UI changes them, so promote users by updating `user.access_level` manually.
 Newly registered users are active `NOVICE` users.
 Authorization reads the user data stored in the session and does not reload the user from the database.
 The current authentication flow does not enforce the database's `disabled` or `banned` states.
@@ -352,16 +365,17 @@ A successful login does not update `lastLoginDate`, and the session ID is never 
 `AuthenticationService` delegates password checking to `PasswordService::verifyAndRehashIfNeeded()`, which verifies with `password_verify()` and, when the stored hash no longer matches the current `PASSWORD_DEFAULT` algorithm, rehashes the password and persists the new hash.
 
 `POST /logout` has no authentication check: it always clears `$_SESSION` (even without an active session) and returns `303` to `/`.
-`GET /login` and `GET /register` always return `200`; when already logged in they render the page with an empty form area instead of the login or registration form.
+`GET /login` and `GET /register` always return `200`; when already logged in they render the page without the login or registration form.
 
 === Registration
 
-`POST /register` validates a `RegisterRequest`, returns a bare `400` on password mismatch and a bare `409 CONFLICT` on a duplicate `loginName` (which reveals that the name exists), and otherwise creates an active `NOVICE` user (`registerDate` set to now, `lastLoginDate` set to `null`) and returns `303` to `/login` without starting a session.
+`POST /register` validates a `RegisterRequest`, returns a bare `400` on password mismatch and a bare `409 CONFLICT` on a duplicate `loginName` (which reveals that the name exists), and otherwise creates an active `NOVICE` user (`registerDate` set to now, `lastLoginDate` set to `null`) and returns `303` to `/login` without logging the user in (no `$_SESSION['user']` is set).
 The validated `email` field is discarded — no column or entity property stores it.
 
 === User settings
 
 `POST /settings` requires `NOVICE` or higher (`401` when anonymous; authorization runs before validation), validates `displayName` (`1..69` characters, not null), updates the user row and `$_SESSION['user']`, and returns `303` to `/settings`.
+`GET /settings` has no authentication requirement: anonymous users get the page without the form, logged-in users get the form prefilled with their current display name.
 
 === Password and field policy
 
@@ -376,7 +390,7 @@ The validated `email` field is discarded — no column or entity property stores
 |===
 
 All listed fields additionally reject `null`.
-Password constructor parameters use `#[SensitiveParameter]`.
+Password values are marked `#[SensitiveParameter]` on the `UserEntity`, `LoginRequest`, and `RegisterRequest` constructor parameters and on the password-handling methods of `PasswordService` and `AuthenticationService`.
 Passwords are hashed with `password_hash(PASSWORD_DEFAULT)`; verification transparently rehashes and persists when `password_needs_rehash()` reports a stale hash.
 The `user.password` column is `VARCHAR(128)`.
 Short or null login passwords yield `400` (validation) rather than `401`.
@@ -386,7 +400,7 @@ The form components mirror these limits with `minlength` and `maxlength` attribu
 
 Every controller handler must declare a `$request` parameter typed as `Request` or as a concrete subclass of `ValidatedRequest`.
 The mapper detects the candidate by type, but the request-mapping action stores the result under the handler argument named `request`, so the parameter must be named `$request` (a `ValidatedRequest $foo` parameter would map and then fail binding with an unknown named parameter).
-A missing or non-matching request parameter throws `RuntimeException`, which becomes `500`, not `400`.
+A missing or non-matching request parameter fails with `500`, not `400` (`RuntimeException` when no request parameter is found; a builtin- or union-typed parameter fails earlier, during type detection).
 
 `Request` receives the original request object unchanged (same instance).
 It contains the URL, HTTP method, headers (`getallheaders()`), GET and POST parameters (`$_GET`/`$_POST` or `null` when empty), and optional uploaded files (`$_FILES` or `null`).
@@ -423,7 +437,7 @@ Sessions are stored in the `session` table (`private/init/init_sqlite.sql`, `pri
 `open()` and `close()` return `true` with only `TODO` locking comments; no locking is implemented.
 Garbage collection uses `created` (the insert time, never refreshed on `write`), so a long-lived session can be collected `max_lifetime` after creation even when active; `gc_maxlifetime` itself is not set in `SESSION_OPTIONS`.
 
-`SessionEntity::$data` has `#[ValidateStringSizeBytes(max: 2 ** 24 - 1)]` (`16777215` bytes, the `MEDIUMTEXT` maximum, `16 MiB - 1` byte) and `::$sessionId` has `max: 64`; both also carry `#[ValidateNotNull]`.
+`SessionEntity::$data` has `#[ValidateStringSizeBytes(max: 2 ** 24 - 1)]` (the `MEDIUMTEXT` maximum) and `::$sessionId` has `max: 64`; both also carry `#[ValidateNotNull]`.
 Enforcement happens in `SessionHandler::write()`; the SQLite `TEXT` column alone does not enforce the limit.
 
 `SessionService::SESSION_OPTIONS` passed to `session_start()`: `name = 'session'`, `cookie_lifetime = 3600`, `cookie_secure = false` (`// TODO: Change for live`), `cookie_httponly = true`, `cookie_samesite = 'Strict'`, `use_strict_mode = true`, `use_only_cookies = true`.
@@ -439,7 +453,7 @@ On login success, the controller stores `SessionUserData(id, displayName, access
 Use `HtmlPageConfigFactory::wrap()` when the standard `HtmlTemplate` page shell is desired.
 Before calling `wrap()`, set `ContextKey::PAGE_TITLE` to a `string` via `ContextService::setContext()`.
 `wrap()` synchronously calls `HtmlPageDataProvider::getPageTitle(): string`, which returns `getContext(PAGE_TITLE)`; an unset or `null` title causes a `TypeError`.
-An already-wrapped config keeps its copied title.
+The page title is copied into the wrapped config at `wrap()` time; later context changes do not affect it.
 `ContextService` type-checks context values: each `ContextKey` backed value is the expected `gettype()` result (currently only `PAGE_TITLE = 'string'`).
 `setContext()` stores `null` as-is; for non-null values with a differing type it throws `InvalidArgumentException`.
 
@@ -579,8 +593,8 @@ $foo = new Foo(
     stringDeny: 'Not denied',
 );
 $result = $validator->validate($foo);
-var_dump($result->isValid());     // true
-var_dump($result->getMessages()); // []
+var_dump($result->isValid());     // bool(true)
+var_dump($result->getMessages()); // array(0) { }
 ----
 
 To add a validation attribute, declare a PHP attribute targeting properties and implement `PropertyValidationAttribute` (both `validate(mixed $value): bool` and the `getErrorMessage(): string` method inherited from `ValidationAttribute`); no validator registration is required.
@@ -591,7 +605,6 @@ A bare `ValidationAttribute` without `Validator` support is ignored; add `IS_REP
 The default runtime database is SQLite at `private/db/smolcms.sq3`.
 The active SQLite schema in `private/init/init_sqlite.sql` contains `user`, `session`, `article`, and `migration` tables.
 `private/init/init.sql` is the MySQL schema (used by `--reset-db` when the PDO driver is `mysql`); using MySQL requires changing the `PDO` service DSN in `CoreServiceConfiguration` and installing `pdo_mysql`.
-The default configuration does not use MySQL.
 
 Persisted entities use `#[Entity(table: ...)]` and `#[Id]`.
 Database snake_case columns map to camelCase entity properties in both directions via `CaseConverter`, and hydration calls `new $entityClass(...$entityProps)`, so every entity property must be an accepted (named) constructor parameter; unknown columns are dropped and missing values become `null`.
@@ -599,6 +612,9 @@ Saving via `EntityService` currently requires `get<Prop>()` for every entity pro
 
 Beyond the case conversion, `EntityService` maps `DateTime` properties and backed enum properties automatically in both directions: database values hydrate into `DateTime` objects or enum instances, and entities serialize `DateTime` as `Y-m-d H:i:s` strings and enums as their backing values for storage.
 Only `DateTime` is supported (not `DateTimeImmutable` or `DateTimeInterface`); null or missing values stay `null`, and an invalid enum value throws from `::from()`.
+
+To persist a new kind of entity: create its table through a migration (`--generate-migration`, then `--migrations`), add an entity class with `#[Entity(table: ...)]` and `#[Id]`, and add a thin `EntityService` subclass for it (autowired like `UserService`).
+The unused `article` entity and `ArticleService` are an in-repo example.
 
 Queries are built with `QueryCriteria` and `QueryBuilder`.
 `select()`, `update()`, and `delete()` start a criteria and fix its query type; conditions are collected with `andWhere()` and `orWhere()`, where the first condition must be an `andWhere()`; `withParameters()` supplies (and overwrites) bound values; `maxResults()` and `skipResults()` translate into a `LIMIT` clause emitted as `LIMIT [offset,] count` with `PHP_INT_MAX` substituted when only an offset is set.
@@ -636,6 +652,8 @@ Install dependencies and run the full suite from the repository root:
 composer install
 vendor/bin/phpunit
 ----
+
+Test classes live in the `SmolCms\Test\` namespace (mapped to `tests/` via `composer.json` `autoload-dev`); the shared test utilities live in `SmolCms\TestUtils\` (mapped to `tests/TestUtils/`).
 
 `SimpleTestCase::setUp()` populates properties tagged with `#[Mock(...)]` using PHPUnit mocks and properties tagged with `#[Stub(...)]` using PHPUnit stubs.
 These attributes only populate test-object properties; they do not replace services in the application container.
@@ -737,7 +755,7 @@ Generation does not execute the migration.
 a|Scans `private/sql` non-recursively via `FileSystemAccessService::listFiles` for regular allowed files ending case-sensitively in `.sql`, sorts them by filename, and executes files not recorded in the `migration` table.
 Comparison and recording use the `basename()` against `migration.filename`.
 Successful migrations are recorded; already-recorded files are skipped, and empty files (including whitespace-only files) are skipped without being recorded but still count as pending for the confirmation prompt.
-Confirmation lists the pending basenames and is required only when pending files exist, unless `--noconfirm` is supplied; any answer other than `y` aborts.
+Confirmation lists the pending basenames and is required only when pending files exist, unless `--noconfirm` is supplied; only `y` (case-insensitive) proceeds — any other answer, including `yes`, aborts.
 A failed migration is not recorded, later files are not attempted, and `Migrations complete.` is not printed.
 Arguments to `--migrations` are ignored, and a missing directory prints an error.
 
@@ -783,7 +801,7 @@ Bare tokens before any recognized flag (or after an unknown flag) are ignored; b
 == Development rules
 
 Every PHP file must start with `declare(strict_types=1);`.
-Do not use `@` to suppress warnings or notices, and do not use deprecated functionality.
+Do not use `@` to suppress warnings or notices in application code (`src/`), and do not use deprecated functionality.
 Tests must have no failures, errors, warnings, notices, risky tests, or skipped tests.
 No build, lint, typecheck, or code-generation task is configured; `phpunit.xml` is the verification config.
 
