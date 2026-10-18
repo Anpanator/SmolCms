@@ -11,7 +11,7 @@ readonly class SessionService
     public const string SESSION_NAME = 'session';
     private const SESSION_OPTIONS = [
         'name' => self::SESSION_NAME,
-        'cookie_lifetime' => 3600,
+        'cookie_lifetime' => 24 * 60 * 60,
         'cookie_secure' => false, // TODO: Change for live
         'cookie_httponly' => true,
         'cookie_samesite' => 'Strict',

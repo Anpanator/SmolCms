@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace SmolCms\Controller;
 
-use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\DTO\SessionUserData;
 use SmolCms\Data\Request\LoginRequest;
