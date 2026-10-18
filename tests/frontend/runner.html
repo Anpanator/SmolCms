@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SmolCms frontend test runner</title>
+    <link rel="stylesheet" href="../../public/css/main.css">
+</head>
+<body>
+    <div id="test-fixture"></div>
+    <script id="test-results" type="application/json" data-complete="false">{"total":0,"passed":0,"failed":0,"failures":[]}</script>
+    <script type="module">
+        // Every test module is imported statically: the whole module graph is
+        // loaded before this script evaluates. (Dynamically awaited imports
+        // starve under --virtual-time-budget on file:// and race the budget.)
+        import * as apiTests from './api.test.js';
+        import * as cssTests from './css.test.js';
+        import * as domTests from './dom.test.js';
+        import * as formsTests from './forms.test.js';
+        import * as homeTests from './home.test.js';
+        import * as loginTests from './login.test.js';
+        import * as navTests from './nav.test.js';
+        import * as notFoundTests from './notFound.test.js';
+        import * as registerTests from './register.test.js';
+        import * as routerTests from './router.test.js';
+        import * as sessionTests from './session.test.js';
+        import * as settingsTests from './settings.test.js';
+        import * as uploadTests from './upload.test.js';
+        import * as validationTests from './validation.test.js';
+
+        const TEST_MODULES = [
+            ['api', apiTests],
+            ['css', cssTests],
+            ['dom', domTests],
+            ['forms', formsTests],
+            ['home', homeTests],
+            ['login', loginTests],
+            ['nav', navTests],
+            ['notFound', notFoundTests],
+            ['register', registerTests],
+            ['router', routerTests],
+            ['session', sessionTests],
+            ['settings', settingsTests],
+            ['upload', uploadTests],
+            ['validation', validationTests],
+        ];
+
+        const results = { total: 0, passed: 0, failed: 0, failures: [] };
+        const resultsScript = document.getElementById('test-results');
+        const fixture = document.getElementById('test-fixture');
+
+        function writeResults() {
+            resultsScript.textContent = JSON.stringify(results);
+            resultsScript.setAttribute('data-complete', 'true');
+        }
+
+        function recordFailure(label, message) {
+            results.failed++;
+            results.failures.push({ name: label, message: String(message).slice(0, 2000) });
+            if (results.total > 0) {
+                writeResults();
+            }
+        }
+
+        window.addEventListener('error', (event) => recordFailure('window.onerror', event.message));
+        window.addEventListener('unhandledrejection', (event) => recordFailure('unhandledrejection', String(event.reason)));
+
+        // Guard against accidental page navigations (e.g. a click on a link
+        // whose default action proceeds): they would silently destroy the
+        // test results. The guard blocks them and records a failure unless a
+        // test explicitly muted it via muteNavigation(true).
+        try {
+            window.__navigationMuted = false;
+            window.navigation?.addEventListener('navigate', (event) => {
+                if (event.hashChange || event.destination.url === location.href) {
+                    return;
+                }
+                event.preventDefault();
+                if (!window.__navigationMuted) {
+                    recordFailure('navigation-guard', `test triggered a page navigation to ${event.destination.url}`);
+                }
+            });
+        } catch (guardError) {
+            recordFailure('navigation-guard <setup>', `failed to install: ${guardError?.message ?? guardError}`);
+        }
+
+        for (const [moduleName, testModule] of TEST_MODULES) {
+            const tests = Object.entries(testModule)
+                .filter(([name, value]) => typeof value === 'function' && name.startsWith('test'));
+            if (tests.length === 0) {
+                recordFailure(`${moduleName} <module>`, 'module exports no test functions');
+                continue;
+            }
+
+            for (const [testName, testFunction] of tests) {
+                results.total++;
+                const label = `${moduleName}::${testName}`;
+                window.__currentTest = label;
+                fixture.replaceChildren();
+                try {
+                    await testFunction(fixture);
+                    results.passed++;
+                } catch (error) {
+                    recordFailure(label, error?.message ?? String(error));
+                }
+            }
+        }
+
+        fixture.replaceChildren();
+        writeResults();
+    </script>
+</body>
+</html>
