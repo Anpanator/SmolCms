@@ -1,0 +1,11 @@
+== Application flow
+
+The high-level flow of a request (or CLI invocation) is:
+
+. `src/app.php` loads `constants.php`, `config.php`, and `vendor/autoload.php`, builds the service graph via `ServiceBuilder::getService(ApplicationCore::class)`, and calls `ApplicationCore::init()`.
+. `init()` runs the startup actions in order: restrict directory access (`open_basedir`), register the DB-backed session handler, and resume the session.
+. Under the CLI SAPI, `runCli()` executes the documented commands and exits; under a web SAPI, `runCgi()` builds a `Request` from the PHP globals via `RequestFactory`.
+. `handleRequest()` matches the URL path against the configured routes, resolves the controller through the service container, extracts path parameters, and runs the pre-controller chain: authorization, request mapping, then validation.
+. The controller handler runs and returns a `Response`; a missing route or a falsy result becomes a `404`, and `Throwable`s from the chain or the controller become empty `400`/`500` responses via `ExceptionResponseService`.
+. `output()` sends the response: response headers via `header()` (guarded by `headers_sent()`), then the status code via `http_response_code()` and the body via `echo`.
+

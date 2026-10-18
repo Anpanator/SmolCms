@@ -1,0 +1,80 @@
+== Testing
+
+Install dependencies and run the full suite from the repository root:
+
+[source,shell]
+----
+composer install
+vendor/bin/phpunit
+----
+
+Test classes live in the `SmolCms\Test\` namespace (mapped to `tests/` via `composer.json` `autoload-dev`); the shared test utilities live in `SmolCms\TestUtils\` (mapped to `tests/TestUtils/`).
+
+`vendor/bin/phpunit` runs the PHP suite and the frontend suite.
+The frontend suite in `tests/frontend/` is dependency-free vanilla JavaScript — `assert.js` and `mocks.js` helpers plus one `*.test.js` module per frontend module — executed by `runner.html` inside headless Chromium.
+`tests/Frontend/FrontendTest.php` (namespace `SmolCms\Test\Frontend`) bridges it into PHPUnit: it locates Chromium via the `CHROMIUM_BINARY` environment variable or `command -v chromium`, runs it headless against `runner.html` with `--dump-dom`, parses the `#test-results` JSON from the dumped DOM, and fails when any frontend test fails, when the runner did not finish, or when no Chromium binary is found.
+There are no skips: Chromium must be installed, and a missing binary fails the test.
+
+`SimpleTestCase::setUp()` populates properties tagged with `#[Mock(...)]` using PHPUnit mocks and properties tagged with `#[Stub(...)]` using PHPUnit stubs.
+These attributes only populate test-object properties; they do not replace services in the application container.
+
+[source,php]
+----
+use PHPUnit\Framework\MockObject\MockObject;
+use SmolCms\Config\CoreServiceConfiguration;
+use SmolCms\Data\Business\ServiceRegistry;
+use SmolCms\Service\Core\ServiceBuilder;
+use SmolCms\TestUtils\SimpleTestCase;
+use SmolCms\TestUtils\Attributes\Mock;
+use SmolCms\TestUtils\Attributes\Stub;
+
+class ServiceBuilderUnitTest extends SimpleTestCase
+{
+    private ServiceBuilder $serviceBuilder;
+
+    #[Mock(CoreServiceConfiguration::class)]
+    private CoreServiceConfiguration|MockObject $serviceConfiguration;
+
+    #[Stub(ServiceRegistry::class)]
+    private ServiceRegistry|MockObject $serviceRegistry;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->serviceBuilder = new ServiceBuilder($this->serviceConfiguration, $this->serviceRegistry);
+    }
+}
+----
+
+The `|MockObject` union is the convention used throughout the suite, and `parent::setUp()` is required to populate the doubles.
+
+`FunctionalTestCase` builds a functional application environment with `sqlite::memory:`, loads `private/init/init_sqlite.sql`, replaces `ContextService` with `TestContextService`, and permits `open_basedir=/` by overriding the `RestrictDirectoryAccessStartupAction` parameters to `['/']` before `ApplicationCore::init()`.
+Use its protected `simulateRequest(Request): Response` method to test requests without a web server.
+The in-memory database is shared by test methods within a functional test class; setup clears sessions but does not isolate database rows per method.
+`FileSystemAccessService` still enforces `FS_APP_LEVEL_WHITELIST` in functional tests; keep test files under `private/init`, `private/sql`, or `private/upload`.
+
+`#[Autowire]` requires a typed property with one named class type (untyped, union, or intersection properties fail); it resolves that type through the functional test service container.
+Subclasses of `SimpleTestCase` or `FunctionalTestCase` overriding `setUp()` must call `parent::setUp()` — otherwise `Mock`/`Stub`/`Autowire` population and (functional) session clearing are skipped.
+
+`loginUser($loginName, $displayName)` creates a `NOVICE` user with password `secure-password-123` when missing and logs in via `POST /login`; call it per test because sessions are cleared while database rows persist across methods in a class.
+
+To override a service for a test class, call `self::registerTestServices()` in `setUpBeforeClass()` after `parent::setUpBeforeClass()`.
+This replaces service definitions and rebuilds the service builder, registry, application core, and in-memory database (`MyExternalClient` below is a placeholder for a real existing class; `parameters` are positional — see <<_configuring_services>>):
+
+[source,php]
+----
+public static function setUpBeforeClass(): void
+{
+    parent::setUpBeforeClass();
+    self::registerTestServices(
+        new Service(
+            identifier: MyExternalClient::class,
+            parameters: ['http://localhost:9999'],
+        ),
+    );
+}
+----
+
+`phpunit.xml` runs the `tests/` directory with `beStrictAboutOutputDuringTests`, `failOnAllIssues`, `displayDetailsOnAllIssues`, and `beStrictAboutCoverageMetadata`; output, deprecations, warnings, notices, risky tests, and other PHPUnit issues fail the run and must be fixed.
+Execution order is `depends,defects`.
+

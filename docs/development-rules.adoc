@@ -1,0 +1,8 @@
+== Development rules
+
+Every PHP file must start with `declare(strict_types=1);`.
+Do not use `@` to suppress warnings or notices in application code (`src/`), and do not use deprecated functionality.
+Tests must have no failures, errors, warnings, notices, risky tests, or skipped tests.
+Frontend code stays plain vanilla JavaScript and CSS under `public/` — no frameworks, no Node.js, no build step.
+No build, lint, typecheck, or code-generation task is configured; `phpunit.xml` is the verification config.
+

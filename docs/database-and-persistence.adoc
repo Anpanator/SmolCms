@@ -1,0 +1,24 @@
+== Database and persistence
+
+The default runtime database is SQLite at `private/db/smolcms.sq3`.
+The active SQLite schema in `private/init/init_sqlite.sql` contains `user`, `session`, `article`, and `migration` tables.
+`private/init/init.sql` is the MySQL schema (used by `--reset-db` when the PDO driver is `mysql`); using MySQL requires changing the `PDO` service DSN in `CoreServiceConfiguration` and installing `pdo_mysql`.
+
+Persisted entities use `#[Entity(table: ...)]` and `#[Id]`.
+Database snake_case columns map to camelCase entity properties in both directions via `CaseConverter`, and hydration calls `new $entityClass(...$entityProps)`, so every entity property must be an accepted (named) constructor parameter; unknown columns are dropped and missing values become `null`.
+Saving via `EntityService` currently requires `get<Prop>()` for every entity property and `set<IdProp>()` for the `#[Id]` property to backfill `lastInsertId`.
+
+Beyond the case conversion, `EntityService` maps `DateTime` properties and backed enum properties automatically in both directions: database values hydrate into `DateTime` objects or enum instances, and entities serialize `DateTime` as `Y-m-d H:i:s` strings and enums as their backing values for storage.
+Only `DateTime` is supported (not `DateTimeImmutable` or `DateTimeInterface`); null or missing values stay `null`, and an invalid enum value throws from `::from()`.
+
+To persist a new kind of entity: create its table through a migration (`--generate-migration`, then `--migrations`), add an entity class with `#[Entity(table: ...)]` and `#[Id]`, and add a thin `EntityService` subclass for it (autowired like `UserService`).
+The unused `article` entity and `ArticleService` are an in-repo example.
+
+Queries are built with `QueryCriteria` and `QueryBuilder`.
+`select()`, `update()`, and `delete()` start a criteria and fix its query type; conditions are collected with `andWhere()` and `orWhere()`, where the first condition must be an `andWhere()`; `withParameters()` supplies (and overwrites) bound values; `maxResults()` and `skipResults()` translate into a `LIMIT` clause emitted as `LIMIT [offset,] count` with `PHP_INT_MAX` substituted when only an offset is set.
+`WHERE` is emitted as `WHERE 1 AND/OR ...`.
+Select criteria enumerate all entity fields, update criteria set all entity fields (including the id column), and criteria cannot express inserts; `EntityService` builds insert statements from the entity's field values instead.
+
+The `article` table, entity, and service exist (`slug`, `title`, `state`, `content`, `created`, `updated`) but are currently unreferenced — no routes or controllers implement article listing or editing.
+`UserEntity::$lastLoginDate` is always `NULL` because login never writes it; `state` is hardcoded to `active` on registration.
+

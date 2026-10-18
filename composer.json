@@ -19,5 +19,17 @@
   },
   "require-dev": {
     "phpunit/phpunit": "^13"
+  },
+  "suggest": {
+    "chromium": "Required by the frontend test suite (tests/Frontend/FrontendTest.php). Install it so \"command -v chromium\" finds it, or point the CHROMIUM_BINARY environment variable at the binary."
+  },
+  "scripts": {
+    "post-install-cmd": [
+      "@check-chromium"
+    ],
+    "post-update-cmd": [
+      "@check-chromium"
+    ],
+    "check-chromium": "php tests/Frontend/check-chromium.php"
   }
 }

@@ -1,0 +1,35 @@
+[#_configuring_services]
+== Configuring services
+
+The application passes a `CoreServiceConfiguration` and a `ServiceRegistry` to `ServiceBuilder` (see `src/app.php`).
+`ServiceBuilder` pre-registers itself, the registry, and the configuration in the registry.
+The core configuration creates its initial `Service` definitions in its constructor.
+Additional definitions can be added with `CoreServiceConfiguration::addService()`; duplicate identifiers throw `ServiceConflictException` unless the `$replace = true` flag is passed.
+This is distinct from `ServiceRegistry::addService()`, which has no replacement flag and always throws on a duplicate key.
+
+A service definition has an identifier (`string`), an optional class (`?string`), and constructor parameters (`array`).
+The identifier is the lookup and cache key in both the configuration and the registry.
+If `class` is omitted, it defaults to the identifier, so omission succeeds only when `class_exists(identifier)` is true; interfaces fail this check and arbitrary strings require an explicit existing class.
+
+`ServiceBuilder::getService(string)` checks the registry, then a configured definition, and only then attempts `autowireService()`; both configured and autowired construction recurse through `getService()`.
+Each identifier is cached separately, so the same identifier returns the same instance and multiple independent instances of one class require multiple identifiers.
+Configuration (or pre-registration) is required when raw or builtin values are needed, when an arbitrary identifier, interface identifier, or alternate implementation is needed, or when multiple instances are required.
+
+Autowiring requires `class_exists()` and, for every constructor parameter, a non-builtin `ReflectionNamedType` resolvable via `getService()`:
+
+* Builtin, untyped (`null` type), union, and intersection types throw `AutowireException`; defaults and nullability are not consulted.
+* There is no `isInstantiable` check: abstract classes and enums pass `class_exists()` and fail later at `new`.
+* Interfaces are never searched for an implementation: an unconfigured interface fails with `InvalidArgumentException`, but can be requested when explicitly configured to a concrete class.
+
+The configured `parameters` array is positional: `array_values()` is applied, keys are ignored, and the result is spread with `...`:
+
+* Positions with a named non-builtin type (class, interface, or enum) must receive a `string` service identifier (a fully qualified class name works), resolved via the full `getService()` order (registry → configured definition → autowire); missing or non-string values cause undefined-key access or `TypeError`, and missing required values cause `ArgumentCountError` at instantiation.
+* All other positions (builtin, untyped, union, intersection) pass values through unchanged; union and intersection types therefore throw when autowired but pass through when explicitly configured.
+
+Variadic parameters require explicit configuration for multiple values; autowiring never discovers multiple services:
+
+* Autowired: a builtin variadic (`string ...`) throws `AutowireException`; a named non-builtin variadic resolves at most one service by type name (interface-typed variadics fail unless configured).
+* Configured: builtin variadics pass all values through as raw values; named non-builtin variadics resolve the value at the variadic position plus every trailing value as service identifiers.
+
+Service identifiers are arbitrary strings or class names.
+

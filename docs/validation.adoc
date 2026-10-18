@@ -1,0 +1,63 @@
+[#_validation]
+== Validation
+
+`Validator::validate(object $objectToValidate): ValidationResult` reflects over all properties (including private ones) and instantiates attributes that are `instanceof ValidationAttribute`.
+`PropertyValidationAttribute::validate(mixed $value): bool` rules return the pass or fail result and `ValidateObject` recurses into nested objects; other direct `ValidationAttribute` implementations are silently ignored.
+Different attribute classes may stack on one property; the same class cannot repeat because none of the built-in attributes is `IS_REPEATABLE`.
+Messages are keyed by property name and the last failing attribute overwrites: a `string` (`'Failed validation: <Class> - <getErrorMessage()>'`) for property rules, or an `array` of nested messages for `ValidateObject`.
+
+`ValidateObject()` skips `null`, otherwise requires an `object` and validates it recursively; a non-object, non-null value causes a `TypeError` (the `validate()` parameter is typed `object`), and its `getErrorMessage()` is never used by the `Validator`.
+
+The built-in validation attributes (all `TARGET_PROPERTY`) are:
+
+* `ValidateRange(float $min, float $max)`: `null` passes, non-`int`/`float` values (including numeric strings) fail, otherwise inclusive bounds
+* `ValidateAllowList(array $allowValues = [])` using strict `in_array` comparison; `null` passes
+* `ValidateDenyList(array $denyValues = [])` using strict `!in_array` comparison; `null` passes unless `null` is denied
+* `ValidateEmail()` using `FILTER_VALIDATE_EMAIL`; `null` passes
+* `ValidateHost(int $type = ALLOW_ALL)` with the `IPV4 = 1`, `IPV6 = 2`, `DOMAIN = 4` bitmask via `FILTER_VALIDATE_IP`/`FILTER_VALIDATE_DOMAIN`; `null` passes
+* `ValidateNotNull()` rejecting only `null` (`!== null`)
+* `ValidateStringSize(int $minLength = 0, ?int $maxLength = null)`: `null` passes, non-strings fail, `mb_strlen` bounds are inclusive, a `null` max means no upper limit
+* `ValidateStringSizeBytes(int $max)`: `null` passes, `strlen($value) <= $max`, max-only, with no `is_string` guard (non-strings may throw `TypeError`)
+* `ValidateObject()` for recursive nested-object validation
+
+Except for `ValidateNotNull` (and `ValidateDenyList([null])`), all validators pass `null`.
+
+Usage:
+
+[source,php]
+----
+use SmolCms\Service\Validation\Attribute\ValidateAllowList;
+use SmolCms\Service\Validation\Attribute\ValidateDenyList;
+use SmolCms\Service\Validation\Attribute\ValidateRange;
+use SmolCms\Service\Validation\Validator;
+
+class Foo
+{
+    public function __construct(
+        #[ValidateRange(min: 10, max: 100)]
+        private float $floatVal,
+        #[ValidateRange(min: -10, max: 0)]
+        private int $intVal,
+        #[ValidateAllowList(['ALLOWED', 1, true])]
+        private mixed $mixedAllow,
+        #[ValidateDenyList(['DENIED', 'ALSO_DENIED'])]
+        private string $stringDeny,
+    ) {
+    }
+}
+
+$validator = new Validator();
+$foo = new Foo(
+    floatVal: 15.0,
+    intVal: -1,
+    mixedAllow: 'ALLOWED',
+    stringDeny: 'Not denied',
+);
+$result = $validator->validate($foo);
+var_dump($result->isValid());     // bool(true)
+var_dump($result->getMessages()); // array(0) { }
+----
+
+To add a validation attribute, declare a PHP attribute targeting properties and implement `PropertyValidationAttribute` (both `validate(mixed $value): bool` and the `getErrorMessage(): string` method inherited from `ValidationAttribute`); no validator registration is required.
+A bare `ValidationAttribute` without `Validator` support is ignored; add `IS_REPEATABLE` when the same rule type must repeat on one property.
+

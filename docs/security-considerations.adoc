@@ -1,0 +1,19 @@
+== Security considerations
+
+The project is a learning project and is not production-hardened; do not deploy it to production as-is.
+Known gaps:
+
+* `cookie_secure = false`
+* no session locking
+* session IDs that are never regenerated
+* minimal upload validation with fan-out PNG/JPEG/AVIF processing
+* user-controlled display names are rendered as text nodes in the SPA (no `innerHTML`), but the API has no output-encoding layer of its own
+* best-effort `open_basedir` restriction — defense in depth, not a substitute for OS permissions or web-server access controls
+* a file-system allowlist that guards against wrong-path writes but not against check-then-use races, symlink swaps, or direct native-call bypasses
+* no CSRF tokens on `POST /login`, `/register`, `/settings`, `/logout`, or `/upload-image` (`SameSite=Strict` is the only cross-site mitigation)
+* no rate limiting
+* a `409` on duplicate registration that enables login-name enumeration
+* no static-serving deny for `/src/` — do not serve `private/` or `src/` statically
+* unenforced `disabled` and `banned` user states
+
+See <<#_directory_access_restrictions,Directory Access Restrictions>>, Session handling, Image uploads, and <<_frontend_single_page_application>> for details.

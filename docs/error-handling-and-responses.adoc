@@ -1,0 +1,15 @@
+[#_error_handling_and_responses]
+== Error handling and responses
+
+`ApplicationCore::handleRequest()` catches `Throwable` around the pre-controller chain and the controller.
+`BadRequestException` becomes an empty `400` response and any other exception becomes an empty `500` response via `ExceptionResponseService`.
+No route match, or a falsy controller result, becomes an empty `404` response via `generateDefaultResponse()`.
+Validation messages exist only in the exception text, never in the response body; there is no logger.
+
+`Response(status, content, headers)` defaults to `OK`, `null`, and `[]`.
+`JsonResponse(data, status)` sets the `Content-Type: application/json` header and JSON-encodes `$data` into the body; `null` data (as used for `204`) leaves the body empty, and a JSON encoding failure throws `InvalidStateException`.
+There is no redirect response: API outcomes are expressed through status codes, and error responses have empty bodies whose user-facing wording the SPA derives from the status code.
+
+`ApplicationCore::output()` in `runCgi()` sends every response header with `header()` (guarded by `headers_sent()`), then the status code via `http_response_code()` and the body via `echo`.
+Content types (`text/html; charset=UTF-8` for the shell, `application/json` for API responses) reach browsers.
+

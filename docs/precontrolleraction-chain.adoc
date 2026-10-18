@@ -1,0 +1,140 @@
+== PreControllerAction Chain
+
+Before a controller handler is invoked, `PreControllerActionFacade` runs an ordered chain of `PreControllerAction` implementations.
+Each action receives the handler-argument array by reference.
+Mutations remain available to later actions and are used for the controller call.
+The facade itself receives the initial array by value.
+
+Returning `null` continues the chain.
+Any non-null `Response`, including a successful response, stops the remaining actions and the controller, and becomes the request response.
+
+=== Configuration
+
+Register actions in `CoreServiceConfiguration` as positional parameters to `PreControllerActionFacade`:
+
+[source,php]
+----
+new Service(
+    identifier: PreControllerActionFacade::class,
+    parameters: [
+        AuthorizationPreControllerAction::class,
+        RequestMappingPreControllerAction::class,
+        ValidationPreControllerAction::class,
+    ],
+),
+----
+
+Actions are not auto-discovered.
+A `PreControllerActionFacade` constructed with zero actions invokes the controller directly (the `foreach` is a no-op), but `CoreServiceConfiguration` must still list at least one action identifier; an empty or missing entry does not produce an empty chain via `ServiceBuilder` — it throws.
+In the default configuration, authorization runs first, followed by request mapping and validation.
+Both `RequestMappingPreControllerAction` (mapping `TypeError` → `BadRequestException`) and `ValidationPreControllerAction` abort via `BadRequestException`, caught in `ApplicationCore` and mapped to a bare `400` response with a `null` body; validation messages survive only in the exception message, not in the response.
+
+=== Authentication
+
+To require authentication for a controller handler, add `#[Authenticated(AccessLevel::NOVICE)]` to the actual route-resolved handler method.
+The `AccessLevel` argument is required.
+The attribute targets methods, not classes.
+
+The `AuthorizationPreControllerAction` checks the attribute at runtime:
+
+* If the attribute is absent, the endpoint is not blocked by this action.
+* If present and no session user exists, a `401 UNAUTHORIZED` response is returned.
+* If the session user's access level is below the required level, a `403 FORBIDDEN` response is returned.
+* If the level is sufficient, authorization passes and request mapping and validation still run.
+
+`AccessLevel` is an ordered int-backed enum ranging from `NOVICE` to `ADMIN`; comparison is on the integer `value` with `<`, so an equal level passes.
+All current gates require the lowest level, `NOVICE`; higher levels exist only as ordered values — no route requires them and no UI changes them, so promote users by updating `user.access_level` manually.
+Newly registered users are active `NOVICE` users.
+Authorization reads the user data stored in the session and does not reload the user from the database.
+The current authentication flow does not enforce the database's `disabled` or `banned` states.
+
+[source,php]
+----
+#[Authenticated(AccessLevel::NOVICE)]
+public function postAction(UserSettingsUpdateRequest $request): Response
+{
+    // ...
+}
+----
+
+These responses do not redirect to `/login` or add a `WWW-Authenticate` header.
+
+=== Login and logout
+
+`POST /login` uses the `LoginRequest` validated request, so request mapping and validation run before the controller: missing or too-short fields yield a bare `400` response via `ValidationPreControllerAction`.
+Once validation passes, the controller looks up the user by login name and verifies the password.
+An unknown login name and a wrong password both return a bare `401 UNAUTHORIZED` response without disclosing which check failed.
+On success, the controller calls `startSession()` (which throws `InvalidStateException` when a session is already active, so re-login without logout fails with `500`), stores the session user data, and returns `200` with `{"user": {"id", "displayName", "accessLevel"}}`.
+A successful login does not update `lastLoginDate`, and the session ID is never regenerated.
+
+`AuthenticationService` delegates password checking to `PasswordService::verifyAndRehashIfNeeded()`, which verifies with `password_verify()` and, when the stored hash no longer matches the current `PASSWORD_DEFAULT` algorithm, rehashes the password and persists the new hash.
+
+`POST /logout` has no authentication check: it always clears `$_SESSION` (even without an active session), destroys the session, and returns `204 NO_CONTENT` with no body.
+
+`GET /api/session` returns `{"user": null}` for anonymous visitors and `{"user": {"id", "displayName", "accessLevel"}}` for logged-in users.
+`accessLevel` is the integer backing value of the `AccessLevel` enum (`NOVICE = 100` up to `ADMIN = 600`).
+The SPA loads it once at boot and after login, registration, and logout to drive the navigation.
+
+=== Registration
+
+`POST /register` validates a `RegisterRequest`, returns a bare `400` on password mismatch and a bare `409 CONFLICT` on a duplicate `loginName` (which reveals that the name exists), and otherwise creates an active `NOVICE` user (`registerDate` set to now, `lastLoginDate` set to `null`) and returns `201` with `{"created": true}` without logging the user in (no `$_SESSION['user']` is set).
+The validated `email` field is discarded — no column or entity property stores it.
+The SPA responds to `201` by navigating to the login view with a success notice.
+
+=== User settings
+
+`POST /settings` requires `NOVICE` or higher (`401` when anonymous; authorization runs before validation), validates `displayName` (`1..69` characters, not null), updates the user row and `$_SESSION['user']`, and returns `200` with the serialized user.
+There is no authenticated `GET /settings` page: `GET /settings` serves the same HTML shell as every other client path, and the SPA prefills the display-name form from the session state, showing a warning notice with a login link for anonymous users.
+On a `401` the client navigates to the login view; other statuses map to user-facing messages.
+
+=== Password and field policy
+
+|===
+| Field | Constraints
+
+| `email` | `1..255` characters, valid email
+| `loginName` | `1..255` characters
+| `displayName` | `1..69` characters
+| `password` | `10..72` characters and at most `72` bytes
+| `passwordRepeat` | `10..72` characters (no byte check)
+|===
+
+All listed fields additionally reject `null`.
+Password values are marked `#[SensitiveParameter]` on the `UserEntity`, `LoginRequest`, and `RegisterRequest` constructor parameters and on the password-handling methods of `PasswordService` and `AuthenticationService`.
+Passwords are hashed with `password_hash(PASSWORD_DEFAULT)`; verification transparently rehashes and persists when `password_needs_rehash()` reports a stale hash.
+The `user.password` column is `VARCHAR(128)`.
+Short or null login passwords yield `400` (validation) rather than `401`.
+The SPA mirrors these limits client-side in `public/js/validation.js`, including the password UTF-8 byte check via `TextEncoder`.
+
+=== Request Mapping
+
+Every controller handler must declare a `$request` parameter typed as `Request` or as a concrete subclass of `ValidatedRequest`.
+The mapper detects the candidate by type, but the request-mapping action stores the result under the handler argument named `request`, so the parameter must be named `$request` (a `ValidatedRequest $foo` parameter would map and then fail binding with an unknown named parameter).
+A missing or non-matching request parameter fails with `500`, not `400` (`RuntimeException` when no request parameter is found; a builtin- or union-typed parameter fails earlier, during type detection).
+
+`Request` receives the original request object unchanged (same instance).
+It contains the URL, HTTP method, headers (`getallheaders()`), GET parameters (`$_GET`), post parameters (`$_POST`, or the decoded JSON request body when `Content-Type` is `application/json` — `null` when empty or unusable), and optional uploaded files (`$_FILES` or `null`).
+
+A `ValidatedRequest` subclass is constructed before the controller runs.
+Its effective constructor must accept the parameter named `rawRequest` typed as `Request $rawRequest`; the inherited constructor from `ValidatedRequest` is sufficient, and a differently named `Request` parameter fails with `Error` (mapped to `500`).
+For every other constructor parameter, the mapper looks up a value using the parameter name:
+
+[source,php]
+----
+$request->postParams[$name] ?? $request->getParams[$name] ?? null
+----
+
+A non-null POST value takes precedence over GET; a null POST value falls through to GET.
+* Only matching constructor parameter names are mapped; unrelated GET and POST keys are ignored.
+* Missing values are passed explicitly as `null`, even when the constructor parameter has a default value, so non-null defaults never apply.
+* No scalar type conversion: values pass unchanged, so with `strict_types`, `"123"` does not satisfy an `int` parameter.
+* Only `TypeError` during construction becomes `BadRequestException`; other failures become `500`: `Error` for unknown `files` or `rawRequest` parameters, `RuntimeException` for a missing parameter or a non-readonly class.
+
+If uploaded files are present, the complete files array is also passed as `$files`; declare `?array $files = null` when optional or `array $files` when required.
+A request carrying `$_FILES` without such a parameter fails with an unknown named parameter (`Error` → `500`); a DTO requiring `array $files` without files in the request fails with `TypeError` (→ `400`).
+Mapped request classes must be declared `readonly`; otherwise a `RuntimeException` (→ `500`) is thrown.
+
+In the default pre-controller chain, authorization runs first, followed by request mapping and then validation.
+`ValidationPreControllerAction` skips plain `Request` objects and invokes `Validator` for `ValidatedRequest` objects; it depends on mapping having populated `handlerArguments['request']`.
+Property attributes implementing `ValidationAttribute` are evaluated (including recursive `ValidateObject` handling); failed validation raises `BadRequestException` whose message is discarded by the bare `400` response.
+

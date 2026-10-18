@@ -1,0 +1,40 @@
+[#_frontend_single_page_application]
+== Frontend (single-page application)
+
+The frontend is a vanilla JavaScript SPA served statically from `public/` under the `/public/` URL prefix: plain ES modules and one stylesheet, with no frameworks, no Node.js, and no build or transpilation step.
+The only HTML the backend renders is the static shell from `IndexController` — `<head>` with `main.css`, a `<div id="app"></div>`, and `<script type="module" src="/public/js/main.js"></script>`.
+
+=== Module map
+
+* `main.js`: entry point.
+Loads the session, builds the header/footer navigation, maps client routes (`/`, `/login`, `/register`, `/settings`, `/upload-image`) to view factories, mounts everything into `#app`, and starts the router.
+* `api.js`: `fetch` wrapper.
+JSON bodies are serialized and sent with `Content-Type: application/json`; `FormData` instances pass through untouched (the browser sets the multipart boundary).
+Responses are decoded from JSON (raw text for other bodies, `null` for empty ones such as `204`); non-2xx statuses and network failures reject with `ApiError`, which carries the status (`0` for network errors).
+* `router.js`: History-API router.
+Renders the active view into a container element, intercepts clicks on internal links, handles `popstate`, and renders the not-found view for unknown paths.
+* `session.js`: session state store.
+Loads `GET /api/session` once, caches the user, and exposes `refresh()` plus subscriber notification on every change.
+* `nav.js`: header and footer navigation rendered from session state — anonymous users see Home/Login/Register, logged-in users see Home/Settings/Upload Image plus an account dropdown with the role label and a logout button.
+* `views/`: `home` (tag sidebar plus placeholder tile grid), `login`, `register`, `settings` (prefilled from the session state), `upload` (multipart `FormData` with the field `image`), and `notFound`.
+* `dom.js`: the `el()` element-builder helper used by all view and nav modules.
+* `forms.js`: form-field and message builders plus the status-to-message mapping.
+* `validation.js`: client-side validation mirroring the backend field rules.
+
+=== Client behavior
+
+* Bootstrapping loads `GET /api/session`, then renders the navigation and the view for the current URL.
+* Client-side validation (`validation.js`) mirrors the backend rules — `loginName` `1..255` characters, `password` `10..72` characters and at most `72` UTF-8 bytes, a non-empty valid `email`, and `displayName` `1..69` characters — for fast feedback; the backend re-validates, and the client treats status codes as the source of truth.
+* Error responses have empty bodies, so the client maps status codes to user-facing messages (`forms.js::messageForStatus`): `400` input, `401` login, `403` permission, `409` taken login name, `500` server error.
+* A `401` on an authenticated action navigates to the login view.
+* Successful login refreshes the session and navigates home; successful registration navigates to `/login?registered=1`, which shows a success notice; logout POSTs `/logout` (best effort), refreshes the session, and navigates home.
+* A successful settings save updates the local session state with the returned user.
+
+=== CSS conventions
+
+`public/css/main.css` is a single stylesheet organized in commented sections and built on custom properties.
+State and behavior live in CSS rather than JavaScript ("CSS over JS"): the account dropdown is a nested list revealed purely by `:hover` and `:focus-within` (keyboard accessible), with no inline style manipulation.
+The code uses modern browser features (ES modules, custom properties, `:focus-within`) and targets evergreen Firefox and Chromium — the engines the frontend test suite runs in.
+
+`public/layout_reference.html` is a static mockup mirroring the real markup and class names; it is a styling reference, not part of the application.
+

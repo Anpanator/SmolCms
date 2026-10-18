@@ -1,0 +1,41 @@
+== Installation and setup
+
+Install the Composer dependencies from the repository root:
+
+[source,shell]
+----
+composer install
+----
+
+The application requires these directories:
+
+* `private/db` for the SQLite database
+* `private/sql` for migration files
+* `private/upload` and `private/upload/img` for image storage
+* `private/init` for the driver-specific schema files
+
+`private/db`, `private/sql`, and `private/upload/img` ship via `.gitkeep` placeholder files.
+`private/upload` ships implicitly as the parent of `private/upload/img/.gitkeep` and has no `.gitkeep` of its own.
+`private/init` ships via its tracked `init.sql` and `init_sqlite.sql` files.
+The `FS_APP_LEVEL_WHITELIST` directories (`private/init`, `private/sql`, `private/upload`) must exist before `FileSystemAccessService` construction; `private/db` and `private/upload/img` must exist before database and image operations, respectively.
+
+The CLI and PHP-FPM users need read access to the application files, including `private/init`.
+The CLI user needs write access to `private/db` for `--reset-db` and `--migrations`, and to `private/sql` for `--generate-migration`.
+The PHP-FPM user needs write access to `private/db` and to `private/upload/img`.
+`private/sql` needs only read access for `--migrations` execution, and `private/upload` itself needs only existence/traverse permission.
+PHP's upload temporary directory must additionally be readable and covered by `FS_DIRECTORY_WHITELIST` in `config.php`.
+
+Ignored by Git (see `.gitignore`): `/vendor`, `/composer.lock`, `/.phpunit.cache/`, `/private/db/smolcms.sq3`.
+`composer.json` is the tracked dependency source.
+
+Initialize or reinitialize the database with the destructive reset command, which drops tables (not the SQLite file itself) and does not run pending migrations:
+
+[source,shell]
+----
+php src/app.php --reset-db
+----
+
+The command prompts for confirmation even when no tables exist.
+Add `--noconfirm` before or after the command to suppress the prompt; `--noconfirm` is a global modifier that also suppresses the `--migrations` prompt and does nothing by itself.
+The command loads `private/init/init_sqlite.sql` for SQLite (the default) and `private/init/init.sql` for MySQL; other drivers are rejected.
+

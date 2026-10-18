@@ -1,0 +1,30 @@
+== Early startup configuration
+
+To run code during application initialization, define an instantiable class implementing `SmolCms\Service\Core\Startup\StartupAction` with a `runAction(): void` method and append its service identifier (usually `::class`) to the `parameters` list of the `ApplicationStartupHandler` `Service` defined in the `CoreServiceConfiguration::__construct()` `$services` array; use `addService(..., replace: true)` if replacing programmatically.
+`ApplicationStartupHandler::__construct()` is `StartupAction ...$actions`, so non-implementors fail at construction.
+
+[source,php]
+----
+// Inside CoreServiceConfiguration::__construct(), in the $services array.
+// The first three actions are the default configuration;
+// MyStartupAction and FancyStartupAction are placeholders for your own additions.
+new Service(
+    identifier: ApplicationStartupHandler::class,
+    parameters: [
+        RestrictDirectoryAccessStartupAction::class,
+        RegisterSessionHandlerStartupAction::class,
+        ResumeSessionStartupAction::class,
+        MyStartupAction::class,
+        FancyStartupAction::class,
+    ],
+),
+----
+
+The `parameters` entries must be resolvable service identifier strings, not instantiated actions.
+Actions are autowired per the rules in <<_configuring_services>>; an action with builtin or otherwise unresolvable constructor parameters needs an explicit `Service` definition with raw values, as `RestrictDirectoryAccessStartupAction` has for its `string ...$directoryWhitelist`.
+Custom non-class identifiers also need an explicit `Service(class: ...)` definition.
+
+Identifiers are resolved transitively when `$serviceBuilder->getService(ApplicationCore::class)` builds `ApplicationStartupHandler` (not in `new ServiceBuilder`, not in `init()`), via `ServiceBuilder::getService()` including variadic-tail handling, and are executed in listed order when `ApplicationCore::init()` calls `ApplicationStartupHandler::runActions()`.
+The normal bootstrap order in `src/app.php` is `getService(ApplicationCore)` → `init()` → `runCli()` → `runCgi()`; only `ApplicationCore` dependencies are built before `init()`, while route controllers and other lazy services are built later.
+`init()` has no guard; each call re-runs `runAction()` on the same cached instances.
+
