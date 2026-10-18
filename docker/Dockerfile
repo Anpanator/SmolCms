@@ -74,8 +74,8 @@ RUN rm -f /usr/local/etc/php-fpm.d/docker.conf \
 
 USER ${APP_UID}:${APP_GID}
 
-RUN php src/app.php --init-db \
-    && php src/app.php --generate-js-integrity \
+RUN php src/app.php --generate-js-integrity \
+    && rm -f private/db/smolcms.sq3 \
     && php-fpm -t --fpm-config /usr/local/etc/php-fpm.conf \
     && nginx -t -c /etc/nginx/nginx.conf
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -Eeuo pipefail
+set -eu
 
 umask 0007
 
@@ -17,28 +17,14 @@ mkdir -p \
     /tmp/nginx/scgi \
     /tmp/nginx/uwsgi
 
-for log_name in \
-    error.log \
-    info.log \
-    nginx-access.log \
-    nginx-error.log \
-    php-error.log \
-    php-fpm-access.log \
-    php-fpm-error.log
+php "$APP_ROOT/src/app.php" --init-db
+
+for file_path in "$DATABASE_FILE" "$APP_ROOT"/private/logs/*.log
 do
-    log_path=$APP_ROOT/private/logs/$log_name
-    if [[ ! -e "$log_path" ]]; then
-        touch "$log_path"
-    fi
-    if [[ -O "$log_path" ]]; then
-        chmod 0660 "$log_path"
+    if [[ -f "$file_path" && -O "$file_path" ]]; then
+        chmod 0660 "$file_path"
     fi
 done
-
-php "$APP_ROOT/src/app.php" --init-db
-if [[ -O "$DATABASE_FILE" ]]; then
-    chmod 0660 "$DATABASE_FILE"
-fi
 
 php-fpm -F --fpm-config /usr/local/etc/php-fpm.conf &
 php_fpm_pid=$!
@@ -51,10 +37,11 @@ shutdown() {
 
 trap shutdown INT TERM
 
-set +e
-wait -n "$php_fpm_pid" "$nginx_pid"
-status=$?
-set -e
+if wait -n "$php_fpm_pid" "$nginx_pid"; then
+    status=0
+else
+    status=$?
+fi
 
 shutdown
 wait "$php_fpm_pid" 2>/dev/null || true
