@@ -144,6 +144,37 @@ namespace SmolCms\Test\Service\Factory {
             $this->requestFactory->buildRequestFromGlobals();
         }
 
+        public function testBuildRequestFromGlobals_ignoresPostSuperGlobalForJsonContentType(): void
+        {
+            $_POST = ['form' => 'data'];
+            $this->setRequestGlobals(
+                method: 'POST',
+                postParams: [],
+                headers: ['Content-Type' => 'application/json'],
+            );
+            $this->expectUrl('http://example.com/resource?from=uri');
+
+            $request = $this->requestFactory->buildRequestFromGlobals();
+
+            // No JSON body is available, so downstream validation must receive null instead of $_POST
+            self::assertNull($request->postParams);
+        }
+
+        public function testBuildRequestFromGlobals_keepsPostSuperGlobalForFormContentType(): void
+        {
+            $postParams = ['loginName' => 'admin', 'password' => 'hunter2'];
+            $this->setRequestGlobals(
+                method: 'POST',
+                postParams: $postParams,
+                headers: ['Content-Type' => 'application/x-www-form-urlencoded'],
+            );
+            $this->expectUrl('http://example.com/resource?from=uri');
+
+            $request = $this->requestFactory->buildRequestFromGlobals();
+
+            self::assertSame($postParams, $request->postParams);
+        }
+
         private function setRequestGlobals(
             ?string $https = null,
             string  $method = 'GET',

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SmolCms\Test\Service\Core\Session;
 
+use ReflectionClass;
 use SmolCms\Data\DTO\SessionUserData;
 use SmolCms\Exception\InvalidStateException;
 use SmolCms\Service\Core\Session\SessionService;
@@ -86,6 +87,16 @@ class SessionServiceTest extends SimpleTestCase
         self::assertSame(PHP_SESSION_NONE, session_status());
         self::assertSame([], $_SESSION);
         self::assertNull($this->sessionService->getUserData());
+    }
+
+    public function testSessionOptions_MarkSessionCookieAsHttpOnly(): void
+    {
+        $reflection = new ReflectionClass(SessionService::class);
+        $options = $reflection->getConstant('SESSION_OPTIONS');
+
+        self::assertIsArray($options);
+        self::assertArrayHasKey('cookie_httponly', $options);
+        self::assertTrue($options['cookie_httponly']);
     }
 
     private function closeActiveSession(): void

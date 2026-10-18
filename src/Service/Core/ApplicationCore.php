@@ -84,6 +84,11 @@ readonly class ApplicationCore
 
     private function output(Response $response): void
     {
+        if (!headers_sent()) {
+            foreach ($response->getHeaders() as $name => $value) {
+                header("$name: $value");
+            }
+        }
         http_response_code($response->getStatus()->value);
         echo $response->getContent();
     }

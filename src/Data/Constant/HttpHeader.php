@@ -5,5 +5,5 @@ namespace SmolCms\Data\Constant;
 
 enum HttpHeader: string
 {
-    case LOCATION = 'Location';
+    case CONTENT_TYPE = 'Content-Type';
 }

@@ -11,7 +11,6 @@ use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\UserService;
 use SmolCms\TestUtils\Attributes\Autowire;
 use SmolCms\TestUtils\FunctionalTestCase;
-use Throwable;
 
 class UserSettingControllerTest extends FunctionalTestCase
 {
@@ -29,36 +28,11 @@ class UserSettingControllerTest extends FunctionalTestCase
         $this->settingsUrl = new Url(protocol: 'https', host: 'localhost', path: '/settings');
     }
 
-    public function testGetAction_ShowsFormWhenLoggedIn(): void
-    {
-        $this->loginUser('form-test-user', 'Form User');
-
-        $request = new Request(url: $this->settingsUrl, method: HttpMethod::GET);
-        try {
-            $response = $this->simulateRequest($request);
-        } catch (Throwable $e) {
-            $this->fail('Exception: ' . $e::class . ': ' . $e->getMessage() . "\n" . $e->getTraceAsString());
-        }
-
-        $this->assertEquals(HttpStatus::OK, $response->getStatus());
-        $this->assertStringContainsString('User settings', $response->getContent());
-    }
-
-    public function testGetAction_ShowsEmptyPageWhenNotLoggedIn(): void
-    {
-        $request = new Request(url: $this->settingsUrl, method: HttpMethod::GET);
-        try {
-            $response = $this->simulateRequest($request);
-        } catch (Throwable $e) {
-            $this->fail('Exception: ' . $e::class . ': ' . $e->getMessage() . "\n" . $e->getTraceAsString());
-        }
-
-        $this->assertEquals(HttpStatus::OK, $response->getStatus());
-    }
-
     public function testPostAction_SuccessfulUpdate(): void
     {
         $this->loginUser('update-test-user', 'Old Name');
+        $userData = $this->sessionService->getUserData();
+        $this->assertNotNull($userData);
 
         $request = new Request(
             url: $this->settingsUrl,
@@ -67,13 +41,22 @@ class UserSettingControllerTest extends FunctionalTestCase
         );
         $response = $this->simulateRequest($request);
 
-        $this->assertEquals(HttpStatus::SEE_OTHER, $response->getStatus());
-        $this->assertArrayHasKey('Location', $response->getHeaders());
-        $this->assertSame('/settings', $response->getHeaders()['Location']);
+        $this->assertEquals(HttpStatus::OK, $response->getStatus());
+        $this->assertSame('application/json', $response->getHeaders()['Content-Type']);
+        $this->assertSame(
+            [
+                'user' => [
+                    'id' => $userData->id,
+                    'displayName' => 'Updated Name',
+                    'accessLevel' => $userData->accessLevel->value,
+                ],
+            ],
+            json_decode((string)$response->getContent(), true)
+        );
 
-        $userData = $this->sessionService->getUserData();
-        $this->assertNotNull($userData);
-        $this->assertSame('Updated Name', $userData->displayName);
+        $updatedUserData = $this->sessionService->getUserData();
+        $this->assertNotNull($updatedUserData);
+        $this->assertSame('Updated Name', $updatedUserData->displayName);
 
         $savedUser = $this->userService->findOneById($userData->id);
         $this->assertNotNull($savedUser);
@@ -90,6 +73,7 @@ class UserSettingControllerTest extends FunctionalTestCase
         $response = $this->simulateRequest($request);
 
         $this->assertEquals(HttpStatus::UNAUTHORIZED, $response->getStatus());
+        $this->assertNull($response->getContent());
         $this->assertNull($this->sessionService->getUserData());
     }
 
@@ -104,6 +88,7 @@ class UserSettingControllerTest extends FunctionalTestCase
         $response = $this->simulateRequest($request);
 
         $this->assertSame(HttpStatus::UNAUTHORIZED, $response->getStatus());
+        $this->assertNull($response->getContent());
     }
 
     public function testPostAction_EmptyDisplayName(): void
@@ -118,6 +103,7 @@ class UserSettingControllerTest extends FunctionalTestCase
         $response = $this->simulateRequest($request);
 
         $this->assertEquals(HttpStatus::BAD_REQUEST, $response->getStatus());
+        $this->assertNull($response->getContent());
     }
 
     public function testPostAction_NullPostParams(): void
@@ -132,5 +118,6 @@ class UserSettingControllerTest extends FunctionalTestCase
         $response = $this->simulateRequest($request);
 
         $this->assertEquals(HttpStatus::BAD_REQUEST, $response->getStatus());
+        $this->assertNull($response->getContent());
     }
 }

@@ -8,7 +8,6 @@ namespace SmolCms\Config;
 use SmolCms\Controller\AuthController;
 use SmolCms\Controller\ImageUploadController;
 use SmolCms\Controller\IndexController;
-use SmolCms\Controller\LoginController;
 use SmolCms\Controller\RegisterController;
 use SmolCms\Controller\UserSettingController;
 use SmolCms\Data\Business\Route;
@@ -34,27 +33,38 @@ class RoutingConfiguration
             RouteEnum::LOGIN->name => new Route(
                 path: RouteEnum::LOGIN->value,
                 method: HttpMethod::GET,
-                controller: LoginController::class,
+                controller: IndexController::class,
             ),
             RouteEnum::REGISTER->name => new Route(
                 path: RouteEnum::REGISTER->value,
                 method: HttpMethod::GET,
-                controller: RegisterController::class,
+                controller: IndexController::class,
             ),
-            'RegisterPostRoute' => new Route(
-                path: RouteEnum::REGISTER->value,
-                method: HttpMethod::POST,
-                controller: RegisterController::class,
+            RouteEnum::SETTINGS->name => new Route(
+                path: RouteEnum::SETTINGS->value,
+                method: HttpMethod::GET,
+                controller: IndexController::class,
+            ),
+            RouteEnum::UPLOAD_IMAGE->name => new Route(
+                path: RouteEnum::UPLOAD_IMAGE->value,
+                method: HttpMethod::GET,
+                controller: IndexController::class,
+            ),
+            RouteEnum::API_SESSION->name => new Route(
+                path: RouteEnum::API_SESSION->value,
+                method: HttpMethod::GET,
+                controller: AuthController::class,
+                handler: 'getSessionAction'
             ),
             'LoginPostRoute' => new Route(
                 path: RouteEnum::LOGIN->value,
                 method: HttpMethod::POST,
                 controller: AuthController::class
             ),
-            RouteEnum::SETTINGS->name => new Route(
-                path: RouteEnum::SETTINGS->value,
-                method: HttpMethod::GET,
-                controller: UserSettingController::class,
+            'RegisterPostRoute' => new Route(
+                path: RouteEnum::REGISTER->value,
+                method: HttpMethod::POST,
+                controller: RegisterController::class,
             ),
             'SettingsPostRoute' => new Route(
                 path: RouteEnum::SETTINGS->value,
@@ -66,11 +76,6 @@ class RoutingConfiguration
                 method: HttpMethod::POST,
                 controller: AuthController::class,
                 handler: 'logoutAction'
-            ),
-            RouteEnum::UPLOAD_IMAGE->name => new Route(
-                path: RouteEnum::UPLOAD_IMAGE->value,
-                method: HttpMethod::GET,
-                controller: ImageUploadController::class,
             ),
             'ImageUploadPostRoute' => new Route(
                 path: RouteEnum::UPLOAD_IMAGE->value,

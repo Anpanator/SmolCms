@@ -47,9 +47,9 @@ class RegisterControllerTest extends FunctionalTestCase
 
         $response = $this->simulateRequest($request);
 
-        $this->assertEquals(HttpStatus::SEE_OTHER, $response->getStatus());
-        $this->assertArrayHasKey('Location', $response->getHeaders());
-        $this->assertSame('/login', $response->getHeaders()['Location']);
+        $this->assertEquals(HttpStatus::CREATED, $response->getStatus());
+        $this->assertSame('application/json', $response->getHeaders()['Content-Type']);
+        $this->assertSame(['created' => true], json_decode((string)$response->getContent(), true));
 
         $savedUser = $this->userService->findOneByLoginName('testuser');
         $this->assertNotNull($savedUser);
@@ -74,6 +74,7 @@ class RegisterControllerTest extends FunctionalTestCase
         $response = $this->simulateRequest($request);
 
         $this->assertEquals(HttpStatus::BAD_REQUEST, $response->getStatus());
+        $this->assertNull($response->getContent());
     }
 
     public function testPostAction_DuplicateLoginName(): void

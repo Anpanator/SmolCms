@@ -3,11 +3,12 @@ declare(strict_types=1);
 
 namespace SmolCms\Controller;
 
+use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\DTO\SessionUserData;
 use SmolCms\Data\Request\LoginRequest;
 use SmolCms\Data\Request\Request;
-use SmolCms\Data\Response\RedirectResponse;
+use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Authentication\AuthenticationService;
 use SmolCms\Service\Core\Session\SessionService;
@@ -36,20 +37,37 @@ readonly class AuthController
         }
 
         $this->sessionService->startSession();
-        $this->sessionService->setUserData(
-            new SessionUserData(
-                $user->getId(),
-                $user->getDisplayName(),
-                $user->getAccessLevel(),
-            )
+        $sessionUserData = new SessionUserData(
+            $user->getId(),
+            $user->getDisplayName(),
+            $user->getAccessLevel(),
         );
+        $this->sessionService->setUserData($sessionUserData);
 
-        return new RedirectResponse();
+        return new JsonResponse(['user' => $this->serializeUser($sessionUserData)]);
+    }
+
+    public function getSessionAction(Request $request): Response
+    {
+        $userData = $this->sessionService->getUserData();
+
+        return new JsonResponse(
+            ['user' => $userData === null ? null : $this->serializeUser($userData)]
+        );
     }
 
     public function logoutAction(Request $request): Response
     {
         $this->sessionService->destroySession();
-        return new RedirectResponse();
+        return new JsonResponse(status: HttpStatus::NO_CONTENT);
+    }
+
+    private function serializeUser(SessionUserData $userData): array
+    {
+        return [
+            'id' => $userData->id,
+            'displayName' => $userData->displayName,
+            'accessLevel' => $userData->accessLevel->value,
+        ];
     }
 }

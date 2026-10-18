@@ -11,4 +11,5 @@ enum RouteEnum: string
     case REGISTER = '/register';
     case SETTINGS = '/settings';
     case UPLOAD_IMAGE = '/upload-image';
+    case API_SESSION = '/api/session';
 }
