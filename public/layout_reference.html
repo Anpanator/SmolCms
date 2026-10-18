@@ -2,63 +2,65 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SmolCms</title>
+    <title>SmolCms layout reference</title>
     <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
-<header>
-    <nav class="top-nav">
-        <a href="#">Nav1</a>
-        <a href="#">Nav2</a>
-        <a href="#">Nav3</a>
-        <a href="#">Nav4</a>
-        <a href="#">Nav5</a>
-        <a href="#">Nav6</a>
-        <a href="#">Nav7</a>
+<header class="site-header">
+    <nav class="top-nav" aria-label="Main navigation">
+        <ul class="nav-list">
+            <li class="nav-item"><a class="nav-link active" href="#">Home</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">Settings</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">Upload Image</a></li>
+            <li class="nav-item has-submenu">
+                <button class="nav-link nav-submenu-trigger" type="button" aria-haspopup="true">User</button>
+                <ul class="submenu">
+                    <li class="submenu-item submenu-label">Role: 100</li>
+                    <li class="submenu-item"><button class="nav-logout button button--link" type="button">Logout</button></li>
+                </ul>
+            </li>
+        </ul>
     </nav>
 </header>
-<main class="layout">
-    <aside class="sidebar">
-        <ul class="tags">
-            <li>Tag</li>
-            <li>Tag</li>
-            <li>Tag</li>
-            <li>Tag</li>
-            <li>Tag</li>
-            <li>Tag</li>
-            <li>Tag</li>
-            <li>Tag</li>
-            <li>Tag</li>
-            <li>Tag</li>
-            <li>Tag</li>
-            <li>Tag</li>
-            <li>Tag</li>
-            <li>Tag</li>
-            <li>Tag</li>
-            <li>Tag</li>
-            <li>Tag</li>
-            <li>Tag</li>
-        </ul>
-    </aside>
-    <section class="content">
-        <div class="grid">
-            <div class="tile"></div>
-            <div class="tile"></div>
-            <div class="tile"></div>
-            <div class="tile"></div>
-            <div class="tile"></div>
-            <div class="tile"></div>
-        </div>
-    </section>
+<main class="view-container">
+    <div class="layout">
+        <aside class="sidebar">
+            <h2 class="sidebar-title">Tags</h2>
+            <ul class="tags">
+                <li class="tags-item"><a class="tags-link" href="#">landscape</a></li>
+                <li class="tags-item"><a class="tags-link" href="#">portrait</a></li>
+                <li class="tags-item"><a class="tags-link" href="#">anime</a></li>
+                <li class="tags-item"><a class="tags-link" href="#">cityscape</a></li>
+                <li class="tags-item"><a class="tags-link" href="#">nature</a></li>
+                <li class="tags-item"><a class="tags-link" href="#">monochrome</a></li>
+                <li class="tags-item"><a class="tags-link" href="#">food</a></li>
+                <li class="tags-item"><a class="tags-link" href="#">architecture</a></li>
+                <li class="tags-item"><a class="tags-link" href="#">night</a></li>
+                <li class="tags-item"><a class="tags-link" href="#">sky</a></li>
+                <li class="tags-item"><a class="tags-link" href="#">water</a></li>
+                <li class="tags-item"><a class="tags-link" href="#">cats</a></li>
+            </ul>
+        </aside>
+        <section class="content">
+            <h1 class="content-title">Latest uploads</h1>
+            <div class="grid">
+                <div class="tile"><span class="tile-placeholder">Image 1</span></div>
+                <div class="tile"><span class="tile-placeholder">Image 2</span></div>
+                <div class="tile"><span class="tile-placeholder">Image 3</span></div>
+                <div class="tile"><span class="tile-placeholder">Image 4</span></div>
+                <div class="tile"><span class="tile-placeholder">Image 5</span></div>
+                <div class="tile"><span class="tile-placeholder">Image 6</span></div>
+            </div>
+        </section>
+    </div>
 </main>
-<footer>
-    <nav class="bottom-nav">
-        <a href="#">Link1</a>
-        <a href="#">Link2</a>
-        <a href="#">Link3</a>
-        <a href="#">Link4</a>
-        <a href="#">Link5</a>
-        <a href="#">Link6</a>
+<footer class="site-footer">
+    <nav class="bottom-nav" aria-label="Footer navigation">
+        <ul class="nav-list">
+            <li class="nav-item"><a class="nav-link active" href="#">Home</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">Settings</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">Upload Image</a></li>
+        </ul>
     </nav>
 </footer>
 </body>

@@ -1,0 +1,60 @@
+/**
+ * SPA entry point. This is the only module that performs work at import
+ * time (it is loaded by the shell as <script type="module">).
+ */
+import { createHeaderNav, createFooterNav } from './nav.js';
+import { createRouter } from './router.js';
+import { createSession } from './session.js';
+import { el } from './dom.js';
+import { createHomeView } from './views/home.js';
+import { createLoginView } from './views/login.js';
+import { createNotFoundView } from './views/notFound.js';
+import { createRegisterView } from './views/register.js';
+import { createSettingsView } from './views/settings.js';
+import { createUploadView } from './views/upload.js';
+
+async function bootstrap() {
+    const appRoot = document.getElementById('app');
+    if (!appRoot) {
+        return;
+    }
+
+    const session = createSession();
+    await session.load();
+
+    /** Hoisted so nav and route factories can reference it before router creation. */
+    function navigate(path, options) {
+        router.navigate(path, options);
+    }
+
+    const headerNav = createHeaderNav({ session, navigate });
+    const footerNav = createFooterNav({ session });
+
+    const viewContainer = el('main', { className: 'view-container' });
+    const routes = {
+        '/': () => createHomeView(),
+        '/login': (context) => createLoginView({ session, ...context }),
+        '/register': (context) => createRegisterView(context),
+        '/settings': (context) => createSettingsView({ session, ...context }),
+        '/upload-image': (context) => createUploadView(context),
+    };
+
+    const router = createRouter({
+        container: viewContainer,
+        routes,
+        notFound: () => createNotFoundView(),
+        onNavigate: (path) => {
+            headerNav.setActive(path);
+            footerNav.setActive(path);
+        },
+    });
+
+    appRoot.append(
+        el('header', { className: 'site-header', children: headerNav.element }),
+        viewContainer,
+        el('footer', { className: 'site-footer', children: footerNav.element }),
+    );
+    router.start();
+}
+
+bootstrap();
