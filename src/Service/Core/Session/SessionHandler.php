@@ -33,10 +33,9 @@ readonly class SessionHandler implements SessionHandlerInterface, SessionUpdateT
         return true;
     }
 
-    public function gc(int $max_lifetime): bool
+    public function gc(int $max_lifetime): int|false
     {
-        $this->sessionEntityService->deleteOlderThan($max_lifetime);
-        return true;
+        return $this->sessionEntityService->deleteOlderThan($max_lifetime);
     }
 
     public function open(string $path, string $name): bool

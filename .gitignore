@@ -2,3 +2,5 @@
 /composer.lock
 /.phpunit.cache/
 /private/db/smolcms.sq3
+/private/*.log
+/private/logs/*.log

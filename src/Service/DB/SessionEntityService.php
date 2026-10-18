@@ -29,13 +29,15 @@ readonly class SessionEntityService extends EntityService
         return !empty($result);
     }
 
-    public function deleteOlderThan(int $seconds): void
+    public function deleteOlderThan(int $seconds): int
     {
         $qc = new QueryCriteria();
         $qc->delete(SessionEntity::class)
             ->andWhere("created < :created")
             ->withParameters(["created" => date("Y-m-d H:i:s", time() - $seconds)]);
-        $this->execute($qc);
+        $statement = $this->prepare($qc);
+        $statement->execute($qc->getParameters());
+        return $statement->rowCount();
     }
 
     public function deleteBySessionId(string $sessionId): void

@@ -18,6 +18,7 @@ use SmolCms\Service\Core\CliCommand\MigrationsExecutor;
 use SmolCms\Service\Core\CliCommand\ResetDbExecutor;
 use SmolCms\Service\Core\CliCommandHandler;
 use SmolCms\Service\Core\ContextService;
+use SmolCms\Service\Core\LoggingService;
 use SmolCms\Service\Core\Startup\RegisterSessionHandlerStartupAction;
 use SmolCms\Service\Core\Startup\RestrictDirectoryAccessStartupAction;
 use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
@@ -46,6 +47,13 @@ class CoreServiceConfiguration
                 class: null,
                 parameters: [
                     'sqlite:' . ROOT_DIR . '/private/db/smolcms.sq3',
+                ]
+            ),
+            new Service(
+                identifier: LoggingService::class,
+                parameters: [
+                    INFO_LOG_FILE_PATH,
+                    ERROR_LOG_FILE_PATH,
                 ]
             ),
             new Service(

@@ -80,7 +80,7 @@ class SessionEntityServiceTest extends FunctionalTestCase
         $this->sessionEntityService->saveAsNew($expiredSession);
         $this->sessionEntityService->saveAsNew($currentSession);
 
-        $this->sessionEntityService->deleteOlderThan(3600);
+        self::assertGreaterThanOrEqual(1, $this->sessionEntityService->deleteOlderThan(3600));
 
         self::assertNull($this->sessionEntityService->findOneBySessionId('session-service-expired'));
         self::assertNotNull($this->sessionEntityService->findOneBySessionId('session-service-current'));

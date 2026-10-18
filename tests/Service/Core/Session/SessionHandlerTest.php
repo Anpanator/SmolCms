@@ -93,7 +93,7 @@ class SessionHandlerTest extends FunctionalTestCase
             data: 'active-data',
         ));
 
-        self::assertTrue($this->sessionHandler->gc(3600));
+        self::assertSame(1, $this->sessionHandler->gc(3600));
         self::assertSame('', $this->sessionHandler->read($expiredSessionId));
         self::assertSame('active-data', $this->sessionHandler->read($activeSessionId));
     }

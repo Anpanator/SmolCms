@@ -20,3 +20,6 @@ const FS_APP_LEVEL_WHITELIST = [
 const MIGRATION_DIR = ROOT_DIR . '/private/sql';
 
 const IMAGE_STORAGE_DIR = ROOT_DIR . '/private/upload/img';
+
+const INFO_LOG_FILE_PATH = ROOT_DIR . '/private/logs/info.log';
+const ERROR_LOG_FILE_PATH = ROOT_DIR . '/private/logs/error.log';
