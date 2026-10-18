@@ -1,7 +1,8 @@
-import { assertEqual, assertTrue } from './assert.js';
-import { mockFetch, sessionResponse, submitForm, testUser, useFetch } from './mocks.js';
-import { createSession } from '../../public/js/session.js';
-import { createUploadView } from '../../public/js/views/upload.js';
+import {assertEqual, assertTrue} from './assert.js';
+import {HttpHeader} from '../../public/js/httpConstants.js';
+import {mockFetch, sessionResponse, submitForm, testUser, useFetch} from './mocks.js';
+import {createSession} from '../../public/js/session.js';
+import {createUploadView} from '../../public/js/views/upload.js';
 
 async function createLoggedInSession() {
     const fetchMock = mockFetch((url) => {
@@ -68,7 +69,7 @@ export async function testValidSubmitPostsFormData() {
             assertTrue(options.body instanceof FormData, 'upload must use multipart FormData');
             assertTrue(options.body.get('image') instanceof File, 'file must be sent in field "image"');
             assertEqual(options.body.get('image').name, 'cat.png');
-            assertTrue(!('Content-Type' in options.headers), 'no manual content-type for multipart');
+            assertTrue(!(HttpHeader.CONTENT_TYPE in options.headers), 'no manual content-type for multipart');
 
             const message = view.querySelector('.form-message');
             assertTrue(!message.hidden, 'success message should be visible');

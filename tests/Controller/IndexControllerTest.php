@@ -5,6 +5,8 @@ namespace SmolCms\Test\Controller;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use SmolCms\Data\Business\Url;
+use SmolCms\Data\Constant\HttpContentType;
+use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Constant\RouteEnum;
@@ -35,7 +37,10 @@ class IndexControllerTest extends FunctionalTestCase
         $response = $this->simulateRequest($request);
 
         $this->assertEquals(HttpStatus::OK, $response->getStatus());
-        $this->assertSame('text/html; charset=UTF-8', $response->getHeaders()['Content-Type']);
+        $this->assertSame(
+            HttpContentType::HTML_UTF_8->value,
+            $response->getHeaders()[HttpHeader::CONTENT_TYPE->value],
+        );
 
         $content = (string)$response->getContent();
         $this->assertStringContainsString('<!DOCTYPE html>', $content);

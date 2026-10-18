@@ -16,6 +16,8 @@ namespace SmolCms\Test\Service\Factory {
 
     use PHPUnit\Framework\MockObject\MockObject;
     use SmolCms\Data\Business\Url;
+    use SmolCms\Data\Constant\HttpContentType;
+    use SmolCms\Data\Constant\HttpHeader;
     use SmolCms\Data\Constant\HttpMethod;
     use SmolCms\Service\Factory\RequestFactory;
     use SmolCms\Service\Factory\UrlFactory;
@@ -150,7 +152,7 @@ namespace SmolCms\Test\Service\Factory {
             $this->setRequestGlobals(
                 method: 'POST',
                 postParams: [],
-                headers: ['Content-Type' => 'application/json'],
+                headers: [HttpHeader::CONTENT_TYPE->value => HttpContentType::JSON->value],
             );
             $this->expectUrl('http://example.com/resource?from=uri');
 
@@ -166,7 +168,7 @@ namespace SmolCms\Test\Service\Factory {
             $this->setRequestGlobals(
                 method: 'POST',
                 postParams: $postParams,
-                headers: ['Content-Type' => 'application/x-www-form-urlencoded'],
+                headers: [HttpHeader::CONTENT_TYPE->value => HttpContentType::FORM_URL_ENCODED->value],
             );
             $this->expectUrl('http://example.com/resource?from=uri');
 

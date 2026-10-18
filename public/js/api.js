@@ -5,6 +5,7 @@
  * bodies such as 204) and reject with an ApiError for non-2xx responses and
  * network failures. No work happens at import time.
  */
+import {HttpContentType, HttpHeader} from './httpConstants.js';
 
 export class ApiError extends Error {
     /**
@@ -25,7 +26,7 @@ export class ApiError extends Error {
  *
  * @param {string} url
  * @param {{ method?: string, body?: *|FormData, headers?: Record<string, string> }} [options]
- * - JSON objects are serialized and sent with Content-Type: application/json.
+ * - JSON objects are serialized and sent with the standard JSON content type.
  * - FormData instances are passed through untouched (multipart handling,
  *   including the multipart boundary, is left to the browser).
  * @returns {Promise<*>} decoded JSON body, raw text for non-JSON bodies, null for empty bodies
@@ -39,7 +40,7 @@ export async function request(url, { method = 'GET', body = null, headers = {} }
         payload = body;
     } else if (body !== null && body !== undefined) {
         payload = JSON.stringify(body);
-        requestHeaders['Content-Type'] = 'application/json';
+        requestHeaders[HttpHeader.CONTENT_TYPE] = HttpContentType.JSON;
     }
 
     let response;

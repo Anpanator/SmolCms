@@ -1,6 +1,7 @@
-import { ApiError, get, postForm, postJson, request } from '../../public/js/api.js';
-import { assertDeepEqual, assertEqual, assertTrue, assertRejects } from './assert.js';
-import { mockFetch, useFetch } from './mocks.js';
+import {ApiError, get, postForm, postJson, request} from '../../public/js/api.js';
+import {HttpContentType, HttpHeader} from '../../public/js/httpConstants.js';
+import {assertDeepEqual, assertEqual, assertRejects, assertTrue} from './assert.js';
+import {mockFetch, useFetch} from './mocks.js';
 
 export async function testSuccessJsonRoundTrip() {
     const fetchMock = mockFetch((url) => {
@@ -25,7 +26,7 @@ export async function testJsonBodyGetsJsonContentType() {
         await postJson('/login', { loginName: 'amy', password: 'long-enough-pass' });
         const { options } = fetchMock.calls[0];
         assertEqual(options.method, 'POST');
-        assertEqual(options.headers['Content-Type'], 'application/json');
+        assertEqual(options.headers[HttpHeader.CONTENT_TYPE], HttpContentType.JSON);
         assertDeepEqual(JSON.parse(options.body), { loginName: 'amy', password: 'long-enough-pass' });
     } finally {
         restore();
@@ -80,7 +81,7 @@ export async function testFormDataPassesThroughUntouched() {
         const { options } = fetchMock.calls[0];
         assertEqual(options.method, 'POST');
         assertEqual(options.body, formData, 'FormData instance should be passed through untouched');
-        assertTrue(!('Content-Type' in options.headers), 'multipart must not get a JSON content-type header');
+        assertTrue(!(HttpHeader.CONTENT_TYPE in options.headers), 'multipart must not get a JSON content-type header');
     } finally {
         restore();
     }

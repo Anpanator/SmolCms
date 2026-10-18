@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace SmolCms\Test\Controller;
 
 use SmolCms\Data\Business\Url;
+use SmolCms\Data\Constant\HttpContentType;
+use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Request\Request;
@@ -42,7 +44,7 @@ class UserProfileControllerTest extends FunctionalTestCase
         $response = $this->simulateRequest($request);
 
         $this->assertEquals(HttpStatus::OK, $response->getStatus());
-        $this->assertSame('application/json', $response->getHeaders()['Content-Type']);
+        $this->assertSame(HttpContentType::JSON->value, $response->getHeaders()[HttpHeader::CONTENT_TYPE->value]);
         $this->assertSame(
             [
                 'user' => [

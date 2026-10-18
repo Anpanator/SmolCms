@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SmolCms\Data\Response;
 
 use JsonException;
+use SmolCms\Data\Constant\HttpContentType;
 use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Exception\InvalidStateException;
@@ -17,7 +18,7 @@ class JsonResponse extends Response
     public function __construct(mixed $data = null, HttpStatus $status = HttpStatus::OK)
     {
         parent::__construct(status: $status);
-        $this->addHeader(HttpHeader::CONTENT_TYPE->value, 'application/json');
+        $this->addHeader(HttpHeader::CONTENT_TYPE->value, HttpContentType::JSON->value);
         if ($data === null) {
             return;
         }

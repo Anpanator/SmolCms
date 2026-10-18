@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SmolCms\Controller;
 
+use SmolCms\Data\Constant\HttpContentType;
 use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
@@ -31,7 +32,7 @@ HTML;
         return new Response(
             content: self::HTML_SHELL,
             headers: [
-                HttpHeader::CONTENT_TYPE->value => 'text/html; charset=UTF-8',
+                HttpHeader::CONTENT_TYPE->value => HttpContentType::HTML_UTF_8->value,
             ],
         );
     }

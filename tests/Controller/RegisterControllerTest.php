@@ -6,6 +6,8 @@ namespace SmolCms\Test\Controller;
 use DateTime;
 use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\AccessLevel;
+use SmolCms\Data\Constant\HttpContentType;
+use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Persistence\UserEntity;
@@ -48,7 +50,7 @@ class RegisterControllerTest extends FunctionalTestCase
         $response = $this->simulateRequest($request);
 
         $this->assertEquals(HttpStatus::CREATED, $response->getStatus());
-        $this->assertSame('application/json', $response->getHeaders()['Content-Type']);
+        $this->assertSame(HttpContentType::JSON->value, $response->getHeaders()[HttpHeader::CONTENT_TYPE->value]);
         $this->assertSame(['created' => true], json_decode((string)$response->getContent(), true));
 
         $savedUser = $this->userService->findOneByLoginName('testuser');

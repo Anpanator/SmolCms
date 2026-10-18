@@ -1,6 +1,7 @@
-import { assertEqual, assertTrue } from './assert.js';
-import { mockFetch, submitForm, useFetch } from './mocks.js';
-import { createRegisterView } from '../../public/js/views/register.js';
+import {assertEqual, assertTrue} from './assert.js';
+import {HttpContentType, HttpHeader} from '../../public/js/httpConstants.js';
+import {mockFetch, submitForm, useFetch} from './mocks.js';
+import {createRegisterView} from '../../public/js/views/register.js';
 
 function fillValidRegistration(view) {
     const values = {
@@ -79,7 +80,7 @@ export async function testValidSubmitPostsRegisterAndNavigatesToLogin() {
         assertEqual(fetchMock.calls.length, 1);
         const { options } = fetchMock.calls[0];
         assertEqual(options.method, 'POST');
-        assertEqual(options.headers['Content-Type'], 'application/json');
+        assertEqual(options.headers[HttpHeader.CONTENT_TYPE], HttpContentType.JSON);
         const body = JSON.parse(options.body);
         assertEqual(body.email, values.email);
         assertEqual(body.loginName, values.loginName);

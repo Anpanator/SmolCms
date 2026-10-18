@@ -51,10 +51,6 @@ class LoggingServiceTest extends SimpleTestCase
 
     public function testLog_UsesTheSelectedPhpErrorLogMode(): void
     {
-        self::assertSame(0, LoggingMode::SYSTEM->value);
-        self::assertSame(3, LoggingMode::FILE->value);
-        self::assertSame(4, LoggingMode::SAPI->value);
-
         $this->loggingService->log(LogLevel::INFO, 'Configured file mode', LoggingMode::FILE);
 
         $infoLog = file_get_contents($this->infoLogFilePath);

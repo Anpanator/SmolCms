@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SmolCms\Test\Data\Response;
 
+use SmolCms\Data\Constant\HttpContentType;
+use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Exception\InvalidStateException;
@@ -18,7 +20,7 @@ class JsonResponseTest extends SimpleTestCase
         $response = new JsonResponse($data);
 
         self::assertSame(HttpStatus::OK, $response->getStatus());
-        self::assertSame('application/json', $response->getHeaders()['Content-Type']);
+        self::assertSame(HttpContentType::JSON->value, $response->getHeaders()[HttpHeader::CONTENT_TYPE->value]);
         self::assertSame('{"user":{"id":1,"displayName":"Test User","accessLevel":100}}', $response->getContent());
     }
 
@@ -43,7 +45,7 @@ class JsonResponseTest extends SimpleTestCase
         $response = new JsonResponse([]);
 
         self::assertSame('[]', $response->getContent());
-        self::assertSame('application/json', $response->getHeaders()['Content-Type']);
+        self::assertSame(HttpContentType::JSON->value, $response->getHeaders()[HttpHeader::CONTENT_TYPE->value]);
     }
 
     public function testConstructor_ThrowsInvalidStateExceptionOnUnencodableData(): void

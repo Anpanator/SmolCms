@@ -6,6 +6,8 @@ namespace SmolCms\Service\Factory;
 
 
 use JsonException;
+use SmolCms\Data\Constant\HttpContentType;
+use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Request\Request;
 
@@ -75,11 +77,11 @@ class RequestFactory
     {
         $contentType = '';
         foreach ($headers ?? [] as $name => $value) {
-            if (strcasecmp($name, 'Content-Type') === 0) {
+            if (strcasecmp($name, HttpHeader::CONTENT_TYPE->value) === 0) {
                 $contentType = $value;
                 break;
             }
         }
-        return str_contains($contentType, 'application/json');
+        return str_contains($contentType, HttpContentType::JSON->value);
     }
 }
