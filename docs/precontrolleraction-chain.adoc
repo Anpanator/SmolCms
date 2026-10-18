@@ -73,7 +73,7 @@ A successful login does not update `lastLoginDate`, and the session ID is never 
 
 `GET /api/session` returns `{"user": null}` for anonymous visitors and `{"user": {"id", "displayName", "accessLevel"}}` for logged-in users.
 `accessLevel` is the integer backing value of the `AccessLevel` enum (`NOVICE = 100` up to `ADMIN = 600`).
-The SPA loads it once at boot and after login, registration, and logout to drive the navigation.
+The SPA loads it once at boot and after login, registration, and logout to drive the navigation; `accessLevel.js` maps the numeric value to the corresponding enum name for display.
 
 === Registration
 
@@ -81,10 +81,11 @@ The SPA loads it once at boot and after login, registration, and logout to drive
 The validated `email` field is discarded — no column or entity property stores it.
 The SPA responds to `201` by navigating to the login view with a success notice.
 
-=== User settings
+=== User profile
 
 `POST /settings` requires `NOVICE` or higher (`401` when anonymous; authorization runs before validation), validates `displayName` (`1..69` characters, not null), updates the user row and `$_SESSION['user']`, and returns `200` with the serialized user.
-There is no authenticated `GET /settings` page: `GET /settings` serves the same HTML shell as every other client path, and the SPA prefills the display-name form from the session state, showing a warning notice with a login link for anonymous users.
+There is no authenticated `GET /settings` page: `GET /settings` serves the same HTML shell as every other client path, and the SPA renders the Profile page from session state, including the read-only named access level.
+Anonymous users see a warning notice with a login link.
 On a `401` the client navigates to the login view; other statuses map to user-facing messages.
 
 === Password and field policy
@@ -137,4 +138,3 @@ Mapped request classes must be declared `readonly`; otherwise a `RuntimeExceptio
 In the default pre-controller chain, authorization runs first, followed by request mapping and then validation.
 `ValidationPreControllerAction` skips plain `Request` objects and invokes `Validator` for `ValidatedRequest` objects; it depends on mapping having populated `handlerArguments['request']`.
 Property attributes implementing `ValidationAttribute` are evaluated (including recursive `ValidateObject` handling); failed validation raises `BadRequestException` whose message is discarded by the bare `400` response.
-

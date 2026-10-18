@@ -12,7 +12,7 @@ use SmolCms\Service\DB\UserService;
 use SmolCms\TestUtils\Attributes\Autowire;
 use SmolCms\TestUtils\FunctionalTestCase;
 
-class UserSettingControllerTest extends FunctionalTestCase
+class UserProfileControllerTest extends FunctionalTestCase
 {
     #[Autowire]
     private UserService $userService;

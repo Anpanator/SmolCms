@@ -8,7 +8,7 @@ use SmolCms\Exception\InvalidStateException;
 
 readonly class SessionService
 {
-    private const SESSION_NAME = 'session';
+    public const string SESSION_NAME = 'session';
     private const SESSION_OPTIONS = [
         'name' => self::SESSION_NAME,
         'cookie_lifetime' => 3600,
@@ -34,6 +34,27 @@ readonly class SessionService
             return;
         }
         session_start(self::SESSION_OPTIONS);
+    }
+
+    public function discardStaleSessionCookie(): void
+    {
+        unset($_COOKIE[self::SESSION_NAME]);
+        if (headers_sent()) {
+            return;
+        }
+
+        $cookieParams = session_get_cookie_params();
+        $cookieOptions = [
+            'expires' => time() - 3600,
+            'path' => $cookieParams['path'],
+            'secure' => self::SESSION_OPTIONS['cookie_secure'],
+            'httponly' => self::SESSION_OPTIONS['cookie_httponly'],
+            'samesite' => self::SESSION_OPTIONS['cookie_samesite'],
+        ];
+        if ($cookieParams['domain'] !== '') {
+            $cookieOptions['domain'] = $cookieParams['domain'];
+        }
+        setcookie(self::SESSION_NAME, '', $cookieOptions);
     }
 
     public function startSession(): void

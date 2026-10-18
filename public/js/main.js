@@ -2,16 +2,16 @@
  * SPA entry point. This is the only module that performs work at import
  * time (it is loaded by the shell as <script type="module">).
  */
-import { createHeaderNav, createFooterNav } from './nav.js';
-import { createRouter } from './router.js';
-import { createSession } from './session.js';
-import { el } from './dom.js';
-import { createHomeView } from './views/home.js';
-import { createLoginView } from './views/login.js';
-import { createNotFoundView } from './views/notFound.js';
-import { createRegisterView } from './views/register.js';
-import { createSettingsView } from './views/settings.js';
-import { createUploadView } from './views/upload.js';
+import {createFooterNav, createHeaderNav} from './nav.js';
+import {createRouter} from './router.js';
+import {createSession} from './session.js';
+import {el} from './dom.js';
+import {createHomeView} from './views/home.js';
+import {createLoginView} from './views/login.js';
+import {createNotFoundView} from './views/notFound.js';
+import {createRegisterView} from './views/register.js';
+import {createProfileView} from './views/profile.js';
+import {createUploadView} from './views/upload.js';
 
 async function bootstrap() {
     const appRoot = document.getElementById('app');
@@ -35,7 +35,7 @@ async function bootstrap() {
         '/': () => createHomeView(),
         '/login': (context) => createLoginView({ session, ...context }),
         '/register': (context) => createRegisterView(context),
-        '/settings': (context) => createSettingsView({ session, ...context }),
+        '/settings': (context) => createProfileView({session, ...context}),
         '/upload-image': (context) => createUploadView(context),
     };
 

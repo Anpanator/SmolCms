@@ -2,13 +2,14 @@
  * Header and footer navigation, rendered from session state.
  *
  * Anonymous: Home / Login / Register.
- * Logged in: Home / Settings / Upload Image / user display name (hover
- * dropdown with logout). Dropdown submenus are plain nested lists whose
+ * Logged in: Home / Upload Image / user display name (hover dropdown with
+ * profile and logout). Dropdown submenus are plain nested lists whose
  * visibility is toggled purely by CSS (:hover / :focus-within).
  * Importing this module has no side effects.
  */
-import { postJson } from './api.js';
-import { el } from './dom.js';
+import {postJson} from './api.js';
+import {accessLevelName} from './accessLevel.js';
+import {el} from './dom.js';
 
 function navLink(path, label, activePath) {
     return el('a', {
@@ -26,7 +27,6 @@ function sessionItems(user, activePath) {
     if (user) {
         return [
             navItem(navLink('/', 'Home', activePath)),
-            navItem(navLink('/settings', 'Settings', activePath)),
             navItem(navLink('/upload-image', 'Upload Image', activePath)),
         ];
     }
@@ -85,8 +85,12 @@ export function createHeaderNav({ session, navigate }) {
                     className: 'submenu',
                     children: [
                         el('li', {
+                            className: 'submenu-item',
+                            children: navLink('/settings', 'Profile', activePath),
+                        }),
+                        el('li', {
                             className: 'submenu-item submenu-label',
-                            children: `Role: ${user.accessLevel}`,
+                            children: `Access level: ${accessLevelName(user.accessLevel)}`,
                         }),
                         el('li', { className: 'submenu-item', children: buildLogoutButton() }),
                     ],
@@ -116,7 +120,7 @@ export function createHeaderNav({ session, navigate }) {
 }
 
 /**
- * Footer bottom navigation, mirroring the session-aware header items.
+ * Footer navigation with session-aware page links; account actions stay in the header dropdown.
  *
  * @param {{ session: *, navigate?: Function }} deps
  * @returns {{ element: HTMLElement, setActive: (path: string) => void, destroy: () => void }}
@@ -131,7 +135,7 @@ export function createFooterNav({ session }) {
 
     function render(user) {
         const links = user
-            ? [['/', 'Home'], ['/settings', 'Settings'], ['/upload-image', 'Upload Image']]
+            ? [['/', 'Home'], ['/upload-image', 'Upload Image']]
             : [['/', 'Home'], ['/login', 'Login'], ['/register', 'Register']];
         list.replaceChildren(...links.map(([path, label]) => el('li', {
             className: 'nav-item',

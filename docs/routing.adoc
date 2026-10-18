@@ -69,7 +69,7 @@ The current configuration contains these user-facing routes:
 | `GET` | `/api/session` | `AuthController::getSessionAction` | None
 | `POST` | `/login` | `AuthController::postAction` | None
 | `POST` | `/register` | `RegisterController::postAction` | None
-| `POST` | `/settings` | `UserSettingController::postAction` | `NOVICE` or higher
+| `POST` | `/settings` | `UserProfileController::postAction` | `NOVICE` or higher
 | `POST` | `/logout` | `AuthController::logoutAction` | None
 | `POST` | `/upload-image` | `ImageUploadController::postAction` | `NOVICE` or higher
 |===
@@ -98,4 +98,3 @@ For a deep-linkable client page, point the `GET` route at `IndexController::getA
 . Add the page to the header and footer navigation items in `public/js/nav.js` when it should appear in the navigation.
 
 The client route map (`main.js`) and navigation items (`nav.js`) are hardcoded in JavaScript and mirror the backend routes; `RouteEnum` remains the single source of truth for server-side paths, so keep all three in sync.
-

@@ -67,6 +67,15 @@ class SessionServiceTest extends SimpleTestCase
         self::assertSame('value', $_SESSION['marker']);
     }
 
+    public function testDiscardStaleSessionCookie_RemovesCookieFromRequest(): void
+    {
+        $_COOKIE[SessionService::SESSION_NAME] = 'stale-session-id';
+
+        $this->sessionService->discardStaleSessionCookie();
+
+        self::assertArrayNotHasKey(SessionService::SESSION_NAME, $_COOKIE);
+    }
+
     public function testStartSession_ThrowsWhenAlreadyActive(): void
     {
         $this->sessionService->startSession();

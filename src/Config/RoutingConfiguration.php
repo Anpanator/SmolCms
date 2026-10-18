@@ -9,7 +9,7 @@ use SmolCms\Controller\AuthController;
 use SmolCms\Controller\ImageUploadController;
 use SmolCms\Controller\IndexController;
 use SmolCms\Controller\RegisterController;
-use SmolCms\Controller\UserSettingController;
+use SmolCms\Controller\UserProfileController;
 use SmolCms\Data\Business\Route;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\RouteEnum;
@@ -69,7 +69,7 @@ class RoutingConfiguration
             'SettingsPostRoute' => new Route(
                 path: RouteEnum::SETTINGS->value,
                 method: HttpMethod::POST,
-                controller: UserSettingController::class,
+                controller: UserProfileController::class,
             ),
             RouteEnum::LOGOUT->name => new Route(
                 path: RouteEnum::LOGOUT->value,

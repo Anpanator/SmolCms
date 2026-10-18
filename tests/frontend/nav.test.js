@@ -1,7 +1,7 @@
-import { assertEqual, assertTrue, settle } from './assert.js';
-import { mockFetch, sessionResponse, testUser, useFetch } from './mocks.js';
-import { createSession } from '../../public/js/session.js';
-import { createHeaderNav, createFooterNav } from '../../public/js/nav.js';
+import {assertEqual, assertTrue, settle} from './assert.js';
+import {mockFetch, sessionResponse, testUser, useFetch} from './mocks.js';
+import {createSession} from '../../public/js/session.js';
+import {createFooterNav, createHeaderNav} from '../../public/js/nav.js';
 
 /**
  * Creates a session loaded once through a mocked fetch. `handler` receives
@@ -23,7 +23,7 @@ export async function testAnonymousNavRendersLoginAndRegister() {
         const links = [...nav.element.querySelectorAll('a.nav-link')].map((link) => link.getAttribute('href'));
         assertEqual(JSON.stringify(links), JSON.stringify(['/', '/login', '/register']));
         assertEqual(nav.element.querySelector('.nav-logout'), null, 'anonymous nav must not have a logout button');
-        assertTrue(!nav.element.textContent.includes('Settings'), 'anonymous nav must not link settings');
+        assertTrue(!nav.element.textContent.includes('Profile'), 'anonymous nav must not link to the profile');
     } finally {
         restore();
     }
@@ -34,8 +34,12 @@ export async function testLoggedInNavRendersUserAndLogout() {
     try {
         const nav = createHeaderNav({ session, navigate: () => {} });
         const links = [...nav.element.querySelectorAll('a.nav-link')].map((link) => link.getAttribute('href'));
-        assertEqual(JSON.stringify(links), JSON.stringify(['/', '/settings', '/upload-image']));
-        assertTrue(nav.element.textContent.includes('Amy'), 'display name should be rendered');
+        assertEqual(JSON.stringify(links), JSON.stringify(['/', '/upload-image', '/settings']));
+        assertEqual(nav.element.querySelector('.nav-submenu-trigger')?.textContent, 'Amy', 'display name should title the account dropdown');
+        assertEqual(nav.element.querySelector('.has-submenu .submenu a[href="/settings"]')?.textContent, 'Profile');
+        assertEqual(nav.element.querySelector('.nav-list > .nav-item > a[href="/settings"]'), null, 'profile link should be in the account dropdown');
+        assertTrue(nav.element.textContent.includes('Access level: Novice'), 'access level should use its name, not the numeric value');
+        assertTrue(!nav.element.textContent.includes('100'), 'access level number should not be shown');
         assertTrue(nav.element.querySelector('.nav-logout') !== null, 'logout button should exist');
         assertTrue(nav.element.querySelector('.has-submenu .submenu') !== null, 'account dropdown should exist');
         assertTrue(nav.element.querySelector('.has-submenu .submenu .nav-logout') !== null, 'logout should live in the dropdown');
@@ -98,12 +102,29 @@ export async function testSetActiveMarksActiveLink() {
     }
 }
 
+export async function testProfileLinkIsActiveInsideAccountDropdown() {
+    const {session, restore} = await createLoadedSession(() => sessionResponse(testUser()));
+    try {
+        const nav = createHeaderNav({
+            session, navigate: () => {
+            }
+        });
+        nav.setActive('/settings');
+        assertEqual(
+            nav.element.querySelector('.has-submenu .submenu a.nav-link.active')?.getAttribute('href'),
+            '/settings',
+        );
+    } finally {
+        restore();
+    }
+}
+
 export async function testFooterNavMirrorsSession() {
     const { session, restore } = await createLoadedSession(() => sessionResponse(testUser()));
     try {
         const footer = createFooterNav({ session });
         const links = [...footer.element.querySelectorAll('a.nav-link')].map((link) => link.getAttribute('href'));
-        assertEqual(JSON.stringify(links), JSON.stringify(['/', '/settings', '/upload-image']));
+        assertEqual(JSON.stringify(links), JSON.stringify(['/', '/upload-image']));
 
         footer.setActive('/upload-image');
         assertEqual(footer.element.querySelector('a.nav-link.active')?.getAttribute('href'), '/upload-image');

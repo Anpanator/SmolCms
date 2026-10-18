@@ -5,7 +5,6 @@ namespace SmolCms\Controller;
 
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\DTO\SessionUserData;
-use SmolCms\Data\Request\Request;
 use SmolCms\Data\Request\UserSettingsUpdateRequest;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
@@ -13,7 +12,7 @@ use SmolCms\Service\Core\Attribute\Authenticated;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\UserService;
 
-readonly class UserSettingController
+readonly class UserProfileController
 {
     public function __construct(
         private SessionService $sessionService,

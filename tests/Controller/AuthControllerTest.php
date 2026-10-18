@@ -105,6 +105,7 @@ class AuthControllerTest extends FunctionalTestCase
 
         $this->assertEquals(HttpStatus::UNAUTHORIZED, $response->getStatus());
         $this->assertNull($response->getContent());
+        $this->assertSame(PHP_SESSION_NONE, session_status());
     }
 
     public function testPostAction_UnauthorizedOnWrongPasswordWithoutAuthenticatedSession(): void
@@ -138,6 +139,7 @@ class AuthControllerTest extends FunctionalTestCase
         $this->assertSame(HttpStatus::UNAUTHORIZED, $response->getStatus());
         $this->assertNull($response->getContent());
         $this->assertNull($this->sessionService->getUserData());
+        $this->assertSame(PHP_SESSION_NONE, session_status());
     }
 
     public function testGetSessionAction_ReturnsNullUserWhenAnonymous(): void
