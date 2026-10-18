@@ -71,6 +71,17 @@ The `public/` directory contains the SPA sources — vanilla JavaScript ES modul
 It has no PHP entry point and requires no build step; nginx serves its files as-is.
 Uploaded images are stored under `private/` and are not publicly served.
 
+[#_systemd_sandboxing]
+=== Systemd sandboxing and writable paths
+
+On systems where `php-fpm` runs under a systemd unit with `ProtectSystem=full` (the Arch Linux default), the service's filesystem tree including `/usr` is mounted read-only.
+Deploying the application below `/usr` (for example to `/usr/share/nginx/html`) therefore makes the SQLite database and the image storage read-only for PHP: reads succeed, but every write — user registration, session persistence on login, image upload — fails and surfaces as an empty `500` response (for login, the response status can flip to `500` even though the buffered `200` JSON body is still sent, because the failing session write happens during shutdown after output was buffered).
+
+`private/references/php-fpm-override.conf` is a ready-to-use systemd drop-in that re-enables writes for exactly the two writable paths (`private/db` and `private/upload/img`) via `ReadWritePaths` while keeping the rest of the sandbox intact.
+Install it as described in the file's header comment and restart `php-fpm`.
+
+PHP errors are logged per `php.ini`'s `error_log` setting (default on this reference system: `/var/log/php_errors.log`); the file must exist and be writable by the FPM user (`touch /var/log/php_errors.log && chown http:http /var/log/php_errors.log`), otherwise logging silently does nothing.
+
 == Application flow
 
 The high-level flow of a request (or CLI invocation) is:
