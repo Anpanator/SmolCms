@@ -51,12 +51,12 @@ COPY --chown=${APP_UID}:${APP_GID} src/ ./src/
 COPY --chown=${APP_UID}:${APP_GID} public/ ./public/
 COPY --chown=${APP_UID}:${APP_GID} private/init/ ./private/init/
 COPY --chown=${APP_UID}:${APP_GID} private/sql/ ./private/sql/
+COPY --chown=${APP_UID}:${APP_GID} private/assets/ ./private/assets/
 
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/php-fpm.conf /usr/local/etc/php-fpm.conf
 COPY docker/php-fpm-pool.conf /usr/local/etc/php-fpm.d/www.conf
 COPY docker/container-entrypoint.sh /usr/local/bin/smolcms-entrypoint
-COPY docker/init-db.php /usr/local/lib/smolcms/init-db.php
 
 RUN rm -f /usr/local/etc/php-fpm.d/docker.conf \
     && mkdir -p \
@@ -74,9 +74,10 @@ RUN rm -f /usr/local/etc/php-fpm.d/docker.conf \
 
 USER ${APP_UID}:${APP_GID}
 
-RUN php-fpm -t --fpm-config /usr/local/etc/php-fpm.conf \
-    && nginx -t -c /etc/nginx/nginx.conf \
-    && php /usr/local/lib/smolcms/init-db.php
+RUN php src/app.php --init-db \
+    && php src/app.php --generate-js-integrity \
+    && php-fpm -t --fpm-config /usr/local/etc/php-fpm.conf \
+    && nginx -t -c /etc/nginx/nginx.conf
 
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/smolcms-entrypoint"]

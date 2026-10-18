@@ -34,10 +34,14 @@ final class CliCommandHandler
         $this->flags = $this->parseGlobalArgs();
 
         $noconfirm = isset($this->flags[CliCommandFlag::NOCONFIRM->name]);
+        $reset = isset($this->flags[CliCommandFlag::RESET->name]);
 
         $executed = false;
         foreach ($this->flags as $flag => $arguments) {
             if (isset($this->executors[$flag])) {
+                if ($flag === CliCommandFlag::INIT_DB->name && $reset) {
+                    $arguments[] = '--reset';
+                }
                 $this->executors[$flag]->execute($arguments, $noconfirm);
                 $executed = true;
             }

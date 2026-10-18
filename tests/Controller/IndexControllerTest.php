@@ -48,5 +48,7 @@ class IndexControllerTest extends FunctionalTestCase
         $this->assertStringContainsString('<div id="app"></div>', $content);
         $this->assertStringContainsString('/public/css/main.css', $content);
         $this->assertStringContainsString('/public/js/main.js', $content);
+        $this->assertStringContainsString('integrity="sha384-', $content);
+        $this->assertStringContainsString('crossorigin="anonymous"', $content);
     }
 }

@@ -17,6 +17,9 @@ class CliCommandHandlerTest extends SimpleTestCase
     #[Mock(CliCommandExecutor::class)]
     private CliCommandExecutor|MockObject $generateMigrationExecutor;
 
+    #[Stub(CliCommandExecutor::class)]
+    private CliCommandExecutor|MockObject $generateJsIntegrityExecutor;
+
     #[Mock(CliCommandExecutor::class)]
     private CliCommandExecutor|MockObject $migrationsExecutor;
 
@@ -41,6 +44,12 @@ class CliCommandHandlerTest extends SimpleTestCase
         $this->generateMigrationExecutor
             ->method('helptext')
             ->willReturn('Generate a new migration file.');
+        $this->generateJsIntegrityExecutor
+            ->method('handles')
+            ->willReturn(CliCommandFlag::GENERATE_JS_INTEGRITY);
+        $this->generateJsIntegrityExecutor
+            ->method('helptext')
+            ->willReturn('Generate SHA-384 integrity attributes for local JavaScript in the HTML shell.');
         $this->migrationsExecutor
             ->method('handles')
             ->willReturn(CliCommandFlag::MIGRATIONS);
@@ -49,13 +58,14 @@ class CliCommandHandlerTest extends SimpleTestCase
             ->willReturn('Execute pending database migrations.');
         $this->resetDbExecutor
             ->method('handles')
-            ->willReturn(CliCommandFlag::RESET_DB);
+            ->willReturn(CliCommandFlag::INIT_DB);
         $this->resetDbExecutor
             ->method('helptext')
-            ->willReturn('Drop all tables and reinitialize the database.');
+            ->willReturn('Initialize an empty database; pass --reset to drop and recreate existing tables.');
         $this->handler = new CliCommandHandler(
             $this->contextService,
             $this->generateMigrationExecutor,
+            $this->generateJsIntegrityExecutor,
             $this->migrationsExecutor,
             $this->resetDbExecutor,
         );
@@ -85,8 +95,9 @@ class CliCommandHandlerTest extends SimpleTestCase
         $this->expectOutputString(
             "Available commands:\n"
             . "  --generate-migration  Generate a new migration file.\n"
+            . "  --generate-js-integrity  Generate SHA-384 integrity attributes for local JavaScript in the HTML shell.\n"
             . "  --migrations  Execute pending database migrations.\n"
-            . "  --reset-db  Drop all tables and reinitialize the database.\n"
+            . "  --init-db  Initialize an empty database; pass --reset to drop and recreate existing tables.\n"
             . "  --noconfirm  Skip confirmation prompts.\n"
         );
         $this->handler->runCommand();
@@ -133,8 +144,9 @@ class CliCommandHandlerTest extends SimpleTestCase
         $this->expectOutputString(
             "Available commands:\n"
             . "  --generate-migration  Generate a new migration file.\n"
+            . "  --generate-js-integrity  Generate SHA-384 integrity attributes for local JavaScript in the HTML shell.\n"
             . "  --migrations  Execute pending database migrations.\n"
-            . "  --reset-db  Drop all tables and reinitialize the database.\n"
+            . "  --init-db  Initialize an empty database; pass --reset to drop and recreate existing tables.\n"
             . "  --noconfirm  Skip confirmation prompts.\n"
         );
         $this->handler->runCommand();
@@ -163,7 +175,7 @@ class CliCommandHandlerTest extends SimpleTestCase
 
     public function testRunCommand_multipleFlags_callsMultipleExecutors(): void
     {
-        $GLOBALS['argv'] = ['script.php', '--migrations', '--reset-db'];
+        $GLOBALS['argv'] = ['script.php', '--migrations', '--init-db'];
 
         $this->migrationsExecutor
             ->expects($this->once())
@@ -222,8 +234,9 @@ class CliCommandHandlerTest extends SimpleTestCase
         $this->expectOutputString(
             "Available commands:\n"
             . "  --generate-migration  Generate a new migration file.\n"
+            . "  --generate-js-integrity  Generate SHA-384 integrity attributes for local JavaScript in the HTML shell.\n"
             . "  --migrations  Execute pending database migrations.\n"
-            . "  --reset-db  Drop all tables and reinitialize the database.\n"
+            . "  --init-db  Initialize an empty database; pass --reset to drop and recreate existing tables.\n"
             . "  --noconfirm  Skip confirmation prompts.\n"
         );
         $this->handler->runCommand();
@@ -260,6 +273,7 @@ class CliCommandHandlerTest extends SimpleTestCase
         $this->handler = new CliCommandHandler(
             $this->contextService,
             $this->generateMigrationExecutor,
+            $this->generateJsIntegrityExecutor,
             $this->migrationsExecutor,
             $this->resetDbExecutor,
         );
@@ -281,9 +295,9 @@ class CliCommandHandlerTest extends SimpleTestCase
         self::assertFalse($this->handler->runCommand());
     }
 
-    public function testRunCommand_resetDbFlag_callsExecutor(): void
+    public function testRunCommand_initDbFlag_callsExecutor(): void
     {
-        $GLOBALS['argv'] = ['script.php', '--reset-db'];
+        $GLOBALS['argv'] = ['script.php', '--init-db'];
 
         $this->migrationsExecutor
             ->expects($this->never())
@@ -299,6 +313,34 @@ class CliCommandHandlerTest extends SimpleTestCase
             ->method('execute')
             ->seal();
 
+        $this->handler->runCommand();
+    }
+
+    public function testRunCommand_resetModifierWithoutInitDb_doesNotRunExecutor(): void
+    {
+        $GLOBALS['argv'] = ['script.php', '--reset'];
+
+        $this->migrationsExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->resetDbExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->generateMigrationExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+
+        $this->expectOutputString(
+            "Available commands:\n"
+            . "  --generate-migration  Generate a new migration file.\n"
+            . "  --generate-js-integrity  Generate SHA-384 integrity attributes for local JavaScript in the HTML shell.\n"
+            . "  --migrations  Execute pending database migrations.\n"
+            . "  --init-db  Initialize an empty database; pass --reset to drop and recreate existing tables.\n"
+            . "  --noconfirm  Skip confirmation prompts.\n"
+        );
         $this->handler->runCommand();
     }
 
@@ -323,9 +365,9 @@ class CliCommandHandlerTest extends SimpleTestCase
         $this->handler->runCommand();
     }
 
-    public function testRunCommand_noconfirmWithResetDb_passesTrue(): void
+    public function testRunCommand_noconfirmWithInitDb_passesTrue(): void
     {
-        $GLOBALS['argv'] = ['script.php', '--reset-db', '--noconfirm'];
+        $GLOBALS['argv'] = ['script.php', '--init-db', '--noconfirm'];
 
         $this->migrationsExecutor
             ->expects($this->never())
@@ -335,6 +377,48 @@ class CliCommandHandlerTest extends SimpleTestCase
             ->expects($this->once())
             ->method('execute')
             ->with([], true)
+            ->seal();
+        $this->generateMigrationExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+
+        $this->handler->runCommand();
+    }
+
+    public function testRunCommand_initDbWithResetModifier_passesResetArgument(): void
+    {
+        $GLOBALS['argv'] = ['script.php', '--init-db', '--reset'];
+
+        $this->migrationsExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->resetDbExecutor
+            ->expects($this->once())
+            ->method('execute')
+            ->with(['--reset'], false)
+            ->seal();
+        $this->generateMigrationExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+
+        $this->handler->runCommand();
+    }
+
+    public function testRunCommand_resetModifierAndNoconfirm_passBothToInitDb(): void
+    {
+        $GLOBALS['argv'] = ['script.php', '--init-db', '--reset', '--noconfirm'];
+
+        $this->migrationsExecutor
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+        $this->resetDbExecutor
+            ->expects($this->once())
+            ->method('execute')
+            ->with(['--reset'], true)
             ->seal();
         $this->generateMigrationExecutor
             ->expects($this->never())

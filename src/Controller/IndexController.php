@@ -8,29 +8,20 @@ use SmolCms\Data\Constant\HttpContentType;
 use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
+use SmolCms\Service\Asset\AssetService;
 
 readonly class IndexController
 {
-    private const HTML_SHELL = <<<'HTML'
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>SmolCms</title>
-    <link rel="stylesheet" href="/public/css/main.css">
-</head>
-<body>
-    <div id="app"></div>
-    <script type="module" src="/public/js/main.js"></script>
-</body>
-</html>
-HTML;
+    public function __construct(
+        private AssetService $assetService,
+    )
+    {
+    }
 
     public function getAction(Request $request): Response
     {
         return new Response(
-            content: self::HTML_SHELL,
+            content: $this->assetService->getHtmlShell(),
             headers: [
                 HttpHeader::CONTENT_TYPE->value => HttpContentType::HTML_UTF_8->value,
             ],

@@ -38,8 +38,9 @@ This builds and runs the `smolcms:prod` target with `display_errors` disabled. H
 
 The production script sets the bind-mount directories to the current user's primary group with setgid group-write
 permissions. This allows the non-root container user to write through a rootless Docker user namespace while keeping the
-data accessible to the host user. Use the rootless Docker context owned by the same host user. The application
-initializes the SQLite schema only when the mounted database file is absent; it does not reset an existing database.
+data accessible to the host user. Use the rootless Docker context owned by the same host user. The application runs
+`php src/app.php --init-db` on startup, initializing the SQLite schema only when the mounted database has no tables; it
+does not reset an existing database.
 
 Both variants use host port `8080` by default and cannot run simultaneously on that port. Set `SMOLCMS_DEV_PORT` or
 `SMOLCMS_PROD_PORT` to use another localhost port. The Compose profiles can also be invoked directly with

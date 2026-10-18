@@ -2,7 +2,9 @@
 == Frontend (single-page application)
 
 The frontend is a vanilla JavaScript SPA served statically from `public/` under the `/public/` URL prefix: plain ES modules and one stylesheet, with no frameworks, no Node.js, and no build or transpilation step.
-The only HTML the backend renders is the static shell from `IndexController` — `<head>` with `main.css`, a `<div id="app"></div>`, and `<script type="module" src="/public/js/main.js"></script>`.
+The only HTML the backend serves is the static shell in `private/assets/index.html`; `IndexController` obtains it through `AssetService`.
+It contains `<head>` with `main.css`, a `<div id="app"></div>`, and the module script with generated SHA-384 `integrity` and `crossorigin="anonymous"` attributes.
+Run `php src/app.php --generate-js-integrity` to refresh the hash; Docker image builds do this automatically.
 
 === Module map
 

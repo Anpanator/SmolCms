@@ -8,14 +8,16 @@ namespace SmolCms\Config;
 use PDO;
 use SmolCms\Data\Business\Service;
 use SmolCms\Exception\ServiceConflictException;
+use SmolCms\Service\Asset\JavaScriptIntegrityService;
 use SmolCms\Service\Core\Action\AuthorizationPreControllerAction;
 use SmolCms\Service\Core\Action\PreControllerActionFacade;
 use SmolCms\Service\Core\Action\RequestMappingPreControllerAction;
 use SmolCms\Service\Core\Action\ValidationPreControllerAction;
 use SmolCms\Service\Core\ApplicationStartupHandler;
+use SmolCms\Service\Core\CliCommand\GenerateJsIntegrityExecutor;
 use SmolCms\Service\Core\CliCommand\GenerateMigrationExecutor;
+use SmolCms\Service\Core\CliCommand\InitializeDatabaseExecutor;
 use SmolCms\Service\Core\CliCommand\MigrationsExecutor;
-use SmolCms\Service\Core\CliCommand\ResetDbExecutor;
 use SmolCms\Service\Core\CliCommandHandler;
 use SmolCms\Service\Core\ContextService;
 use SmolCms\Service\Core\LoggingService;
@@ -69,6 +71,13 @@ class CoreServiceConfiguration
                 ]
             ),
             new Service(
+                identifier: JavaScriptIntegrityService::class,
+                parameters: [
+                    FileSystemAccessService::class,
+                    ROOT_DIR . '/public/js',
+                ]
+            ),
+            new Service(
                 identifier: ApplicationStartupHandler::class,
                 parameters: [
                     RestrictDirectoryAccessStartupAction::class,
@@ -97,8 +106,9 @@ class CoreServiceConfiguration
                 parameters: [
                     ContextService::class,
                     GenerateMigrationExecutor::class,
+                    GenerateJsIntegrityExecutor::class,
                     MigrationsExecutor::class,
-                    ResetDbExecutor::class,
+                    InitializeDatabaseExecutor::class,
                 ]
             ),
             new Service(

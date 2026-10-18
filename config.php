@@ -4,7 +4,8 @@ declare(strict_types=1);
 // Note that some includes and other file access may already have happened at that point
 const FS_DIRECTORY_WHITELIST = [
     ROOT_DIR . '/private',
-    ROOT_DIR . '/src'
+    ROOT_DIR . '/src',
+    ROOT_DIR . '/public/js',
 ];
 
 // In case app-level access checks should be more restrictive, you can be more specific here.
@@ -15,6 +16,9 @@ const FS_APP_LEVEL_WHITELIST = [
     ROOT_DIR . '/private/init',
     ROOT_DIR . '/private/sql',
     ROOT_DIR . '/private/upload',
+    // AssetService reads the shell and --generate-js-integrity updates its script integrity attributes.
+    ROOT_DIR . '/private/assets',
+    ROOT_DIR . '/public/js',
 ];
 
 const MIGRATION_DIR = ROOT_DIR . '/private/sql';

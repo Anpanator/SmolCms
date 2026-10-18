@@ -35,9 +35,7 @@ do
     fi
 done
 
-if [[ ! -f "$DATABASE_FILE" ]]; then
-    php /usr/local/lib/smolcms/init-db.php
-fi
+php "$APP_ROOT/src/app.php" --init-db
 if [[ -O "$DATABASE_FILE" ]]; then
     chmod 0660 "$DATABASE_FILE"
 fi
