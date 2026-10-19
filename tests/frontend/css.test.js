@@ -80,8 +80,24 @@ export function testImageTileAndReviewStylesExist() {
         'the moderation workspace should split into 75/25 columns',
     );
 
-    const reviewImageRule = findRule(rules, '.review-image', 'object-fit:contain');
-    assertTrue(reviewImageRule !== undefined, 'the full-size image should fit without cropping');
+    const reviewImageRule = findRule(rules, '.review-image', 'max-width:100%');
+    assertTrue(
+        reviewImageRule?.text.includes('max-height:100%'),
+        'the default review image should fit within its frame without being enlarged',
+    );
+    const fullSizeImageRule = findRule(rules, '.review-image--full-size', 'max-width:none');
+    assertTrue(
+        fullSizeImageRule?.text.includes('max-height:none'),
+        'the full-size review image should use its natural dimensions',
+    );
+    assertTrue(
+        findRule(rules, '.review-image-panel', 'max-height:100dvh') !== undefined,
+        'the review image area should not exceed the viewport height',
+    );
+    assertTrue(
+        findRule(rules, '.review-image-frame', 'overflow:auto') !== undefined,
+        'the review image frame should scroll when the natural-size image overflows',
+    );
 
     assertTrue(findRule(rules, '.review-metadata-panel') !== undefined, 'active image metadata should have a panel');
 

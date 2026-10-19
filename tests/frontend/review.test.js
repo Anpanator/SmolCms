@@ -148,6 +148,99 @@ export async function testModQueueShowsDownloadImageAndActiveMetadata() {
     }
 }
 
+export async function testDownloadImageTogglesBetweenFittedAndFullSize() {
+    const {view, fetchMock, restore} = await createViewWith(500);
+    try {
+        const image = view.querySelector('.review-image');
+        assertEqual(image.getAttribute('role'), 'button', 'the image size control should be keyboard accessible');
+
+        image.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+        assertTrue(image.classList.contains('review-image--full-size'), 'click should show the image at natural size');
+        assertEqual(image.getAttribute('aria-pressed'), 'true');
+        assertTrue(view.querySelector('.review-image-frame').classList.contains('review-image-frame--full-size'));
+
+        image.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+        assertTrue(!image.classList.contains('review-image--full-size'), 'a second click should restore the fitted view');
+        assertEqual(image.getAttribute('aria-pressed'), 'false');
+
+        image.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'Enter',
+            bubbles: true,
+            cancelable: true,
+        }));
+        assertTrue(image.classList.contains('review-image--full-size'), 'Enter should activate the size control');
+        assertTrue(
+            !fetchMock.calls.some((call) => call.url.startsWith('/api/review/approve')),
+            'activating the image control must not approve the image',
+        );
+    } finally {
+        restore();
+    }
+}
+
+export async function testDraggingFullSizeImagePansWithoutTogglingIt(fixture) {
+    const {view, restore} = await createViewWith(500);
+    try {
+        fixture.append(view);
+        const image = view.querySelector('.review-image');
+        const frame = view.querySelector('.review-image-frame');
+        image.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+
+        let scrollLeft = 0;
+        let scrollTop = 0;
+        Object.defineProperties(frame, {
+            clientWidth: {configurable: true, value: 100},
+            clientHeight: {configurable: true, value: 100},
+            scrollWidth: {configurable: true, value: 500},
+            scrollHeight: {configurable: true, value: 400},
+            scrollLeft: {
+                configurable: true,
+                get: () => scrollLeft,
+                set: (value) => {
+                    scrollLeft = value;
+                },
+            },
+            scrollTop: {
+                configurable: true,
+                get: () => scrollTop,
+                set: (value) => {
+                    scrollTop = value;
+                },
+            },
+        });
+
+        image.dispatchEvent(new PointerEvent('pointerdown', {
+            bubbles: true,
+            cancelable: true,
+            pointerId: 9,
+            isPrimary: true,
+            button: 0,
+            clientX: 100,
+            clientY: 100,
+        }));
+        image.dispatchEvent(new PointerEvent('pointermove', {
+            bubbles: true,
+            cancelable: true,
+            pointerId: 9,
+            isPrimary: true,
+            clientX: 60,
+            clientY: 70,
+        }));
+        image.dispatchEvent(new PointerEvent('pointerup', {
+            bubbles: true,
+            pointerId: 9,
+            isPrimary: true,
+            button: 0,
+        }));
+        image.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+        assertEqual(scrollLeft, 40, 'dragging right-to-left should pan horizontally');
+        assertEqual(scrollTop, 30, 'dragging bottom-to-top should pan vertically');
+        assertTrue(image.classList.contains('review-image--full-size'), 'the drag click must not restore fitted size');
+    } finally {
+        restore();
+    }
+}
+
 export async function testSelectingThumbnailUpdatesImageAndMetadata() {
     const {view, fetchMock, restore} = await createViewWith(500);
     try {
