@@ -17,6 +17,8 @@ import {createTagQueueView} from './views/tagQueue.js';
 import {createUploadView} from './views/upload.js';
 import {createTagsView} from './views/tags.js';
 import {createTagmeView} from './views/tagme.js';
+import {createUsersView} from './views/users.js';
+import {createAuditLogView} from './views/auditLog.js';
 
 async function bootstrap() {
     const appRoot = document.getElementById('app');
@@ -47,6 +49,8 @@ async function bootstrap() {
         '/review': (context) => createReviewView({session, ...context}),
         '/tag-queue': (context) => createTagQueueView({session, ...context}),
         '/tags': (context) => createTagsView({session, ...context}),
+        '/users': (context) => createUsersView({session, ...context}),
+        '/audit-log': (context) => createAuditLogView({session, ...context}),
     };
 
     const router = createRouter({

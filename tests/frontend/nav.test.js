@@ -145,8 +145,11 @@ export async function testModQueueLinkVisibleForModerators() {
             const links = [...nav.element.querySelectorAll('a.nav-link')].map((link) => link.getAttribute('href'));
             assertEqual(
                 JSON.stringify(links),
-                JSON.stringify(['/', '/upload-image', '/tagme', '/review', '/tag-queue', '/tags', '/settings']),
-                'moderation links should sit between Upload Image and the account dropdown',
+                JSON.stringify([
+                    '/', '/upload-image', '/tagme', '/review', '/tag-queue', '/tags',
+                    '/users', '/audit-log', '/settings',
+                ]),
+                'moderation and internal links should follow Upload Image and precede the account dropdown',
             );
         } finally {
             restore();
@@ -199,6 +202,37 @@ export async function testTagQueueLinkVisibleForModerators() {
     }
 }
 
+export async function testInternalDropdownIsVisibleOnlyForModerators() {
+    for (const accessLevel of [null, 100, 400]) {
+        const {session, restore} = await createLoadedSession(() => sessionResponse(
+            accessLevel === null ? null : testUser({accessLevel}),
+        ));
+        try {
+            const nav = createHeaderNav({session, navigate: () => {}});
+            assertEqual(nav.element.querySelector('.internal-nav-item'), null);
+            assertEqual(nav.element.querySelector('a.nav-link[href="/users"]'), null);
+            assertEqual(nav.element.querySelector('a.nav-link[href="/audit-log"]'), null);
+        } finally {
+            restore();
+        }
+    }
+
+    for (const accessLevel of [500, 600]) {
+        const {session, restore} = await createLoadedSession(() => sessionResponse(testUser({accessLevel})));
+        try {
+            const nav = createHeaderNav({session, navigate: () => {}});
+            const internalItem = nav.element.querySelector('.internal-nav-item');
+            assertTrue(internalItem !== null, `access level ${accessLevel} should see the Internal menu`);
+            assertEqual(internalItem.querySelector('.internal-nav-trigger')?.textContent, 'Internal');
+            assertTrue(internalItem.querySelector('ul.submenu') !== null, 'Internal should use the dropdown submenu');
+            assertEqual(internalItem.querySelector('a[href="/users"]')?.textContent, 'User Management');
+            assertEqual(internalItem.querySelector('a[href="/audit-log"]')?.textContent, 'Audit Log');
+        } finally {
+            restore();
+        }
+    }
+}
+
 export async function testTagQueueLinkHiddenBelowModerators() {
     for (const accessLevel of [100, 400]) {
         const {session, restore} = await createLoadedSession(() => sessionResponse(testUser({accessLevel})));
@@ -208,6 +242,21 @@ export async function testTagQueueLinkHiddenBelowModerators() {
         } finally {
             restore();
         }
+    }
+}
+
+export async function testInternalDropdownHighlightsTheActiveSubmenuRoute() {
+    const {session, restore} = await createLoadedSession(() => sessionResponse(testUser({accessLevel: 500})));
+    try {
+        const nav = createHeaderNav({session, navigate: () => {}});
+        for (const path of ['/users', '/audit-log']) {
+            nav.setActive(path);
+            const internalItem = nav.element.querySelector('.internal-nav-item');
+            assertTrue(internalItem.querySelector('.internal-nav-trigger').classList.contains('active'));
+            assertEqual(internalItem.querySelector('.submenu a.nav-link.active')?.getAttribute('href'), path);
+        }
+    } finally {
+        restore();
     }
 }
 

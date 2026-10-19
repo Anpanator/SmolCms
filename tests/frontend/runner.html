@@ -13,6 +13,7 @@
         // loaded before this script evaluates. (Dynamically awaited imports
         // starve under --virtual-time-budget on file:// and race the budget.)
         import * as apiTests from './api.test.js';
+        import * as auditLogTests from './auditLog.test.js';
         import * as accessLevelTests from './accessLevel.test.js';
         import * as cssTests from './css.test.js';
         import * as domTests from './dom.test.js';
@@ -39,10 +40,12 @@
         import * as tagListTests from './tagList.test.js';
         import * as tagmeTests from './tagme.test.js';
         import * as uploadTests from './upload.test.js';
+        import * as usersTests from './users.test.js';
         import * as validationTests from './validation.test.js';
 
         const TEST_MODULES = [
             ['api', apiTests],
+            ['auditLog', auditLogTests],
             ['accessLevel', accessLevelTests],
             ['css', cssTests],
             ['dom', domTests],
@@ -69,6 +72,7 @@
             ['tagList', tagListTests],
             ['tagme', tagmeTests],
             ['upload', uploadTests],
+            ['users', usersTests],
             ['validation', validationTests],
         ];
 
