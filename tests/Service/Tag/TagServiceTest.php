@@ -8,6 +8,7 @@ use DateTime;
 use InvalidArgumentException;
 use PDO;
 use SmolCms\Data\Constant\ImageStatus;
+use SmolCms\Exception\TagmeRemovalBlockedException;
 use SmolCms\Service\DB\ImageEntityService;
 use SmolCms\Service\Tag\TagService;
 use SmolCms\TestUtils\Attributes\Autowire;
@@ -24,6 +25,64 @@ class TagServiceTest extends FunctionalTestCase
 
     #[Autowire]
     private PDO $pdo;
+
+    public function testAddTagsToImageDoesNotCreateUnknownTagsAndReportsNewAssociations(): void
+    {
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+        );
+        $knownName = 'add-existing-' . bin2hex(random_bytes(4));
+        $unknownName = 'add-unknown-' . bin2hex(random_bytes(4));
+        $tooLongName = str_repeat('x', 101);
+        $this->tagService->createTag($knownName);
+
+        self::assertSame(
+            [
+                'applied' => [$knownName],
+                'unknown' => [$unknownName, $tooLongName, ''],
+                'newlyAttached' => [$knownName],
+            ],
+            $this->tagService->addTagsToImageWithChanges(
+                $image->getId(),
+                [mb_strtoupper($knownName, 'UTF-8'), $unknownName, $tooLongName, ''],
+            ),
+        );
+        self::assertSame(
+            ['applied' => [$knownName], 'unknown' => [$unknownName]],
+            $this->tagService->addTagsToImage($image->getId(), [$knownName, $unknownName]),
+        );
+        self::assertSame(1, $this->tagService->getUsageCount($knownName));
+        self::assertNull($this->tagService->getUsageCount($unknownName));
+    }
+
+    public function testRemoveTagFromImageRequiresTenOtherTagsBeforeRemovingTagme(): void
+    {
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+        );
+        $this->tagService->attachTagToImage($image->getId(), 'tagme');
+        for ($index = 0; $index < 9; $index++) {
+            $this->tagService->attachTagToImage($image->getId(), 'tagme-rule-' . $index . '-' . bin2hex(random_bytes(2)));
+        }
+        self::assertSame(10, $this->tagService->countTagsForImage($image->getId()));
+        try {
+            $this->tagService->removeTagFromImage($image->getId(), 'TAGME');
+            self::fail('Removing tagme with fewer than ten other tags must be blocked.');
+        } catch (TagmeRemovalBlockedException) {
+            self::assertContains('tagme', $this->tagService->getTagsForImage($image->getId()));
+        }
+
+        $this->tagService->attachTagToImage($image->getId(), 'tagme-rule-extra-' . bin2hex(random_bytes(3)));
+        self::assertSame(11, $this->tagService->countTagsForImage($image->getId()));
+        self::assertTrue($this->tagService->removeTagFromImage($image->getId(), 'TAGME'));
+        self::assertSame(10, $this->tagService->countTagsForImage($image->getId()));
+        self::assertNotContains('tagme', $this->tagService->getTagsForImage($image->getId()));
+        self::assertFalse($this->tagService->removeTagFromImage($image->getId(), 'tagme'));
+    }
 
     public function testNormalizeName_collapsesWhitespaceAndRejectsInvalidNames(): void
     {

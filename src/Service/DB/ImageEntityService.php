@@ -95,6 +95,32 @@ readonly class ImageEntityService extends EntityService
         return $this->countResults($qc);
     }
 
+    public function findRandomAcceptedImageWithTagName(string $tagName): ?ImageEntity
+    {
+        $driver = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $tagNameCondition = $driver === 'sqlite'
+            ? 't.name COLLATE NOCASE = :tag_name'
+            : 't.name = :tag_name';
+        $randomOrder = $driver === 'mysql' ? 'RAND()' : 'RANDOM()';
+
+        $criteria = new QueryCriteria();
+        $criteria->select(ImageEntity::class)
+            ->andWhere('status = :accepted_status')
+            ->andWhere(
+                'id IN (SELECT it.image_id FROM image_tag it '
+                . 'INNER JOIN tag t ON t.id = it.tag_id '
+                . 'WHERE ' . $tagNameCondition . ')'
+            )
+            ->withParameters([
+                'accepted_status' => ImageStatus::ACCEPTED->value,
+                'tag_name' => $tagName,
+            ])
+            ->orderBy($randomOrder)
+            ->maxResults(1);
+
+        return ($this->execute($criteria) ?? [])[0] ?? null;
+    }
+
     /**
      * Finds images whose variants were saved by the processing worker.
      * These rows are also used to retry original-file cleanup after a worker interruption.

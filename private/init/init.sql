@@ -69,3 +69,35 @@ CREATE TABLE image_tag
 
 INSERT IGNORE INTO tag (name, category_id)
 SELECT 'tagme', id FROM tag_category WHERE name = 'General';
+
+CREATE TABLE tag_suggestion
+(
+    id       INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    image_id INT UNSIGNED NOT NULL,
+    tag_name VARCHAR(100) NOT NULL,
+    user_id  INT UNSIGNED NOT NULL,
+    created  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_tag_suggestion_image_tag (image_id, tag_name),
+    KEY idx_tag_suggestion_image (image_id),
+    KEY idx_tag_suggestion_user (user_id)
+) ENGINE = InnoDb;
+
+CREATE TABLE tag_approval
+(
+    id      INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    tag_id  INT UNSIGNED NOT NULL,
+    user_id INT UNSIGNED NOT NULL,
+    created DATETIME     NOT NULL,
+    KEY idx_tag_approval_tag (tag_id),
+    KEY idx_tag_approval_user (user_id)
+) ENGINE = InnoDb;
+
+CREATE TABLE audit_log
+(
+    id          INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id     INT UNSIGNED NOT NULL,
+    action_type INT          NOT NULL,
+    context     VARCHAR(255) NOT NULL DEFAULT '',
+    created     DATETIME     NOT NULL,
+    KEY idx_audit_log_user (user_id)
+) ENGINE = InnoDb;

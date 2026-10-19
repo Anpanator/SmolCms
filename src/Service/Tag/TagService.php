@@ -11,6 +11,7 @@ use SmolCms\Data\Persistence\ImageTagEntity;
 use SmolCms\Data\Persistence\TagCategoryEntity;
 use SmolCms\Data\Persistence\TagEntity;
 use SmolCms\Exception\PersistenceException;
+use SmolCms\Exception\TagmeRemovalBlockedException;
 use SmolCms\Service\DB\EntityService;
 use SmolCms\Service\DB\QueryCriteria;
 use Throwable;
@@ -199,6 +200,134 @@ readonly class TagService extends EntityService
             $this->decrementUsageCount($tag);
             return true;
         });
+    }
+
+    /**
+     * Applies existing tags to an image without creating unknown tags.
+     *
+     * @param list<string> $tagNames
+     * @return array{applied: list<string>, unknown: list<string>}
+     */
+    public function addTagsToImage(int $imageId, array $tagNames): array
+    {
+        $result = $this->addTagsToImageWithChanges($imageId, $tagNames);
+        return [
+            'applied' => $result['applied'],
+            'unknown' => $result['unknown'],
+        ];
+    }
+
+    /**
+     * Applies existing tags and also identifies associations newly created by this call.
+     *
+     * @param list<string> $tagNames
+     * @return array{applied: list<string>, unknown: list<string>, newlyAttached: list<string>}
+     */
+    public function addTagsToImageWithChanges(int $imageId, array $tagNames): array
+    {
+        return $this->withinTransaction(function () use ($imageId, $tagNames): array {
+            $applied = [];
+            $unknown = [];
+            $newlyAttached = [];
+            $seen = [];
+
+            if ($imageId < 1 || !$this->imageExists($imageId)) {
+                return [
+                    'applied' => $applied,
+                    'unknown' => $unknown,
+                    'newlyAttached' => $newlyAttached,
+                ];
+            }
+
+            foreach ($tagNames as $tagName) {
+                if (!is_string($tagName)) {
+                    $unknown[] = '';
+                    continue;
+                }
+
+                try {
+                    $normalizedName = self::normalizeName($tagName);
+                } catch (InvalidArgumentException) {
+                    $invalidName = trim($tagName);
+                    $invalidKey = "invalid:$invalidName";
+                    if (!isset($seen[$invalidKey])) {
+                        $seen[$invalidKey] = true;
+                        $unknown[] = $invalidName;
+                    }
+                    continue;
+                }
+
+                if (isset($seen[$normalizedName])) {
+                    continue;
+                }
+                $seen[$normalizedName] = true;
+
+                if ($this->findTag($normalizedName) === null) {
+                    $unknown[] = $normalizedName;
+                    continue;
+                }
+
+                $applied[] = $normalizedName;
+                if ($this->attachTagToImage($imageId, $normalizedName)) {
+                    $newlyAttached[] = $normalizedName;
+                }
+            }
+
+            return [
+                'applied' => $applied,
+                'unknown' => $unknown,
+                'newlyAttached' => $newlyAttached,
+            ];
+        });
+    }
+
+    /**
+     * Removes a tag from an image, except that tagme requires ten other image tags.
+     *
+     * @throws TagmeRemovalBlockedException When the tagme minimum-tag rule is not met.
+     */
+    public function removeTagFromImage(int $imageId, string $tagName): bool
+    {
+        if ($imageId < 1) {
+            return false;
+        }
+        $normalizedName = self::normalizeName($tagName);
+
+        return $this->withinTransaction(function () use ($imageId, $normalizedName): bool {
+            $tag = $this->findTag($normalizedName);
+            if ($tag === null) {
+                return false;
+            }
+
+            $attachedTags = $this->getTagsAttachedToImage($imageId);
+            $isAttached = false;
+            foreach ($attachedTags as $attachedTag) {
+                if ($attachedTag->getId() === $tag->getId()) {
+                    $isAttached = true;
+                    break;
+                }
+            }
+            if (!$isAttached) {
+                return false;
+            }
+
+            if ($normalizedName === 'tagme' && count($attachedTags) < 11) {
+                throw new TagmeRemovalBlockedException(
+                    'The tagme tag can only be removed from images with ten other tags.'
+                );
+            }
+
+            return $this->detachTagFromImage($imageId, $normalizedName);
+        });
+    }
+
+    public function countTagsForImage(int $imageId): int
+    {
+        $criteria = new QueryCriteria();
+        $criteria->select(ImageTagEntity::class)
+            ->andWhere('image_id = :image_id')
+            ->withParameters(['image_id' => $imageId]);
+        return $this->countResults($criteria);
     }
 
     /**
@@ -641,7 +770,7 @@ readonly class TagService extends EntityService
         return false;
     }
 
-    private static function escapeLikePattern(string $value): string
+    public static function escapeLikePattern(string $value): string
     {
         return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
     }

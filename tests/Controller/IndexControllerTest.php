@@ -24,6 +24,10 @@ class IndexControllerTest extends FunctionalTestCase
             'settings' => [RouteEnum::SETTINGS],
             'upload image' => [RouteEnum::UPLOAD_IMAGE],
             'tags' => [RouteEnum::TAGS_PAGE],
+            'tag queue' => [RouteEnum::TAG_QUEUE],
+            'tagme queue' => [RouteEnum::TAGME_QUEUE],
+            'user management' => [RouteEnum::USER_MANAGEMENT],
+            'audit log' => [RouteEnum::AUDIT_LOG],
         ];
     }
 

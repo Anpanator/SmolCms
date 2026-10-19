@@ -14,6 +14,10 @@ enum RouteEnum: string
     case IMAGE_DISPLAY = '/image';
     case IMAGE_REVIEW = '/review';
     case TAGS_PAGE = '/tags';
+    case TAG_QUEUE = '/tag-queue';
+    case TAGME_QUEUE = '/tagme';
+    case USER_MANAGEMENT = '/users';
+    case AUDIT_LOG = '/audit-log';
     case API_SESSION = '/api/session';
     case API_IMAGES = '/api/images';
     case API_IMAGE_DETAIL = '/api/image/detail';
@@ -25,4 +29,15 @@ enum RouteEnum: string
     case API_REVIEW_QUEUE = '/api/review/queue';
     case API_REVIEW_APPROVE = '/api/review/approve';
     case API_REVIEW_REJECT = '/api/review/reject';
+    case API_IMAGE_TAGS = '/api/image/tags';
+    case API_IMAGE_TAGS_REMOVE = '/api/image/tags/remove';
+    case API_TAG_SUGGESTIONS = '/api/tag-suggestions';
+    case API_TAG_SUGGESTION_QUEUE = '/api/tag-suggestions/queue';
+    case API_TAG_SUGGESTION_APPROVE = '/api/tag-suggestions/approve';
+    case API_TAG_SUGGESTION_REJECT = '/api/tag-suggestions/reject';
+    case API_AUDIT_LOG = '/api/audit-log';
+    case API_USERS = '/api/users';
+    case API_USERS_UPDATE = '/api/users/update';
+    case API_PROFILE = '/api/profile';
+    case API_TAGME_RANDOM = '/api/tagme/random';
 }

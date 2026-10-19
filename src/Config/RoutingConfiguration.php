@@ -6,13 +6,19 @@ namespace SmolCms\Config;
 
 
 use SmolCms\Controller\AuthController;
+use SmolCms\Controller\AuditLogController;
 use SmolCms\Controller\ImageApiController;
 use SmolCms\Controller\ImageFileController;
 use SmolCms\Controller\ImageReviewController;
+use SmolCms\Controller\ImageTagController;
 use SmolCms\Controller\ImageUploadController;
 use SmolCms\Controller\IndexController;
+use SmolCms\Controller\ProfileController;
 use SmolCms\Controller\RegisterController;
+use SmolCms\Controller\TagSuggestionController;
+use SmolCms\Controller\TagmeController;
 use SmolCms\Controller\TagApiController;
+use SmolCms\Controller\UserManagementController;
 use SmolCms\Controller\UserProfileController;
 use SmolCms\Data\Business\Route;
 use SmolCms\Data\Constant\HttpMethod;
@@ -101,6 +107,26 @@ class RoutingConfiguration
                 method: HttpMethod::GET,
                 controller: IndexController::class,
             ),
+            RouteEnum::TAG_QUEUE->name => new Route(
+                path: RouteEnum::TAG_QUEUE->value,
+                method: HttpMethod::GET,
+                controller: IndexController::class,
+            ),
+            RouteEnum::TAGME_QUEUE->name => new Route(
+                path: RouteEnum::TAGME_QUEUE->value,
+                method: HttpMethod::GET,
+                controller: IndexController::class,
+            ),
+            RouteEnum::USER_MANAGEMENT->name => new Route(
+                path: RouteEnum::USER_MANAGEMENT->value,
+                method: HttpMethod::GET,
+                controller: IndexController::class,
+            ),
+            RouteEnum::AUDIT_LOG->name => new Route(
+                path: RouteEnum::AUDIT_LOG->value,
+                method: HttpMethod::GET,
+                controller: IndexController::class,
+            ),
             RouteEnum::API_IMAGES->name => new Route(
                 path: RouteEnum::API_IMAGES->value,
                 method: HttpMethod::GET,
@@ -172,6 +198,72 @@ class RoutingConfiguration
                 method: HttpMethod::POST,
                 controller: ImageReviewController::class,
                 handler: 'rejectAction',
+            ),
+            RouteEnum::API_IMAGE_TAGS->name => new Route(
+                path: RouteEnum::API_IMAGE_TAGS->value,
+                method: HttpMethod::POST,
+                controller: ImageTagController::class,
+                handler: 'addAction',
+            ),
+            RouteEnum::API_IMAGE_TAGS_REMOVE->name => new Route(
+                path: RouteEnum::API_IMAGE_TAGS_REMOVE->value,
+                method: HttpMethod::POST,
+                controller: ImageTagController::class,
+                handler: 'removeAction',
+            ),
+            RouteEnum::API_TAG_SUGGESTIONS->name => new Route(
+                path: RouteEnum::API_TAG_SUGGESTIONS->value,
+                method: HttpMethod::POST,
+                controller: TagSuggestionController::class,
+                handler: 'createAction',
+            ),
+            RouteEnum::API_TAG_SUGGESTION_QUEUE->name => new Route(
+                path: RouteEnum::API_TAG_SUGGESTION_QUEUE->value,
+                method: HttpMethod::GET,
+                controller: TagSuggestionController::class,
+                handler: 'queueAction',
+            ),
+            RouteEnum::API_TAG_SUGGESTION_APPROVE->name => new Route(
+                path: RouteEnum::API_TAG_SUGGESTION_APPROVE->value,
+                method: HttpMethod::POST,
+                controller: TagSuggestionController::class,
+                handler: 'approveAction',
+            ),
+            RouteEnum::API_TAG_SUGGESTION_REJECT->name => new Route(
+                path: RouteEnum::API_TAG_SUGGESTION_REJECT->value,
+                method: HttpMethod::POST,
+                controller: TagSuggestionController::class,
+                handler: 'rejectAction',
+            ),
+            RouteEnum::API_AUDIT_LOG->name => new Route(
+                path: RouteEnum::API_AUDIT_LOG->value,
+                method: HttpMethod::GET,
+                controller: AuditLogController::class,
+                handler: 'getAction',
+            ),
+            RouteEnum::API_USERS->name => new Route(
+                path: RouteEnum::API_USERS->value,
+                method: HttpMethod::GET,
+                controller: UserManagementController::class,
+                handler: 'getListAction',
+            ),
+            RouteEnum::API_USERS_UPDATE->name => new Route(
+                path: RouteEnum::API_USERS_UPDATE->value,
+                method: HttpMethod::POST,
+                controller: UserManagementController::class,
+                handler: 'updateAction',
+            ),
+            RouteEnum::API_PROFILE->name => new Route(
+                path: RouteEnum::API_PROFILE->value,
+                method: HttpMethod::GET,
+                controller: ProfileController::class,
+                handler: 'getAction',
+            ),
+            RouteEnum::API_TAGME_RANDOM->name => new Route(
+                path: RouteEnum::API_TAGME_RANDOM->value,
+                method: HttpMethod::GET,
+                controller: TagmeController::class,
+                handler: 'getRandomAction',
             ),
         ];
     }
