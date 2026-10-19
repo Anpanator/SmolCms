@@ -3,7 +3,7 @@
  * POSTs JSON to /settings. On 401 the user is sent to the login view.
  * Importing this module has no side effects.
  */
-import {postJson} from '../api.js';
+import {get, postJson} from '../api.js';
 import {el} from '../dom.js';
 import {accessLevelName} from '../accessLevel.js';
 import {
@@ -31,11 +31,14 @@ export function createProfileView({session, navigate}) {
     const accessLevelField = user
         ? createReadOnlyField('Access level', 'accessLevel', accessLevelName(user.accessLevel))
         : null;
+    const approvedTagSuggestionsField = user
+        ? createReadOnlyField('Approved tag suggestions', 'approvedTagSuggestions', 'Loading…')
+        : null;
 
     const form = el('form', {
         className: 'form',
         attributes: {action: '/settings', method: 'post', novalidate: 'novalidate'},
-        children: [fields.displayName.wrapper, accessLevelField, message, submit],
+        children: [fields.displayName.wrapper, accessLevelField, approvedTagSuggestionsField, message, submit],
     });
 
     const children = [el('h1', {className: 'page-title', children: 'Profile'})];
@@ -50,6 +53,20 @@ export function createProfileView({session, navigate}) {
         }));
     }
     children.push(form);
+
+    if (approvedTagSuggestionsField !== null) {
+        const approvedTagSuggestionsInput = approvedTagSuggestionsField.querySelector('input');
+        get('/api/profile')
+            .then((data) => {
+                const count = data?.approvedTagSuggestions;
+                approvedTagSuggestionsInput.value = Number.isSafeInteger(count) && count >= 0
+                    ? String(count)
+                    : 'Unavailable';
+            })
+            .catch(() => {
+                approvedTagSuggestionsInput.value = 'Unavailable';
+            });
+    }
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();

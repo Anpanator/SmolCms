@@ -119,6 +119,7 @@ class UserManagementControllerTest extends FunctionalTestCase
         self::assertSame(
             ['user' => [
                 'id' => $mod->getId(),
+                'loginName' => $mod->getLoginName(),
                 'displayName' => 'Updated Mod Display',
                 'accessLevel' => AccessLevel::FELLOW->value,
             ]],
@@ -161,6 +162,75 @@ class UserManagementControllerTest extends FunctionalTestCase
                 'accessLevel' => 123,
             ])->getStatus(),
         );
+    }
+
+    public function testUserUpdateCanChangeLoginNameAndChecksUniquenessAndValidation(): void
+    {
+        $token = bin2hex(random_bytes(5));
+        $target = $this->createUser('users-login-target-' . $token, 'Login Target', AccessLevel::NOVICE);
+        $other = $this->createUser('users-login-other-' . $token, 'Login Other', AccessLevel::NOVICE);
+        $this->loginUserWithAccessLevel(
+            'users-login-mod-' . $token,
+            'Users Login Mod',
+            AccessLevel::MOD,
+        );
+
+        $updatedLoginName = 'users-login-updated-' . $token;
+        $updatedResponse = $this->simulateUserUpdate($target->getId(), [
+            'loginName' => $updatedLoginName,
+            'displayName' => 'Updated Login Target',
+            'accessLevel' => AccessLevel::NOVICE->value,
+        ]);
+        self::assertSame(HttpStatus::OK, $updatedResponse->getStatus());
+        self::assertSame([
+            'user' => [
+                'id' => $target->getId(),
+                'loginName' => $updatedLoginName,
+                'displayName' => 'Updated Login Target',
+                'accessLevel' => AccessLevel::NOVICE->value,
+            ],
+        ], json_decode((string)$updatedResponse->getContent(), true, JSON_THROW_ON_ERROR));
+        self::assertSame($updatedLoginName, $this->userService->findOneById($target->getId())->getLoginName());
+
+        $unchangedResponse = $this->simulateUserUpdate($target->getId(), [
+            'displayName' => 'Login Name Unchanged',
+            'accessLevel' => AccessLevel::NOVICE->value,
+        ]);
+        self::assertSame(HttpStatus::OK, $unchangedResponse->getStatus());
+        self::assertSame(
+            $updatedLoginName,
+            $this->userService->findOneById($target->getId())->getLoginName(),
+            'an absent loginName should leave the current login name unchanged',
+        );
+
+        $nullResponse = $this->simulateUserUpdate($target->getId(), [
+            'loginName' => null,
+            'displayName' => 'Login Name Still Unchanged',
+            'accessLevel' => AccessLevel::NOVICE->value,
+        ]);
+        self::assertSame(HttpStatus::OK, $nullResponse->getStatus());
+        self::assertSame($updatedLoginName, $this->userService->findOneById($target->getId())->getLoginName());
+
+        $duplicateResponse = $this->simulateUserUpdate($target->getId(), [
+            'loginName' => $other->getLoginName(),
+            'displayName' => 'Should Not Be Saved',
+            'accessLevel' => AccessLevel::NOVICE->value,
+        ]);
+        self::assertSame(HttpStatus::CONFLICT, $duplicateResponse->getStatus());
+        $afterDuplicate = $this->userService->findOneById($target->getId());
+        self::assertSame($updatedLoginName, $afterDuplicate->getLoginName());
+        self::assertSame('Login Name Still Unchanged', $afterDuplicate->getDisplayName());
+
+        foreach (['', str_repeat('a', 256)] as $invalidLoginName) {
+            self::assertSame(
+                HttpStatus::BAD_REQUEST,
+                $this->simulateUserUpdate($target->getId(), [
+                    'loginName' => $invalidLoginName,
+                    'displayName' => 'Valid Display',
+                    'accessLevel' => AccessLevel::NOVICE->value,
+                ])->getStatus(),
+            );
+        }
     }
 
     private function createUser(string $loginName, string $displayName, AccessLevel $accessLevel): UserEntity

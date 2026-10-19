@@ -17,7 +17,7 @@ import {
     setFieldErrors,
     showMessage,
 } from '../forms.js';
-import {validateDisplayName} from '../validation.js';
+import {validateDisplayName, validateLoginName} from '../validation.js';
 
 const USERS_URL = '/api/users';
 const UPDATE_USER_URL = '/api/users/update';
@@ -221,6 +221,11 @@ export function createUsersView({
 
     function openEditModal(user) {
         const titleId = `edit-user-title-${user.id}`;
+        const loginNameField = createField({
+            label: 'Login name',
+            name: 'loginName',
+            value: user.loginName ?? '',
+        });
         const displayNameField = createField({
             label: 'Display name',
             name: 'displayName',
@@ -243,7 +248,7 @@ export function createUsersView({
             attributes: {novalidate: 'novalidate'},
             children: [
                 createReadOnlyField('ID', 'id', user.id),
-                createReadOnlyField('Login name', 'loginName', user.loginName),
+                loginNameField.wrapper,
                 createReadOnlyField('Register date', 'registerDate', user.registerDate),
                 displayNameField.wrapper,
                 accessLevelField.wrapper,
@@ -267,7 +272,7 @@ export function createUsersView({
         });
         let savePending = false;
 
-        displayNameField.input.focus();
+        loginNameField.input.focus();
         cancelButton.addEventListener('click', () => modal.close());
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
@@ -275,11 +280,16 @@ export function createUsersView({
                 return;
             }
             clearMessage(modalMessage);
+            const loginName = loginNameField.input.value.trim();
             const displayName = displayNameField.input.value.trim();
-            const displayNameError = validateDisplayName(displayName);
-            setFieldErrors({displayName: displayNameField}, {displayName: displayNameError});
-            if (displayNameError) {
-                showMessage(modalMessage, displayNameError);
+            const errors = {
+                loginName: validateLoginName(loginName),
+                displayName: validateDisplayName(displayName),
+            };
+            setFieldErrors({loginName: loginNameField, displayName: displayNameField}, errors);
+            const validationError = errors.loginName ?? errors.displayName;
+            if (validationError) {
+                showMessage(modalMessage, validationError);
                 return;
             }
 
@@ -292,12 +302,13 @@ export function createUsersView({
             savePending = true;
             saveButton.disabled = true;
             try {
-                const data = await postJson(`${UPDATE_USER_URL}?id=${user.id}`, {displayName, accessLevel});
+                const data = await postJson(`${UPDATE_USER_URL}?id=${user.id}`, {loginName, displayName, accessLevel});
                 const savedUser = data?.user ?? {};
                 const updatedUser = {
                     ...user,
                     ...savedUser,
                     id: user.id,
+                    loginName: savedUser.loginName ?? loginName,
                     displayName: savedUser.displayName ?? displayName,
                     accessLevel: savedUser.accessLevel ?? accessLevel,
                 };
@@ -314,10 +325,19 @@ export function createUsersView({
                     navigate('/login');
                     return;
                 }
+                if (error?.status === 409) {
+                    showMessage(modalMessage, 'This login name is already taken.');
+                    return;
+                }
                 if (error?.status === 400) {
+                    const currentLoginNameError = validateLoginName(loginNameField.input.value.trim());
                     const currentDisplayNameError = validateDisplayName(displayNameField.input.value.trim());
-                    setFieldErrors({displayName: displayNameField}, {displayName: currentDisplayNameError});
-                    showMessage(modalMessage, currentDisplayNameError ?? messageForStatus(400));
+                    const currentErrors = {
+                        loginName: currentLoginNameError,
+                        displayName: currentDisplayNameError,
+                    };
+                    setFieldErrors({loginName: loginNameField, displayName: displayNameField}, currentErrors);
+                    showMessage(modalMessage, currentLoginNameError ?? currentDisplayNameError ?? messageForStatus(400));
                     return;
                 }
                 showMessage(modalMessage, messageForStatus(error?.status ?? 0));

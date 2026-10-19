@@ -1,12 +1,18 @@
-import {assertEqual, assertTrue} from './assert.js';
+import {assertEqual, assertTrue, settle} from './assert.js';
 import {mockFetch, sessionResponse, submitForm, testUser, useFetch} from './mocks.js';
 import {createSession} from '../../public/js/session.js';
 import {createProfileView} from '../../public/js/views/profile.js';
 
-async function createLoggedInSession(user = testUser()) {
+async function createLoggedInSession(
+    user = testUser(),
+    profileResponse = {status: 200, body: {approvedTagSuggestions: 3}},
+) {
     const fetchMock = mockFetch((url) => {
         if (url === '/api/session') {
             return sessionResponse(user);
+        }
+        if (url === '/api/profile') {
+            return profileResponse;
         }
         throw new Error(`unexpected fetch of ${url}`);
     });
@@ -45,6 +51,42 @@ export async function testProfileDisplaysAccessLevelReadOnly() {
     }
 }
 
+export async function testProfileDisplaysApprovedTagSuggestionCount() {
+    const {session, fetchMock, restore} = await createLoggedInSession();
+    try {
+        const view = createProfileView({session, navigate: () => {}});
+        await settle();
+
+        const count = view.querySelector('input[name="approvedTagSuggestions"]');
+        assertEqual(
+            view.querySelector('label[for="field-approvedTagSuggestions"]')?.textContent,
+            'Approved tag suggestions',
+        );
+        assertEqual(count?.value, '3', 'profile should display the approved tag suggestion count');
+        assertTrue(count?.readOnly, 'approved tag suggestion count should be read-only');
+        assertTrue(fetchMock.calls.some((call) => call.url === '/api/profile'), 'profile should fetch its approved count');
+    } finally {
+        restore();
+    }
+}
+
+export async function testProfileRendersWhenApprovedTagSuggestionFetchFails() {
+    const {session, restore} = await createLoggedInSession(testUser(), {status: 500, body: null});
+    try {
+        const view = createProfileView({session, navigate: () => {}});
+        await settle();
+
+        assertTrue(view.querySelector('input[name="displayName"]') !== null, 'profile form should render on fetch failure');
+        assertEqual(
+            view.querySelector('input[name="approvedTagSuggestions"]')?.value,
+            'Unavailable',
+            'failed count requests should display an unavailable state',
+        );
+    } finally {
+        restore();
+    }
+}
+
 export async function testInvalidDisplayNameShowsErrorWithoutFetching() {
     const {session, fetchMock, restore} = await createLoggedInSession();
     try {
@@ -57,7 +99,7 @@ export async function testInvalidDisplayNameShowsErrorWithoutFetching() {
 
         const error = view.querySelector('.field-error');
         assertTrue(!error.hidden, 'empty display name should show an error');
-        assertEqual(fetchMock.calls.length, 1, 'only the initial session load should have fetched');
+        assertEqual(fetchMock.calls.length, 2, 'only the session and profile data should have been fetched');
     } finally {
         restore();
     }
@@ -135,6 +177,8 @@ export async function testAnonymousProfileShowsLoginNotice() {
         assertTrue(view.querySelector('.notice--warning') !== null, 'anonymous users should see a login hint');
         assertTrue(view.querySelector('input[name="displayName"]') !== null, 'form should still render');
         assertEqual(view.querySelector('input[name="accessLevel"]'), null, 'anonymous users have no access level to display');
+        assertEqual(view.querySelector('input[name="approvedTagSuggestions"]'), null, 'anonymous users have no count to display');
+        assertEqual(fetchMock.calls.length, 1, 'anonymous profiles should not fetch the approved count');
     } finally {
         restore();
     }

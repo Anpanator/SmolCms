@@ -128,7 +128,7 @@ export async function testEditUserModalPostsAndUpdatesTheTableRow() {
         if (url === '/api/users/update?id=2' && options.method === 'POST') {
             return {
                 status: 200,
-                body: {user: {id: 2, displayName: 'Updated Amy', accessLevel: 300}},
+                body: {user: {id: 2, loginName: 'amy-updated', displayName: 'Updated Amy', accessLevel: 300}},
             };
         }
         return undefined;
@@ -139,13 +139,15 @@ export async function testEditUserModalPostsAndUpdatesTheTableRow() {
         assertTrue(modal !== null, 'editing should open a modal');
         assertEqual(modal.getAttribute('role'), 'dialog');
         assertTrue(modal.querySelector('input[name="id"]').readOnly, 'the user ID is read-only');
-        assertTrue(modal.querySelector('input[name="loginName"]').readOnly, 'the login name is read-only');
+        assertEqual(modal.querySelector('input[name="loginName"]').value, 'amy', 'the login name should be prefilled');
+        assertTrue(!modal.querySelector('input[name="loginName"]').readOnly, 'the login name should be editable');
         assertTrue(modal.querySelector('input[name="registerDate"]').readOnly, 'the register date is read-only');
         assertEqual(
             [...modal.querySelectorAll('select[name="accessLevel"] option')].map((option) => option.value).join('|'),
             '100|200|300|400|500|600',
         );
 
+        modal.querySelector('input[name="loginName"]').value = 'amy-updated';
         modal.querySelector('input[name="displayName"]').value = 'Updated Amy';
         modal.querySelector('select[name="accessLevel"]').value = '300';
         await submitForm(modal.querySelector('.user-edit-form'));
@@ -155,9 +157,10 @@ export async function testEditUserModalPostsAndUpdatesTheTableRow() {
         assertEqual(updateCall.options.method, 'POST');
         assertEqual(
             JSON.stringify(JSON.parse(updateCall.options.body)),
-            JSON.stringify({displayName: 'Updated Amy', accessLevel: 300}),
+            JSON.stringify({loginName: 'amy-updated', displayName: 'Updated Amy', accessLevel: 300}),
         );
         const updatedRow = view.querySelector('.users-table-row[data-user-id="2"]');
+        assertEqual(updatedRow.querySelector('.users-login-cell').textContent, 'amy-updated');
         assertEqual(updatedRow.querySelector('.users-display-name-cell').textContent, 'Updated Amy');
         assertEqual(updatedRow.querySelector('.users-access-level-cell').textContent, 'Master');
         assertEqual(updatedRow.querySelector('.users-register-date-cell').textContent, USERS[0].registerDate);
@@ -179,6 +182,7 @@ export async function testEditUserValidatesDisplayNameAndShowsForbiddenInModal()
         view.querySelector('.users-table-row[data-user-id="2"] .users-edit-button').click();
         const modal = document.querySelector('.modal-backdrop');
         const form = modal.querySelector('.user-edit-form');
+        const loginName = modal.querySelector('input[name="loginName"]');
         const displayName = modal.querySelector('input[name="displayName"]');
         displayName.value = '   ';
         await submitForm(form);
@@ -187,10 +191,47 @@ export async function testEditUserValidatesDisplayNameAndShowsForbiddenInModal()
         assertEqual(modal.querySelector('.form-message:not([hidden])')?.textContent, 'Display name is required.');
 
         displayName.value = 'Valid Name';
+        loginName.value = '   ';
+        await submitForm(form);
+        assertEqual(fetchMock.calls.filter((call) => call.options.method === 'POST').length, 0);
+        assertEqual(loginName.parentElement.querySelector('.field-error:not([hidden])')?.textContent, 'Login name is required.');
+        assertEqual(modal.querySelector('.form-message:not([hidden])')?.textContent, 'Login name is required.');
+
+        loginName.value = 'valid-login';
         await submitForm(form);
         assertEqual(fetchMock.calls.filter((call) => call.options.method === 'POST').length, 1);
         assertTrue(modal.querySelector('.form-message:not([hidden])')?.textContent.includes('permission'));
         assertTrue(document.querySelector('.modal-backdrop') !== null, 'a forbidden save should leave the modal open');
+    } finally {
+        document.querySelector('.modal-backdrop .modal-cancel')?.click();
+        restore();
+    }
+}
+
+export async function testDuplicateLoginNameShowsConflictInEditModal() {
+    const {view, fetchMock, restore} = await createLoadedView((url, options) => (
+        url === '/api/users/update?id=2' && options.method === 'POST'
+            ? {status: 409, body: null}
+            : undefined
+    ));
+    try {
+        view.querySelector('.users-table-row[data-user-id="2"] .users-edit-button').click();
+        const modal = document.querySelector('.modal-backdrop');
+        modal.querySelector('input[name="loginName"]').value = 'already-taken';
+        await submitForm(modal.querySelector('.user-edit-form'));
+
+        assertEqual(fetchMock.calls.filter((call) => call.options.method === 'POST').length, 1);
+        assertTrue(
+            modal.querySelector('.form-message:not([hidden])')?.textContent.toLowerCase().includes('login name')
+            && modal.querySelector('.form-message:not([hidden])')?.textContent.toLowerCase().includes('taken'),
+            'a duplicate login name should show a clear conflict message',
+        );
+        assertTrue(document.querySelector('.modal-backdrop') !== null, 'a conflict should leave the modal open');
+        assertEqual(
+            view.querySelector('.users-table-row[data-user-id="2"] .users-login-cell').textContent,
+            'amy',
+            'a conflict should not update the table row',
+        );
     } finally {
         document.querySelector('.modal-backdrop .modal-cancel')?.click();
         restore();

@@ -18,6 +18,8 @@ readonly class UserManagementUpdateRequest extends ValidatedRequest
         #[ValidateNotNull]
         #[ValidateAllowList(allowValues: [100, 200, 300, 400, 500, 600])]
         public ?int $accessLevel,
+        #[ValidateStringSize(minLength: 1, maxLength: 255)]
+        public ?string $loginName = null,
     )
     {
         parent::__construct($rawRequest);

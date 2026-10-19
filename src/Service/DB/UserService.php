@@ -62,14 +62,22 @@ readonly class UserService extends EntityService
         ];
     }
 
-    public function updateUser(int $id, string $displayName, AccessLevel $accessLevel): ?UserEntity
+    public function updateUser(
+        int $id,
+        string $displayName,
+        AccessLevel $accessLevel,
+        ?string $loginName = null,
+    ): ?UserEntity
     {
-        return $this->withinTransaction(function () use ($id, $displayName, $accessLevel): ?UserEntity {
+        return $this->withinTransaction(function () use ($id, $displayName, $accessLevel, $loginName): ?UserEntity {
             $user = $this->findOneById($id);
             if ($user === null) {
                 return null;
             }
 
+            if ($loginName !== null) {
+                $user->setLoginName($loginName);
+            }
             $user->setDisplayName($displayName);
             $user->setAccessLevel($accessLevel);
             $this->update($user);

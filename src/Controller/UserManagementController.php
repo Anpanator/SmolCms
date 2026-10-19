@@ -74,13 +74,22 @@ readonly class UserManagementController
             return new Response(HttpStatus::FORBIDDEN);
         }
 
-        $updated = $this->userService->updateUser($id, $displayName, $requestedAccessLevel);
+        $loginName = $request->loginName;
+        if ($loginName !== null) {
+            $existingUser = $this->userService->findOneByLoginName($loginName);
+            if ($existingUser !== null && $existingUser->getId() !== $id) {
+                return new Response(HttpStatus::CONFLICT);
+            }
+        }
+
+        $updated = $this->userService->updateUser($id, $displayName, $requestedAccessLevel, $loginName);
         if ($updated === null) {
             return new Response(HttpStatus::NOT_FOUND);
         }
         return new JsonResponse([
             'user' => [
                 'id' => $updated->getId(),
+                'loginName' => $updated->getLoginName(),
                 'displayName' => $updated->getDisplayName(),
                 'accessLevel' => $updated->getAccessLevel()->value,
             ],
