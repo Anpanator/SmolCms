@@ -32,6 +32,7 @@ function sessionItems(user, activePath) {
         ];
         if ((user.accessLevel ?? 0) >= AccessLevel.MOD) {
             items.push(navItem(navLink('/review', 'Mod Queue', activePath)));
+            items.push(navItem(navLink('/tag-queue', 'Tag Queue', activePath)));
             items.push(navItem(navLink('/tags', 'Tags', activePath)));
         }
         return items;

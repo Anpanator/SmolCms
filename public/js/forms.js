@@ -17,6 +17,8 @@ export function messageForStatus(status, conflictMessage = 'This login name is a
             return 'Please log in to continue.';
         case 403:
             return 'You do not have permission to do that.';
+        case 404:
+            return 'This item no longer exists.';
         case 409:
             return conflictMessage;
         case 413:
