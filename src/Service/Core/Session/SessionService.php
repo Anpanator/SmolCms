@@ -33,7 +33,9 @@ readonly class SessionService
         if (!isset($_COOKIE[self::SESSION_NAME])) {
             return;
         }
-        session_start(self::SESSION_OPTIONS);
+        if (session_start(self::SESSION_OPTIONS)) {
+            $this->refreshSessionCookie();
+        }
     }
 
     public function discardStaleSessionCookie(): void
@@ -91,5 +93,26 @@ readonly class SessionService
     private function isSessionActive(): bool
     {
         return session_status() === PHP_SESSION_ACTIVE;
+    }
+
+    private function refreshSessionCookie(): void
+    {
+        if (headers_sent()) {
+            return;
+        }
+
+        $cookieParams = session_get_cookie_params();
+        $cookieOptions = [
+            'expires' => time() + $cookieParams['lifetime'],
+            'path' => $cookieParams['path'],
+            'secure' => $cookieParams['secure'],
+            'httponly' => $cookieParams['httponly'],
+            'samesite' => $cookieParams['samesite'],
+        ];
+        if ($cookieParams['domain'] !== '') {
+            $cookieOptions['domain'] = $cookieParams['domain'];
+        }
+
+        setcookie(self::SESSION_NAME, session_id(), $cookieOptions);
     }
 }
