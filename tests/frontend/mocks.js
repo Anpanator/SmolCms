@@ -1,8 +1,8 @@
 /**
- * Shared test helpers: fetch mocking, history stubbing and navigation guard.
+ * Shared test helpers: request mocks, history stubbing and navigation guard.
  * Importing this module has no side effects.
  */
-import { settle } from './assert.js';
+import {settle} from './assert.js';
 
 const NULL_BODY_STATUSES = new Set([204, 205, 304]);
 
@@ -34,6 +34,104 @@ export function mockFetch(handler) {
     };
     impl.calls = calls;
     return impl;
+}
+
+class MockEventTarget {
+    constructor() {
+        this.listeners = new Map();
+    }
+
+    addEventListener(type, listener) {
+        const listeners = this.listeners.get(type) ?? [];
+        listeners.push(listener);
+        this.listeners.set(type, listeners);
+    }
+
+    emit(type, details = {}) {
+        const event = {type, ...details};
+        for (const listener of this.listeners.get(type) ?? []) {
+            listener(event);
+        }
+    }
+}
+
+/**
+ * Creates a recordable XMLHttpRequest mock. Handlers receive the request and
+ * return a response descriptor or promise; requests can also be completed
+ * manually with request.respond() while testing progress updates.
+ *
+ * @param {(url: string, request: object) => object|Promise<*>} handler
+ * @returns {Function & { calls: Array<object> }}
+ */
+export function mockXhr(handler) {
+    const calls = [];
+
+    class MockXMLHttpRequest {
+        constructor() {
+            this.upload = new MockEventTarget();
+            this.events = new MockEventTarget();
+            this.headers = [];
+            this.status = 0;
+            this.responseText = '';
+        }
+
+        open(method, url) {
+            this.method = method;
+            this.url = url;
+        }
+
+        setRequestHeader(name, value) {
+            this.headers.push({name, value});
+        }
+
+        addEventListener(type, listener) {
+            this.events.addEventListener(type, listener);
+        }
+
+        send(body) {
+            this.body = body;
+            calls.push(this);
+
+            let response;
+            try {
+                response = handler(this.url, this);
+            } catch {
+                this.events.emit('error');
+                return;
+            }
+
+            Promise.resolve(response).then(
+                (value) => this.respond(value),
+                () => this.events.emit('error'),
+            );
+        }
+
+        respond(response = {}) {
+            for (const progress of response.progressEvents ?? []) {
+                this.upload.emit('progress', progress);
+            }
+            this.status = response.status ?? 200;
+            const body = response.body ?? null;
+            this.responseText = body === null ? '' : typeof body === 'string' ? body : JSON.stringify(body);
+            this.events.emit('load');
+        }
+    }
+
+    MockXMLHttpRequest.calls = calls;
+    return MockXMLHttpRequest;
+}
+
+/**
+ * Temporarily replaces globalThis.XMLHttpRequest with the given implementation.
+ *
+ * @returns {Function} restore function
+ */
+export function useXhr(implementation) {
+    const original = globalThis.XMLHttpRequest;
+    globalThis.XMLHttpRequest = implementation;
+    return () => {
+        globalThis.XMLHttpRequest = original;
+    };
 }
 
 /**

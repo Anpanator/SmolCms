@@ -1,10 +1,13 @@
 == Image uploads
 
-Users with `NOVICE` or higher (`401` when anonymous, `403` when below the level) can submit a multipart `POST /upload-image` with one to ten files in the field `image[]`; `GET /upload-image` serves the same HTML shell as every other client path, and the upload form is rendered client-side.
-`ImageUploadController::postAction` manually runs `ImageUploadValidator` (it is not a `ValidatedRequest`): the validator normalizes PHP's column-oriented multi-file `files['image']` structure, requires each entry to have `tmp_name` and `name`, checks `is_uploaded_file()`, and rejects batches above ten files.
+Users with `NOVICE` or higher (`401` when anonymous, `403` when below the level) can select any number of images in the client; it uploads them sequentially, one file per multipart `POST /upload-image` request in the field `image[]`.
+The API accepts one to ten files per request. `GET /upload-image` serves the same HTML shell as every other client path, and the upload form is rendered client-side.
+`ImageUploadController::postAction` manually runs `ImageUploadValidator` (it is not a `ValidatedRequest`): the validator normalizes PHP's column-oriented multi-file `files['image']` structure, requires each entry to have `tmp_name` and `name`, checks `is_uploaded_file()`, and rejects empty requests or requests above ten files.
 It maps each PHP upload `error` code to explicit response statuses instead of failing silently: `UPLOAD_ERR_INI_SIZE`/`UPLOAD_ERR_FORM_SIZE` → `413`, `UPLOAD_ERR_NO_FILE`/`UPLOAD_ERR_PARTIAL` → `400`, `UPLOAD_ERR_NO_TMP_DIR`/`UPLOAD_ERR_CANT_WRITE`/`UPLOAD_ERR_EXTENSION` → `500`; structural failures and non-SAPI paths → `400`.
 
-Uploads are limited to **100 MB per file** (`upload_max_filesize = 100M`) and **1001 MB per request** (`post_max_size = 1001M`, nginx `client_max_body_size 1001m` — keep the aggregate limits in sync; larger bodies are rejected by nginx with `413` before PHP sees them).
+Uploads are limited to **100 MB per file** (`upload_max_filesize = 100M`) and **100 MB total per request** (`post_max_size = 100M`, nginx `client_max_body_size 100m` — keep the aggregate request limits in sync; larger bodies are rejected by nginx with `413` before PHP sees them).
+The request limit includes the full multipart body and its overhead.
+Since the client sends each selected image in its own sequential request, this limit applies separately to each upload rather than to the combined selection.
 `memory_limit = 1024M` gives GD headroom for decoding large uploads into uncompressed RGBA buffers.
 
 For every file the controller runs `file_get_contents(tmp_name)` (guarded by `is_readable()`, `false` returns `500`; in docker `php.ini` pins `upload_tmp_dir` to the whitelisted `private/upload/tmp`, and for local runs `config.php` adds `sys_get_temp_dir()` to `FS_DIRECTORY_WHITELIST`), then gates on `ImageTypeDetectionFacade` (`Png`, `Jpeg`, `Avif`, and `Webp` detectors, first match wins; `null` returns `400`).
@@ -25,7 +28,7 @@ Every stored image file is named `<sha-256 hex checksum>.<extension>` and lives 
 The extension is the `ImageType` value itself — `png`, `jpeg` (not `jpg`), `avif`, `webp`.
 
 The sanitized original is stored under `IMAGE_STORAGE_DIR` with the extension of its detected type.
-The variant directories are filled by the post-upload processing pipeline below: thumbs (`IMAGE_THUMB_DIR = public/img/thumb`, filenames `{checksum}.avif`), samples (`IMAGE_SAMPLE_DIR = private/img/sample`, filenames `{checksum}.webp`), and downloads (`IMAGE_DOWNLOAD_DIR = private/img/dl`, filenames `{checksum}.<jpeg|webp|avif>` — WebP for PNG sources).
+The variant directories are filled by the post-upload processing pipeline below: thumbs (`IMAGE_THUMB_DIR = public/img/thumb`, filenames `\{checksum}.avif`), samples (`IMAGE_SAMPLE_DIR = private/img/sample`, filenames `\{checksum}.webp`), and downloads (`IMAGE_DOWNLOAD_DIR = private/img/dl`, filenames `\{checksum}.<jpeg|webp|avif>` — WebP for PNG sources).
 Because the name is derived from the content, re-uploading identical bytes stores the same file again (no duplicate); different bytes cannot collide.
 Two-character subdirectories are created on demand and are covered by the app-level whitelist through `FileSystemAccessService::isPathAllowed()` (checked via `realpath()` after creation).
 

@@ -20,7 +20,7 @@ export function messageForStatus(status) {
         case 409:
             return 'This login name is already taken.';
         case 413:
-            return 'The upload is too large. Each image is limited to 100 MB, and a batch to 1001 MB.';
+            return 'The upload is too large. Each request is limited to 100 MB total, and each image is limited to 100 MB.';
         case 500:
             return 'Something went wrong on the server. Please try again later.';
         default:

@@ -680,6 +680,39 @@ h3 {
     box-shadow: var(--shadow);
 }
 
+.upload-progress {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.upload-progress[hidden] {
+    display: none;
+}
+
+.upload-progress-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.upload-progress-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.upload-progress progress {
+    width: 100%;
+    min-height: 1rem;
+    accent-color: var(--color-accent);
+}
+
+.upload-progress-status {
+    color: var(--color-muted);
+    font-size: 0.85rem;
+    overflow-wrap: anywhere;
+}
+
 .field {
     display: flex;
     flex-direction: column;
@@ -740,6 +773,11 @@ h3 {
 .button--primary:hover,
 .button--primary:focus-visible {
     background: var(--color-accent-strong);
+}
+
+.button:disabled {
+    cursor: wait;
+    opacity: 0.7;
 }
 
 .button--danger {

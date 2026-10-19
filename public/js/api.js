@@ -1,5 +1,5 @@
 /**
- * Minimal JSON/multipart fetch wrapper.
+ * Minimal JSON/fetch and multipart/XHR wrappers.
  *
  * All functions resolve with the decoded response body (or null for empty
  * bodies such as 204) and reject with an ApiError for non-2xx responses and
@@ -19,6 +19,21 @@ export class ApiError extends Error {
         this.status = status;
         this.body = body;
     }
+}
+
+function decodeResponseBody(text) {
+    if (!text) {
+        return null;
+    }
+    try {
+        return JSON.parse(text);
+    } catch {
+        return text;
+    }
+}
+
+function networkError() {
+    return new ApiError(0, null, 'Network error: could not reach the server.');
 }
 
 /**
@@ -47,18 +62,11 @@ export async function request(url, { method = 'GET', body = null, headers = {} }
     try {
         response = await fetch(url, { method, headers: requestHeaders, body: payload });
     } catch {
-        throw new ApiError(0, null, 'Network error: could not reach the server.');
+        throw networkError();
     }
 
     const text = await response.text();
-    let decoded = null;
-    if (text.length > 0) {
-        try {
-            decoded = JSON.parse(text);
-        } catch {
-            decoded = text;
-        }
-    }
+    const decoded = decodeResponseBody(text);
 
     if (!response.ok) {
         throw new ApiError(response.status, decoded);
@@ -74,3 +82,42 @@ export const postJson = (url, body) => request(url, { method: 'POST', body });
 
 /** POST a multipart FormData body. */
 export const postForm = (url, body) => request(url, { method: 'POST', body });
+
+/**
+ * POST a multipart body through XMLHttpRequest so callers can observe upload
+ * progress. The browser supplies the multipart Content-Type and boundary.
+ *
+ * @param {string} url
+ * @param {FormData} body
+ * @param {(event: ProgressEvent) => void} [onUploadProgress]
+ * @returns {Promise<*>} decoded response body, raw text, or null for an empty body
+ * @throws {ApiError} on non-2xx status and network failure
+ */
+export function postFormWithProgress(url, body, onUploadProgress = () => {
+}) {
+    return new Promise((resolve, reject) => {
+        try {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url);
+            xhr.upload.addEventListener('progress', onUploadProgress);
+            xhr.addEventListener('load', () => {
+                if (xhr.status === 0) {
+                    reject(networkError());
+                    return;
+                }
+
+                const decoded = decodeResponseBody(xhr.responseText);
+                if (xhr.status < 200 || xhr.status >= 300) {
+                    reject(new ApiError(xhr.status, decoded));
+                    return;
+                }
+                resolve(decoded);
+            });
+            xhr.addEventListener('error', () => reject(networkError()));
+            xhr.addEventListener('abort', () => reject(networkError()));
+            xhr.send(body);
+        } catch {
+            reject(networkError());
+        }
+    });
+}

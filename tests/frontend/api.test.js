@@ -1,7 +1,7 @@
-import {ApiError, get, postForm, postJson, request} from '../../public/js/api.js';
+import {ApiError, get, postForm, postFormWithProgress, postJson, request} from '../../public/js/api.js';
 import {HttpContentType, HttpHeader} from '../../public/js/httpConstants.js';
 import {assertDeepEqual, assertEqual, assertRejects, assertTrue} from './assert.js';
-import {mockFetch, useFetch} from './mocks.js';
+import {mockFetch, mockXhr, useFetch, useXhr} from './mocks.js';
 
 export async function testSuccessJsonRoundTrip() {
     const fetchMock = mockFetch((url) => {
@@ -82,6 +82,59 @@ export async function testFormDataPassesThroughUntouched() {
         assertEqual(options.method, 'POST');
         assertEqual(options.body, formData, 'FormData instance should be passed through untouched');
         assertTrue(!(HttpHeader.CONTENT_TYPE in options.headers), 'multipart must not get a JSON content-type header');
+    } finally {
+        restore();
+    }
+}
+
+export async function testMultipartProgressUsesXhrAndDoesNotSetContentType() {
+    const xhrMock = mockXhr(() => ({
+        status: 201,
+        body: {filename: 'a.png'},
+        progressEvents: [{loaded: 3, total: 10, lengthComputable: true}],
+    }));
+    const restore = useXhr(xhrMock);
+    try {
+        const formData = new FormData();
+        formData.append('image[]', new File(['x'], 'a.png', {type: 'image/png'}));
+        const progressEvents = [];
+        const data = await postFormWithProgress('/upload-image', formData, (event) => {
+            progressEvents.push({loaded: event.loaded, total: event.total, lengthComputable: event.lengthComputable});
+        });
+
+        assertDeepEqual(data, {filename: 'a.png'});
+        assertEqual(xhrMock.calls.length, 1);
+        assertEqual(xhrMock.calls[0].method, 'POST');
+        assertEqual(xhrMock.calls[0].url, '/upload-image');
+        assertEqual(xhrMock.calls[0].body, formData, 'FormData should be passed through untouched');
+        assertEqual(xhrMock.calls[0].headers.length, 0, 'multipart Content-Type should be set by the browser');
+        assertDeepEqual(progressEvents, [{loaded: 3, total: 10, lengthComputable: true}]);
+    } finally {
+        restore();
+    }
+}
+
+export async function testMultipartApiErrorPreservesDecodedBody() {
+    const xhrMock = mockXhr(() => ({status: 422, body: {error: 'bad image'}}));
+    const restore = useXhr(xhrMock);
+    try {
+        const error = await assertRejects(() => postFormWithProgress('/upload-image', new FormData()));
+        assertTrue(error instanceof ApiError, 'multipart errors should be ApiError instances');
+        assertEqual(error.status, 422);
+        assertDeepEqual(error.body, {error: 'bad image'});
+    } finally {
+        restore();
+    }
+}
+
+export async function testMultipartNetworkFailureUsesApiError() {
+    const xhrMock = mockXhr(() => Promise.reject(new TypeError('Network error')));
+    const restore = useXhr(xhrMock);
+    try {
+        const error = await assertRejects(() => postFormWithProgress('/upload-image', new FormData()));
+        assertTrue(error instanceof ApiError, 'multipart network failures should be ApiError instances');
+        assertEqual(error.status, 0);
+        assertEqual(error.body, null);
     } finally {
         restore();
     }
