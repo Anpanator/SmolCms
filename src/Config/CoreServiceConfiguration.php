@@ -24,10 +24,14 @@ use SmolCms\Service\Core\LoggingService;
 use SmolCms\Service\Core\Startup\RegisterSessionHandlerStartupAction;
 use SmolCms\Service\Core\Startup\RestrictDirectoryAccessStartupAction;
 use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
+use SmolCms\Service\DB\ImageEntityService;
+use SmolCms\Service\DB\UserService;
 use SmolCms\Service\File\FileSystemAccessService;
 use SmolCms\Service\Image\AvifImageProcessor;
 use SmolCms\Service\Image\AvifImageTypeDetector;
 use SmolCms\Service\Image\ImageProcessorFacade;
+use SmolCms\Service\Image\ImageQueryService;
+use SmolCms\Service\Image\ImageReviewService;
 use SmolCms\Service\Image\ImageStorageService;
 use SmolCms\Service\Image\ImageTypeDetectionFacade;
 use SmolCms\Service\Image\JpegImageProcessor;
@@ -156,6 +160,23 @@ class CoreServiceConfiguration
                 identifier: ImageUploadValidator::class,
                 parameters: [
                     ImageTypeDetectionFacade::class,
+                ]
+            ),
+            new Service(
+                identifier: ImageQueryService::class,
+                parameters: [
+                    ImageEntityService::class,
+                    UserService::class,
+                ]
+            ),
+            new Service(
+                identifier: ImageReviewService::class,
+                parameters: [
+                    ImageEntityService::class,
+                    ImageQueryService::class,
+                    UserService::class,
+                    LoggingService::class,
+                    FileSystemAccessService::class,
                 ]
             ),
         ];

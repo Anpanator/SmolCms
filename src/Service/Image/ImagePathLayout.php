@@ -44,6 +44,27 @@ final class ImagePathLayout
         return $subdir . '/' . self::fileName($checksum, $extension);
     }
 
+    /**
+     * Path of a stored file relative to its base directory, derived from the full
+     * stored file name (e.g. `ab89d3…c9.png` → `ab/ab89d3…c9.png`).
+     *
+     * Use this variant when only the complete file name is known (e.g. a file name
+     * recorded in the database); it must still be a plain `checksum.extension` basename.
+     */
+    public static function relativePathForFileName(string $fileName): string
+    {
+        if (str_contains($fileName, '/') || str_contains($fileName, '\\')) {
+            throw new InvalidArgumentException('File name must be a basename without path separators.');
+        }
+        if (strlen($fileName) <= self::SUBDIR_PREFIX_LENGTH) {
+            throw new InvalidArgumentException(
+                'File name must be at least ' . (self::SUBDIR_PREFIX_LENGTH + 1) . ' characters long.'
+            );
+        }
+        $subdir = substr($fileName, 0, self::SUBDIR_PREFIX_LENGTH);
+        return $subdir . '/' . $fileName;
+    }
+
     private static function assertChecksum(string $checksum): void
     {
         if (strlen($checksum) < self::SUBDIR_PREFIX_LENGTH) {

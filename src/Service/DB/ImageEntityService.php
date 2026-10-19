@@ -19,6 +19,16 @@ readonly class ImageEntityService extends EntityService
         return $result[0] ?? null;
     }
 
+    public function findOneBySampleFilename(string $sampleFilename): ?ImageEntity
+    {
+        return $this->findOneByColumn('sample_filename', $sampleFilename);
+    }
+
+    public function findOneByDownloadFilename(string $downloadFilename): ?ImageEntity
+    {
+        return $this->findOneByColumn('download_filename', $downloadFilename);
+    }
+
     /**
      * @param ImageStatus $status
      * @param int|null $limit
@@ -36,5 +46,25 @@ readonly class ImageEntityService extends EntityService
         }
         $result = $this->execute($qc);
         return $result ?? [];
+    }
+
+    public function deleteById(int $id): void
+    {
+        $qc = new QueryCriteria();
+        $qc->delete(ImageEntity::class)
+            ->andWhere('id = :id')
+            ->withParameters(['id' => $id]);
+        $this->execute($qc);
+    }
+
+    private function findOneByColumn(string $column, string $value): ?ImageEntity
+    {
+        $qc = new QueryCriteria();
+        $qc->select(ImageEntity::class)
+            ->andWhere("$column = :$column")
+            ->withParameters([$column => $value])
+            ->maxResults(1);
+        $result = $this->execute($qc);
+        return $result[0] ?? null;
     }
 }
