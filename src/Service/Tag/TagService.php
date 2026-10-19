@@ -16,6 +16,7 @@ use Throwable;
 readonly class TagService
 {
     private const string DEFAULT_CATEGORY = 'General';
+    private const int BROWSE_PER_PAGE = 25;
 
     public function __construct(
         private PDO $pdo,
@@ -309,7 +310,7 @@ readonly class TagService
      */
     public function browseTags(int $page = 1, string $query = ''): array
     {
-        if ($page < 1 || $page > intdiv(PHP_INT_MAX, 100) + 1) {
+        if ($page < 1 || $page > intdiv(PHP_INT_MAX, self::BROWSE_PER_PAGE) + 1) {
             throw new InvalidArgumentException('Page must be a positive integer.');
         }
 
@@ -335,8 +336,8 @@ readonly class TagService
         foreach ($parameters as $name => $value) {
             $statement->bindValue(':' . $name, $value, PDO::PARAM_STR);
         }
-        $statement->bindValue(':limit', 100, PDO::PARAM_INT);
-        $statement->bindValue(':offset', ($page - 1) * 100, PDO::PARAM_INT);
+        $statement->bindValue(':limit', self::BROWSE_PER_PAGE, PDO::PARAM_INT);
+        $statement->bindValue(':offset', ($page - 1) * self::BROWSE_PER_PAGE, PDO::PARAM_INT);
         $statement->execute();
 
         $tags = [];
@@ -351,7 +352,7 @@ readonly class TagService
         return [
             'tags' => $tags,
             'page' => $page,
-            'perPage' => 100,
+            'perPage' => self::BROWSE_PER_PAGE,
             'total' => $total,
         ];
     }

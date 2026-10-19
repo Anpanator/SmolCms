@@ -58,6 +58,14 @@ function queryParams(call) {
     return new URL(call.url, 'http://localhost').searchParams;
 }
 
+function tagForm(view) {
+    return view.querySelector('input[name="tagName"]').closest('form');
+}
+
+function categoryForm(view) {
+    return view.querySelector('input[name="categoryName"]').closest('form');
+}
+
 function wait(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -257,7 +265,7 @@ export async function testCreateTagPostsNormalizedValuesAndRefreshesTheTable() {
         const categorySelect = view.querySelector('select[name="category"]');
         nameInput.value = '  new\t  tag  ';
         categorySelect.value = 'Artist';
-        await submitForm(view.querySelector('.tags-form'));
+        await submitForm(tagForm(view));
 
         const post = fetchMock.calls.find((call) => call.url === '/api/tags' && call.options.method === 'POST');
         assertTrue(post !== undefined);
@@ -266,7 +274,7 @@ export async function testCreateTagPostsNormalizedValuesAndRefreshesTheTable() {
         assertEqual(view.querySelectorAll('.tags-table-row').length, 3);
         assertEqual(nameInput.value, '', 'success should clear the tag name field');
         assertEqual(categorySelect.value, 'General', 'success should reset the category to General');
-        const message = view.querySelectorAll('.tags-form')[0].querySelector('.form-message:not([hidden])');
+        const message = tagForm(view).querySelector('.form-message:not([hidden])');
         assertTrue(!message.hidden);
         assertTrue(message.textContent.includes('new tag'));
     } finally {
@@ -285,7 +293,7 @@ export async function testCreateTagShowsValidationAndConflictMessages() {
     });
     try {
         const nameInput = view.querySelector('input[name="tagName"]');
-        const form = view.querySelector('.tags-form');
+        const form = tagForm(view);
         nameInput.value = 'invalid, tag';
         await submitForm(form);
         assertEqual(fetchMock.calls.filter((call) => call.options.method === 'POST').length, 0);
@@ -293,7 +301,7 @@ export async function testCreateTagShowsValidationAndConflictMessages() {
 
         nameInput.value = 'valid tag';
         await submitForm(form);
-        const tagMessage = view.querySelectorAll('.tags-form')[0].querySelector('.form-message:not([hidden])');
+        const tagMessage = tagForm(view).querySelector('.form-message:not([hidden])');
         assertEqual(tagMessage.textContent, 'Please check your input.');
 
         await submitForm(form);
@@ -319,14 +327,14 @@ export async function testCreateCategoryPostsAndRefreshesTheCategorySelect() {
     try {
         const nameInput = view.querySelector('input[name="categoryName"]');
         nameInput.value = ' Characters ';
-        await submitForm(view.querySelectorAll('.tags-form')[1]);
+        await submitForm(categoryForm(view));
 
         const post = fetchMock.calls.find((call) => call.url === '/api/tag-categories' && call.options.method === 'POST');
         assertEqual(JSON.stringify(JSON.parse(post.options.body)), JSON.stringify({name: 'Characters'}));
         assertEqual(nameInput.value, '');
         assertTrue([...view.querySelectorAll('select[name="category"] option')].some((option) => option.value === 'Characters'));
         assertEqual(view.querySelector('select[name="category"]').value, 'Characters');
-        assertEqual(view.querySelectorAll('.tags-form')[1].querySelector('.form-message').textContent, 'Category "Characters" created.');
+        assertEqual(categoryForm(view).querySelector('.form-message').textContent, 'Category "Characters" created.');
     } finally {
         restore();
     }
@@ -340,9 +348,9 @@ export async function testCreateCategoryConflictUsesCategoryMessage() {
     ));
     try {
         view.querySelector('input[name="categoryName"]').value = 'Artist';
-        await submitForm(view.querySelectorAll('.tags-form')[1]);
+        await submitForm(categoryForm(view));
         assertEqual(
-            view.querySelectorAll('.tags-form')[1].querySelector('.form-message').textContent,
+            categoryForm(view).querySelector('.form-message').textContent,
             'A category with that name already exists.',
         );
     } finally {

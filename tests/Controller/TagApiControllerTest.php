@@ -187,7 +187,7 @@ class TagApiControllerTest extends FunctionalTestCase
     {
         $this->loginUserWithAccessLevel('tag-api-mod-browse', 'Tag API Mod', AccessLevel::MOD);
         $prefix = 'api-browse-' . bin2hex(random_bytes(4)) . '-';
-        for ($index = 0; $index < 101; $index++) {
+        for ($index = 0; $index < 26; $index++) {
             $this->tagService->createTag($prefix . sprintf('%03d', $index));
         }
 
@@ -200,11 +200,11 @@ class TagApiControllerTest extends FunctionalTestCase
         $body = json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR);
         self::assertSame(['tags', 'page', 'perPage', 'total'], array_keys($body));
         self::assertSame(2, $body['page']);
-        self::assertSame(100, $body['perPage']);
-        self::assertSame(101, $body['total']);
+        self::assertSame(25, $body['perPage']);
+        self::assertSame(26, $body['total']);
         self::assertCount(1, $body['tags']);
         self::assertSame(
-            ['name' => $prefix . '100', 'category' => 'General', 'usageCount' => 0],
+            ['name' => $prefix . '025', 'category' => 'General', 'usageCount' => 0],
             $body['tags'][0]
         );
     }

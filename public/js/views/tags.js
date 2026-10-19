@@ -18,7 +18,7 @@ import {normalizeTagName, validateTagCategoryName, validateTagName} from '../val
 
 const TAGS_URL = '/api/tags';
 const CATEGORIES_URL = '/api/tag-categories';
-const PER_PAGE = 100;
+const PER_PAGE = 25;
 /** AccessLevel::MOD — keep aligned with src/Data/Constant/AccessLevel.php. */
 const MIN_TAG_ACCESS_LEVEL = 500;
 
@@ -124,24 +124,22 @@ export function createTagsView({
     const page = el('section', {
         className: 'tags-page',
         children: [
-            el('h1', {className: 'tags-title', children: 'Tags'}),
-            search.element,
-            el('section', {
-                className: 'tags-browser',
-                attributes: {'aria-labelledby': 'tags-browser-title'},
-                children: [
-                    el('h2', {className: 'tags-section-title', attributes: {id: 'tags-browser-title'}, children: 'Browse tags'}),
-                    listMessage,
-                    el('div', {
-                        className: 'tags-table-wrap',
-                        children: table,
-                    }),
-                    pagination.element,
-                ],
-            }),
             el('div', {
                 className: 'tags-management',
                 children: [
+                    el('section', {
+                        className: 'tags-form-panel',
+                        attributes: {'aria-labelledby': 'create-category-title'},
+                        children: [
+                            el('h2', {
+                                className: 'tags-section-title',
+                                attributes: {id: 'create-category-title'},
+                                children: 'Create category'
+                            }),
+                            categoryForm,
+                            search.element,
+                        ],
+                    }),
                     el('section', {
                         className: 'tags-form-panel',
                         attributes: {'aria-labelledby': 'create-tag-title'},
@@ -150,14 +148,23 @@ export function createTagsView({
                             tagForm,
                         ],
                     }),
-                    el('section', {
-                        className: 'tags-form-panel',
-                        attributes: {'aria-labelledby': 'create-category-title'},
-                        children: [
-                            el('h2', {className: 'tags-section-title', attributes: {id: 'create-category-title'}, children: 'Create category'}),
-                            categoryForm,
-                        ],
+                ],
+            }),
+            el('section', {
+                className: 'tags-browser',
+                attributes: {'aria-labelledby': 'tags-browser-title'},
+                children: [
+                    el('h2', {
+                        className: 'tags-section-title',
+                        attributes: {id: 'tags-browser-title'},
+                        children: 'Browse tags'
                     }),
+                    listMessage,
+                    el('div', {
+                        className: 'tags-table-wrap',
+                        children: table,
+                    }),
+                    pagination.element,
                 ],
             }),
         ],

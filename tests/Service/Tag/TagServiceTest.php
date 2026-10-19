@@ -251,19 +251,19 @@ class TagServiceTest extends FunctionalTestCase
         self::assertSame([mb_strtolower($attachedTag, 'UTF-8')], $this->tagService->getTagsForImage($image->getId()));
     }
 
-    public function testBrowseTagsPaginatesAtOneHundredResults(): void
+    public function testBrowseTagsPaginatesAtTwentyFiveResults(): void
     {
         $prefix = 'browse-page-' . bin2hex(random_bytes(4)) . '-';
-        for ($index = 0; $index < 101; $index++) {
+        for ($index = 0; $index < 26; $index++) {
             $this->tagService->createTag($prefix . sprintf('%03d', $index));
         }
 
         $firstPage = $this->tagService->browseTags(1, $prefix);
         $secondPage = $this->tagService->browseTags(2, $prefix);
 
-        self::assertSame(101, $firstPage['total']);
-        self::assertSame(100, $firstPage['perPage']);
-        self::assertCount(100, $firstPage['tags']);
+        self::assertSame(26, $firstPage['total']);
+        self::assertSame(25, $firstPage['perPage']);
+        self::assertCount(25, $firstPage['tags']);
         self::assertSame(2, $secondPage['page']);
         self::assertCount(1, $secondPage['tags']);
     }
