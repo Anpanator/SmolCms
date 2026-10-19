@@ -21,8 +21,10 @@ use Throwable;
 
 /**
  * Batch processor for uploaded images in PENDING state. For every image it decodes the
- * sanitized original and generates three variants — thumbnail (AVIF), sample/viewing
+ * original and generates three variants — thumbnail (AVIF), sample/viewing
  * image (WebP) and download image (original format, or lossless WebP for PNG sources) —
+ * each encoded from GD-decoded pixels rather than copied from the source bytes, so
+ * source metadata or trailing payloads cannot reach the served variants.
  * then updates the entity with the variant filenames, the download image's metadata and
  * the next lifecycle status. Variant files are content-addressed and the entity update
  * is repeatable, so an interrupted image can safely be processed again while its original
@@ -96,7 +98,7 @@ class ImageProcessingService
         $sampleContent = $this->encode($sampleImage, ImageType::WEBP, self::VARIANT_QUALITY);
 
         $downloadImage = ImageResizer::resizeToFit($image, self::DOWNLOAD_MAX_SIZE, self::DOWNLOAD_MAX_SIZE);
-        [$downloadContent, $downloadType] = $this->buildDownloadContent($originalContent, $downloadImage, $originalType);
+        [$downloadContent, $downloadType] = $this->buildDownloadContent($downloadImage, $originalType);
 
         // The frontend metadata sidebar shows the download image's dimensions, format and
         // file size, so the entity metadata mirrors the download variant.
@@ -171,19 +173,21 @@ class ImageProcessingService
     }
 
     /**
-     * Transcodes the download variant by original type. JPEG, AVIF and WebP originals
-     * are already optimal, so their bytes are copied as-is; PNG originals are re-encoded
-     * as pixel-lossless WebP via IMG_WEBP_LOSSLESS (GD does not expose a separate
-     * "best compression" tuning for lossless WebP — the lossless flag is the only knob).
+     * Re-encodes the download variant in its original format, except PNG which is
+     * converted to pixel-lossless WebP as before. GD cannot reliably recover an image's
+     * original encoder settings, so use maximum JPEG quality, lossless WebP, and AVIF
+     * quality 75. Re-encoding also removes metadata such as EXIF.
      *
      * @return array{0: string, 1: ImageType} The download bytes and the format they are stored in.
      */
-    private function buildDownloadContent(string $originalContent, GdImage $downloadImage, ImageType $originalType): array
+    private function buildDownloadContent(GdImage $downloadImage, ImageType $originalType): array
     {
-        if ($originalType === ImageType::PNG) {
-            return [$this->encode($downloadImage, ImageType::WEBP, IMG_WEBP_LOSSLESS), ImageType::WEBP];
-        }
-        return [$originalContent, $originalType];
+        return match ($originalType) {
+            ImageType::PNG => [$this->encode($downloadImage, ImageType::WEBP, IMG_WEBP_LOSSLESS), ImageType::WEBP],
+            ImageType::JPEG => [$this->encode($downloadImage, ImageType::JPEG, 100), ImageType::JPEG],
+            ImageType::WEBP => [$this->encode($downloadImage, ImageType::WEBP, IMG_WEBP_LOSSLESS), ImageType::WEBP],
+            ImageType::AVIF => [$this->encode($downloadImage, ImageType::AVIF, 75), ImageType::AVIF],
+        };
     }
 
     private function resolvePostProcessingStatus(ImageEntity $entity): ImageStatus

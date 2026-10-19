@@ -8,10 +8,9 @@ use InvalidArgumentException;
 use SmolCms\Data\Image\ImageType;
 
 /**
- * Sanitizes an uploaded image by decoding it through exactly the processor that
- * matches the detected image type. The returned GdImage contains pure pixel data
- * (no EXIF or other metadata); encoding it again as the detected type guarantees
- * the stored file truly is that format.
+ * Validates uploaded image data by decoding it through the processor matching the
+ * detected image type. Uploads retain their original bytes; the decoded GdImage is
+ * used to confirm the image is readable and capture its dimensions.
  */
 readonly class ImageProcessorFacade
 {

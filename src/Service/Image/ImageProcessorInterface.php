@@ -15,11 +15,8 @@ interface ImageProcessorInterface
     public function getType(): ImageType;
 
     /**
-     * Decodes and validates image data into a GdImage.
-     *
-     * Sanitizing happens by decoding the raw upload into pure pixel data: encoding
-     * that GdImage (ImageStorageService) strips any EXIF/metadata and produces a file
-     * that truly is the claimed format.
+     * Decodes and validates image data into a GdImage. Encoding that image later
+     * produces pixel data without source metadata such as EXIF.
      */
     public function sanitize(string $imageData): GdImage;
 }

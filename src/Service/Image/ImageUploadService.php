@@ -12,8 +12,8 @@ use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\ImageEntityService;
 
 /**
- * Orchestrates a single synchronous image upload: sanitize, store the sanitized
- * original under IMAGE_STORAGE_DIR and create its pending database record.
+ * Orchestrates a single synchronous image upload: validate the image, store the
+ * original bytes under IMAGE_STORAGE_DIR and create its pending database record.
  */
 readonly class ImageUploadService
 {
@@ -34,7 +34,7 @@ readonly class ImageUploadService
         }
 
         $image = $this->imageProcessorFacade->sanitizeImage($imageData, $imageType);
-        $stored = $this->imageStorageService->storeImage($image, $imageType);
+        $stored = $this->imageStorageService->storeOriginal($imageData, $imageType, $image);
 
         $entity = new ImageEntity(
             id: null,

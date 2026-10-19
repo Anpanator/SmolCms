@@ -18,13 +18,27 @@ readonly class ImageStorageService
     }
 
     /**
-     * Encodes the image as the given type, names the file after the SHA-256 checksum of
-     * the encoded bytes (see ImagePathLayout) and writes it below the configured storage
-     * path. Returns the metadata of the stored file.
+     * Encodes a GD image as the given type and stores the result under its SHA-256
+     * checksum (see ImagePathLayout). Returns the metadata of the stored file.
      */
     public function storeImage(GdImage $image, ImageType $imageType): StoredImage
     {
         $content = $this->encode($image, $imageType);
+        return $this->storeContent($content, $imageType, imagesx($image), imagesy($image));
+    }
+
+    /**
+     * Stores the original uploaded bytes without re-encoding them. The decoded image
+     * is used only to capture its dimensions; the image processing worker performs
+     * any required re-encoding later.
+     */
+    public function storeOriginal(string $content, ImageType $imageType, GdImage $image): StoredImage
+    {
+        return $this->storeContent($content, $imageType, imagesx($image), imagesy($image));
+    }
+
+    private function storeContent(string $content, ImageType $imageType, int $width, int $height): StoredImage
+    {
         $checksum = hash('sha256', $content);
         $extension = $imageType->getFileExtension();
         $this->storeBytes($content, ImagePathLayout::relativePath($checksum, $extension));
@@ -32,8 +46,8 @@ readonly class ImageStorageService
         return new StoredImage(
             checksum: $checksum,
             filename: ImagePathLayout::fileName($checksum, $extension),
-            width: imagesx($image),
-            height: imagesy($image),
+            width: $width,
+            height: $height,
             fileSize: strlen($content),
             type: $imageType,
         );

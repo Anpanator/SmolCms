@@ -79,7 +79,7 @@ class ImageUploadServiceTest extends FunctionalTestCase
         rmdir($path);
     }
 
-    public function testUpload_storesSanitizedOriginalAndCreatesPendingRecord(): void
+    public function testUpload_storesOriginalBytesAndCreatesPendingRecord(): void
     {
         $imageData = file_get_contents(ROOT_DIR . '/tests/TestUtils/TestFiles/image.png');
 
@@ -102,8 +102,9 @@ class ImageUploadServiceTest extends FunctionalTestCase
         $filePath = IMAGE_STORAGE_DIR . '/' . $relativePath;
         self::assertFileExists($filePath);
         $storedContent = file_get_contents($filePath);
-        self::assertSame($entity->getChecksum(), hash('sha256', $storedContent));
-        self::assertSame($entity->getFileSize(), strlen($storedContent));
+        self::assertSame($imageData, $storedContent);
+        self::assertSame(hash('sha256', $imageData), $entity->getChecksum());
+        self::assertSame(strlen($imageData), $entity->getFileSize());
         self::assertInstanceOf(GdImage::class, imagecreatefromstring($storedContent));
     }
 

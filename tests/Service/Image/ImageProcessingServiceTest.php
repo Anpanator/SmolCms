@@ -143,6 +143,27 @@ class ImageProcessingServiceTest extends FunctionalTestCase
         return $entity;
     }
 
+    private function createPendingImageFromContent(
+        string    $content,
+        ImageType $type,
+        int       $userId,
+        DateTime  $uploadDate = new DateTime(),
+    ): ImageEntity
+    {
+        $checksum = hash('sha256', $content);
+        $this->originalStorage->storeBytes($content, ImagePathLayout::relativePath($checksum, $type->getFileExtension()));
+        $entity = new ImageEntity(
+            id: null,
+            userId: $userId,
+            uploadDate: $uploadDate,
+            status: ImageStatus::PENDING,
+            checksum: $checksum,
+            originalExtension: $type->getFileExtension(),
+        );
+        $this->imageEntityService->saveAsNew($entity);
+        return $entity;
+    }
+
     private static function createTestImage(int $width, int $height): GdImage
     {
         $image = imagecreatetruecolor($width, $height);
@@ -240,21 +261,14 @@ class ImageProcessingServiceTest extends FunctionalTestCase
         }
     }
 
-    public function testProcessBatch_jpegImage_copiesOriginalBytesAndSetsPendingReviewForNovice(): void
+    public function testProcessBatch_jpegImage_reencodesAtMaximumQualityAndSetsPendingReviewForNovice(): void
     {
         $novice = $this->createUser(AccessLevel::NOVICE);
-        $originalContent = self::encodeImage(self::createTestImage(300, 200), ImageType::JPEG);
-        $checksum = hash('sha256', $originalContent);
-        $this->originalStorage->storeBytes($originalContent, ImagePathLayout::relativePath($checksum, 'jpeg'));
-        $entity = new ImageEntity(
-            id: null,
-            userId: $novice->getId(),
-            uploadDate: new DateTime(),
-            status: ImageStatus::PENDING,
-            checksum: $checksum,
-            originalExtension: 'jpeg',
-        );
-        $this->imageEntityService->saveAsNew($entity);
+        $injectedPayload = "\nSMOLCMS-UNSAFE-TRAILING-PAYLOAD";
+        $originalContent = self::jpegWithExifApp1Segment(
+                self::encodeImage(self::createTestImage(300, 200), ImageType::JPEG, 75)
+            ) . $injectedPayload;
+        $entity = $this->createPendingImageFromContent($originalContent, ImageType::JPEG, $novice->getId());
 
         $processed = $this->testee->processBatch(10);
 
@@ -265,18 +279,70 @@ class ImageProcessingServiceTest extends FunctionalTestCase
         self::assertNotNull($reloaded->getThumbFilename());
         self::assertNotNull($reloaded->getSampleFilename());
 
-        // Download: JPEG source is copied byte-identical, extension stays "jpeg"
+        // Download: JPEG is rewritten at maximum quality; EXIF metadata is stripped.
         $downloadContent = self::assertChecksumFilename(ROOT_DIR . self::TEST_BASE_DIR . '/download', $reloaded->getDownloadFilename());
         self::assertMatchesRegularExpression('/^[0-9a-f]{64}\.jpeg$/', $reloaded->getDownloadFilename());
-        self::assertSame($originalContent, $downloadContent);
+        self::assertNotSame($originalContent, $downloadContent);
+        self::assertStringNotContainsString("Exif\x00\x00", $downloadContent);
+        self::assertStringNotContainsString($injectedPayload, $downloadContent);
+        $decodedOriginal = imagecreatefromstring($originalContent);
+        self::assertInstanceOf(GdImage::class, $decodedOriginal);
+        self::assertSame(self::encodeImage($decodedOriginal, ImageType::JPEG, 100), $downloadContent);
         self::assertSame(300, $reloaded->getWidth());
         self::assertSame(200, $reloaded->getHeight());
         self::assertSame('jpeg', $reloaded->getFormat());
-        self::assertSame(strlen($originalContent), $reloaded->getFileSize());
+        self::assertSame(strlen($downloadContent), $reloaded->getFileSize());
 
         // NOVICE uploader does not skip the moderation queue
         self::assertSame(ImageStatus::PENDING_REVIEW, $reloaded->getStatus());
         self::assertFileDoesNotExist($this->originalPath($entity));
+    }
+
+    public function testProcessBatch_webpImage_reencodesLosslessly(): void
+    {
+        $wizard = $this->createUser(AccessLevel::WIZARD);
+        $originalContent = self::encodeImage(self::createTestImage(300, 200), ImageType::WEBP, 66);
+        $entity = $this->createPendingImageFromContent($originalContent, ImageType::WEBP, $wizard->getId());
+
+        self::assertSame(1, $this->testee->processBatch(10));
+
+        $reloaded = $this->imageEntityService->findOneById($entity->getId());
+        self::assertNotNull($reloaded);
+        $downloadContent = self::assertChecksumFilename(
+            ROOT_DIR . self::TEST_BASE_DIR . '/download',
+            $reloaded->getDownloadFilename()
+        );
+        self::assertMatchesRegularExpression('/^[0-9a-f]{64}\.webp$/', $reloaded->getDownloadFilename());
+        self::assertNotSame($originalContent, $downloadContent);
+
+        $decodedOriginal = imagecreatefromstring($originalContent);
+        self::assertInstanceOf(GdImage::class, $decodedOriginal);
+        self::assertSame(
+            self::encodeImage($decodedOriginal, ImageType::WEBP, IMG_WEBP_LOSSLESS),
+            $downloadContent
+        );
+    }
+
+    public function testProcessBatch_avifImage_reencodesAtQuality75(): void
+    {
+        $wizard = $this->createUser(AccessLevel::WIZARD);
+        $originalContent = self::encodeImage(self::createTestImage(300, 200), ImageType::AVIF, 100);
+        $entity = $this->createPendingImageFromContent($originalContent, ImageType::AVIF, $wizard->getId());
+
+        self::assertSame(1, $this->testee->processBatch(10));
+
+        $reloaded = $this->imageEntityService->findOneById($entity->getId());
+        self::assertNotNull($reloaded);
+        $downloadContent = self::assertChecksumFilename(
+            ROOT_DIR . self::TEST_BASE_DIR . '/download',
+            $reloaded->getDownloadFilename()
+        );
+        self::assertMatchesRegularExpression('/^[0-9a-f]{64}\.avif$/', $reloaded->getDownloadFilename());
+        self::assertNotSame($originalContent, $downloadContent);
+
+        $decodedOriginal = imagecreatefromstring($originalContent);
+        self::assertInstanceOf(GdImage::class, $decodedOriginal);
+        self::assertSame(self::encodeImage($decodedOriginal, ImageType::AVIF, 75), $downloadContent);
     }
 
     public function testProcessBatch_duplicatePendingImages_deletesOriginalAfterBothAreProcessed(): void
@@ -449,16 +515,16 @@ class ImageProcessingServiceTest extends FunctionalTestCase
         $this->testee->processBatch(0);
     }
 
-    private static function encodeImage(GdImage $image, ImageType $imageType): string
+    private static function encodeImage(GdImage $image, ImageType $imageType, ?int $quality = null): string
     {
         $obLevel = ob_get_level();
         ob_start();
         try {
             $success = match ($imageType) {
                 ImageType::PNG => imagepng($image),
-                ImageType::JPEG => imagejpeg($image),
-                ImageType::AVIF => imageavif($image),
-                ImageType::WEBP => imagewebp($image),
+                ImageType::JPEG => $quality === null ? imagejpeg($image) : imagejpeg($image, null, $quality),
+                ImageType::AVIF => $quality === null ? imageavif($image) : imageavif($image, null, $quality),
+                ImageType::WEBP => $quality === null ? imagewebp($image) : imagewebp($image, null, $quality),
             };
             $content = ob_get_clean();
         } finally {
@@ -470,5 +536,12 @@ class ImageProcessingServiceTest extends FunctionalTestCase
             self::fail('Failed to encode test image as ' . $imageType->value);
         }
         return $content;
+    }
+
+    private static function jpegWithExifApp1Segment(string $jpeg): string
+    {
+        $exifPayload = "Exif\x00\x00" . "MM\x00\x2A\x00\x00\x00\x08\x00\x00";
+        $app1Segment = "\xFF\xE1" . pack('n', strlen($exifPayload) + 2) . $exifPayload;
+        return "\xFF\xD8" . $app1Segment . substr($jpeg, 2);
     }
 }

@@ -7,7 +7,7 @@ use SmolCms\Data\Image\ImageType;
 
 /**
  * Result of storing an image: the content checksum the file is named after
- * plus the metadata derived while encoding it.
+ * plus the dimensions and byte size of the stored file.
  */
 readonly class StoredImage
 {
