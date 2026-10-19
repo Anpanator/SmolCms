@@ -120,21 +120,12 @@ class CoreServiceConfiguration
             ),
             new Service(
                 identifier: PngImageProcessor::class,
-                parameters: [
-                    ImageStorageService::class,
-                ]
             ),
             new Service(
                 identifier: JpegImageProcessor::class,
-                parameters: [
-                    ImageStorageService::class,
-                ]
             ),
             new Service(
                 identifier: AvifImageProcessor::class,
-                parameters: [
-                    ImageStorageService::class,
-                ]
             ),
             new Service(
                 identifier: ImageTypeDetectionFacade::class,

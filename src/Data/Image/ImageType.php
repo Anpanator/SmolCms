@@ -15,4 +15,15 @@ string
     {
         return $this->value;
     }
+
+    /**
+     * Canonical file extension for the type.
+     *
+     * The ImageType backing value itself is used as the extension (so `jpeg`, NOT `jpg`).
+     * Every stored image file is named `<sha-256 hex checksum>.<extension>` — see ImagePathLayout.
+     */
+    public function getFileExtension(): string
+    {
+        return $this->value;
+    }
 }

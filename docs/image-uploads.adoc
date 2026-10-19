@@ -3,17 +3,35 @@
 Users with `NOVICE` or higher (`401` when anonymous, `403` when below the level) can submit a multipart `POST /upload-image` with the field `image`; `GET /upload-image` serves the same HTML shell as every other client path, and the upload form is rendered client-side.
 `ImageUploadController::postAction` manually runs `ImageUploadValidator` (it is not a `ValidatedRequest`): the validator requires `files['image']` to be an array with `tmp_name` and `name` and requires `is_uploaded_file()`, ignoring the `error`, `size`, and MIME fields entirely; failure returns `400`.
 
-On success the controller runs `file_get_contents(tmp_name)` (`false` returns `500`; the upload temporary directory must be in `FS_DIRECTORY_WHITELIST`), then gates on `ImageTypeDetectionFacade` (`Png`, `Jpeg`, `Avif` detectors, first match wins; `null` returns `400`).
+On success the controller runs `file_get_contents(tmp_name)` (guarded by `is_readable()`, `false` returns `500`; the upload temporary directory must be in `FS_DIRECTORY_WHITELIST`), then gates on `ImageTypeDetectionFacade` (`Png`, `Jpeg`, `Avif` detectors, first match wins; `null` returns `400`).
 PNG checks the first 4 bytes for `89504E47`, JPEG checks `FFD8FF`, and AVIF checks `ftypavif` or `ftypavis` at offset 4.
-The detected type is otherwise discarded.
 
-Accepted uploads call `ImageProcessorFacade` (`Png`, `Jpeg`, `Avif`, in that order) with `basename()` of the client-supplied name; each processor runs generic `imagecreatefromstring()` and then `ImageStorageService::storeImage()` with its fixed type into `IMAGE_STORAGE_DIR` (`private/upload/img`) under that basename.
-That is three sequential overwrites of one path (`imagepng` quality 9, `imagejpeg` quality 100, `imageavif` quality 100): the final bytes are AVIF while the original basename and extension are preserved.
-A same-name re-upload overwrites silently; a missing or disallowed directory, or an `imagecreatefromstring()` failure, throws and becomes `500`.
-Success returns `201` with `{"filename": "<basename>"}`; the SPA shows the stored filename in a success message.
-There is no public image-delivery route, upload quota, deduplication, or extension normalization; `private/` is not web-exposed.
+The rest of the flow is orchestrated by `ImageUploadService::upload(string $imageData, ImageType $imageType): ImageEntity`, which takes the uploader identity from `SessionService::getUserData()` (an unauthenticated session throws `InvalidStateException`; the controller relies on `#[Authenticated]` so this does not occur in practice):
+
+. `ImageProcessorFacade::sanitizeImage()` decodes the upload through exactly the processor registered for the detected type (`PngImageProcessor`, `JpegImageProcessor`, or `AvifImageProcessor`; each declares its type via `getType()`). All use generic `imagecreatefromstring()`; a decode failure throws `InvalidArgumentException` and becomes `500`. The returned `GdImage` holds pure pixel data.
+. `ImageStorageService::storeImage()` encodes that `GdImage` as the detected type (`imagepng` quality 9, `imagejpeg` quality 100, `imageavif` quality 100), which strips EXIF and other metadata and guarantees the stored file truly is the detected format. It then writes the bytes below `IMAGE_STORAGE_DIR` (`private/upload/img`) and returns a `StoredImage` (checksum, filename, width, height, file size, type).
+. An `ImageEntity` row is inserted via `ImageEntityService::saveAsNew()`: the logged-in `user_id`, `upload_date = now`, `status = pending`, the content `checksum`, `original_extension`, `format`, `width`, `height`, `file_size`, and `NULL` for the three variant filenames (`thumb_filename`, `sample_filename`, `download_filename`).
+
+The client-supplied filename is never used for storage.
+
+=== Storage naming rules
+
+Every stored image file is named `<sha-256 hex checksum>.<extension>` and lives under a two-character subdirectory (the first two checksum characters) of its base directory: `<base>/<c[0]><c[1]>/<checksum>.<extension>` (see `ImagePathLayout`, which is the single source of truth for this layout).
+The extension is the `ImageType` value itself — `png`, `jpeg` (not `jpg`), `avif`.
+
+The sanitized original is stored under `IMAGE_STORAGE_DIR` with the extension of its detected type.
+The variant directories are reserved for later processing: thumbs (`IMAGE_THUMB_DIR = public/img/thumb`, filenames `{checksum}.avif`), samples (`IMAGE_SAMPLE_DIR = private/img/sample`, filenames `{checksum}.webp`), and downloads (`IMAGE_DOWNLOAD_DIR = private/img/dl`, filenames `{checksum}.<jpeg|webp|avif>`).
+Because the name is derived from the content, re-uploading identical bytes stores the same file again (no duplicate); different bytes cannot collide.
+Two-character subdirectories are created on demand and are covered by the app-level whitelist through `FileSystemAccessService::isPathAllowed()` (checked via `realpath()` after creation).
+
+=== Response and database record
+
+Success returns `201` with `{"filename": "<checksum>.<extension>"}` — the basename of the stored original (its path below `IMAGE_STORAGE_DIR` is `<first 2 checksum chars>/<filename>`); the SPA shows this filename in a success message.
+Each accepted upload has exactly one row in the `image` table (see `private/init/init_sqlite.sql`; kept in sync by the `create image table` migration).
+`ImageEntityService` exposes `findOneById(int)` and `findByStatus(ImageStatus, ?int $limit = null)` (ordered by `upload_date` ascending, via `QueryCriteria::orderBy()`); the lifecycle status is the `ImageStatus` enum (`pending`, `pending_review`, `accepted`, `rejected`).
+
+There is no public image-delivery route and no upload quota; `private/` is not web-exposed (`public/img/thumb` will be, once thumb generation lands).
 
 `ext-gd` with PNG, JPEG, and AVIF support is required — AVIF support is required for every successful upload under the current configuration, not only "where used".
 Image handling should be treated as experimental.
 Functional tests must stub `ImageUploadValidator` because `is_uploaded_file()` fails outside real uploads.
-

@@ -12,18 +12,20 @@ The application requires these directories:
 * `private/db` for the SQLite database
 * `private/sql` for migration files
 * `private/upload` and `private/upload/img` for image storage
+* `private/img` with `private/img/sample` and `private/img/dl` for image samples and downloads
+* `public/img` with `public/img/thumb` for web-deliverable image thumbs
 * `private/init` for the driver-specific schema files
 * `private/assets` for the HTML shell
 
-`private/db`, `private/sql`, and `private/upload/img` ship via `.gitkeep` placeholder files.
-`private/upload` ships implicitly as the parent of `private/upload/img/.gitkeep` and has no `.gitkeep` of its own.
+`private/db`, `private/sql`, `private/upload/img`, `private/img/sample`, `private/img/dl`, and `public/img/thumb` ship via `.gitkeep` placeholder files.
+`private/upload` and `private/img` ship implicitly as parents of tracked child paths and have no `.gitkeep` of their own.
 `private/init` ships via its tracked `init.sql` and `init_sqlite.sql` files.
 `private/assets` ships via its tracked `index.html` shell.
-The `FS_APP_LEVEL_WHITELIST` directories (`private/init`, `private/sql`, `private/upload`, `private/assets`, and `public/js`) must exist before `FileSystemAccessService` construction; `private/db` and `private/upload/img` must exist before database and image operations, respectively.
+The `FS_APP_LEVEL_WHITELIST` directories (`private/init`, `private/sql`, `private/upload`, `private/img`, `private/assets`, `public/js`, and `public/img`) must exist before `FileSystemAccessService` construction; `private/db`, `private/upload/img`, and the image directories below `private/img` and `public/img` must exist before database and image operations, respectively.
 
 The CLI and PHP-FPM users need read access to the application files, including `private/init` and `private/assets`.
 The CLI user needs write access to `private/db` for `--init-db` and `--migrations`, to `private/sql` for `--generate-migration`, and to `private/assets` for `--generate-js-integrity`.
-The PHP-FPM user needs write access to `private/db` and to `private/upload/img`.
+The PHP-FPM user needs write access to `private/db`, to `private/upload/img`, and to the writable image directories `private/img` and `public/img`.
 `private/sql` needs only read access for `--migrations` execution, and `private/upload` itself needs only existence/traverse permission.
 PHP's upload temporary directory must additionally be readable and covered by `FS_DIRECTORY_WHITELIST` in `config.php`.
 

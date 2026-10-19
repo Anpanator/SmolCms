@@ -1,7 +1,7 @@
 == Database and persistence
 
 The default runtime database is SQLite at `private/db/smolcms.sq3`.
-The active SQLite schema in `private/init/init_sqlite.sql` contains `user`, `session`, `article`, and `migration` tables.
+The active SQLite schema in `private/init/init_sqlite.sql` contains `user`, `session`, `article`, `migration`, and `image` tables.
 `private/init/init.sql` is the MySQL schema (used by `--init-db` when the PDO driver is `mysql`); using MySQL requires changing the `PDO` service DSN in `CoreServiceConfiguration` and installing `pdo_mysql`.
 
 Persisted entities use `#[Entity(table: ...)]` and `#[Id]`.
@@ -12,10 +12,10 @@ Beyond the case conversion, `EntityService` maps `DateTime` properties and backe
 Only `DateTime` is supported (not `DateTimeImmutable` or `DateTimeInterface`); null or missing values stay `null`, and an invalid enum value throws from `::from()`.
 
 To persist a new kind of entity: create its table through a migration (`--generate-migration`, then `--migrations`), add an entity class with `#[Entity(table: ...)]` and `#[Id]`, and add a thin `EntityService` subclass for it (autowired like `UserService`).
-The unused `article` entity and `ArticleService` are an in-repo example.
+The unused `article` entity and `ArticleService` are an in-repo example; `ImageEntity`/`ImageEntityService` back the upload feature.
 
 Queries are built with `QueryCriteria` and `QueryBuilder`.
-`select()`, `update()`, and `delete()` start a criteria and fix its query type; conditions are collected with `andWhere()` and `orWhere()`, where the first condition must be an `andWhere()`; `withParameters()` supplies (and overwrites) bound values; `maxResults()` and `skipResults()` translate into a `LIMIT` clause emitted as `LIMIT [offset,] count` with `PHP_INT_MAX` substituted when only an offset is set.
+`select()`, `update()`, and `delete()` start a criteria and fix its query type; conditions are collected with `andWhere()` and `orWhere()`, where the first condition must be an `andWhere()`; `withParameters()` supplies (and overwrites) bound values; `orderBy()` collects `ORDER BY` terms (direction restricted to `ASC`/`DESC`, emitted for selects between the `WHERE` and `LIMIT` parts); `maxResults()` and `skipResults()` translate into a `LIMIT` clause emitted as `LIMIT [offset,] count` with `PHP_INT_MAX` substituted when only an offset is set.
 `WHERE` is emitted as `WHERE 1 AND/OR ...`.
 Select criteria enumerate all entity fields, update criteria set all entity fields (including the id column), and criteria cannot express inserts; `EntityService` builds insert statements from the entity's field values instead.
 

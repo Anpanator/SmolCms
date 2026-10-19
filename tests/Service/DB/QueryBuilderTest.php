@@ -102,6 +102,48 @@ class QueryBuilderTest extends SimpleTestCase
         self::assertSame($expectedQuery, strtolower($resultQuery));
     }
 
+    public function testBuildSelectQuery_successWithOrderBy(): void
+    {
+        $expectedQuery = 'select id, test_field from test_table where 1 and id = :id order by test_field desc';
+        $queryCriteria = new QueryCriteria();
+        $queryCriteria
+            ->select(TestEntity::class)
+            ->andWhere('id = :id')
+            ->orderBy('test_field', QueryCriteria::ORDER_DESC);
+
+        $resultQuery = $this->queryBuilder->buildQuery($queryCriteria);
+
+        self::assertSame($expectedQuery, strtolower($resultQuery));
+    }
+
+    public function testBuildSelectQuery_successWithOrderByAndLimit(): void
+    {
+        $expectedQuery = 'select id, test_field from test_table order by test_field asc limit 10';
+        $queryCriteria = new QueryCriteria();
+        $queryCriteria
+            ->select(TestEntity::class)
+            ->orderBy('test_field')
+            ->maxResults(10);
+
+        $resultQuery = $this->queryBuilder->buildQuery($queryCriteria);
+
+        self::assertSame($expectedQuery, strtolower($resultQuery));
+    }
+
+    public function testBuildSelectQuery_ignoresOrderByForNonSelectQueries(): void
+    {
+        $expectedQuery = 'delete from test_table where 1 and id = :id';
+        $queryCriteria = new QueryCriteria();
+        $queryCriteria
+            ->delete(TestEntity::class)
+            ->andWhere('id = :id')
+            ->orderBy('test_field');
+
+        $resultQuery = $this->queryBuilder->buildQuery($queryCriteria);
+
+        self::assertSame($expectedQuery, strtolower($resultQuery));
+    }
+
     public function testBuildSelectQuery_preservesZeroLimit(): void
     {
         $expectedQuery = 'select id, test_field from test_table limit 0';

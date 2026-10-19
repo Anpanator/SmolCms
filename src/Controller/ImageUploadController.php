@@ -9,8 +9,9 @@ use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Attribute\Authenticated;
-use SmolCms\Service\Image\ImageProcessorFacade;
+use SmolCms\Service\Image\ImagePathLayout;
 use SmolCms\Service\Image\ImageTypeDetectionFacade;
+use SmolCms\Service\Image\ImageUploadService;
 use SmolCms\Service\Validation\ImageUploadValidator;
 
 readonly class ImageUploadController
@@ -18,7 +19,7 @@ readonly class ImageUploadController
     public function __construct(
         private ImageUploadValidator     $imageUploadValidator,
         private ImageTypeDetectionFacade $imageTypeDetectionFacade,
-        private ImageProcessorFacade     $imageProcessorFacade,
+        private ImageUploadService       $imageUploadService,
     )
     {
     }
@@ -33,9 +34,7 @@ readonly class ImageUploadController
 
         $file = $request->files['image'];
         $tmpPath = $file['tmp_name'];
-        $filename = basename($file['name']);
-
-        $fileContent = file_get_contents($tmpPath);
+        $fileContent = is_readable($tmpPath) ? file_get_contents($tmpPath) : false;
         if ($fileContent === false) {
             return new Response(HttpStatus::INTERNAL_SERVER_ERROR);
         }
@@ -45,8 +44,11 @@ readonly class ImageUploadController
             return new Response(HttpStatus::BAD_REQUEST);
         }
 
-        $this->imageProcessorFacade->processImage($fileContent, $filename);
+        $entity = $this->imageUploadService->upload($fileContent, $imageType);
 
-        return new JsonResponse(['filename' => $filename], HttpStatus::CREATED);
+        return new JsonResponse(
+            ['filename' => ImagePathLayout::fileName($entity->getChecksum(), $entity->getOriginalExtension())],
+            HttpStatus::CREATED
+        );
     }
 }

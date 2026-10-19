@@ -135,6 +135,43 @@ class QueryCriteriaTest extends SimpleTestCase
         self::assertSame(5, $queryCriteria->getOffset());
     }
 
+    public function testOrderBy_success(): void
+    {
+        $queryCriteria = new QueryCriteria();
+        $result = $queryCriteria->orderBy('upload_date');
+
+        self::assertSame($result, $queryCriteria);
+        self::assertSame([['upload_date', QueryCriteria::ORDER_ASC]], $queryCriteria->getOrderBy());
+    }
+
+    public function testOrderBy_descending_success(): void
+    {
+        $queryCriteria = new QueryCriteria();
+        $queryCriteria->orderBy('upload_date', QueryCriteria::ORDER_DESC);
+
+        self::assertSame([['upload_date', QueryCriteria::ORDER_DESC]], $queryCriteria->getOrderBy());
+    }
+
+    public function testOrderBy_multipleFields_success(): void
+    {
+        $queryCriteria = new QueryCriteria();
+        $queryCriteria->orderBy('upload_date')->orderBy('id', QueryCriteria::ORDER_DESC);
+
+        self::assertSame(
+            [['upload_date', QueryCriteria::ORDER_ASC], ['id', QueryCriteria::ORDER_DESC]],
+            $queryCriteria->getOrderBy()
+        );
+    }
+
+    public function testOrderBy_invalidDirection_throwsException(): void
+    {
+        $this->expectException(InvalidStateException::class);
+        $this->expectExceptionMessageIsOrContains('Invalid order direction: sideways');
+
+        $queryCriteria = new QueryCriteria();
+        $queryCriteria->orderBy('upload_date', 'sideways');
+    }
+
     public function testDefaults_areNull(): void
     {
         $queryCriteria = new QueryCriteria();
@@ -143,6 +180,7 @@ class QueryCriteriaTest extends SimpleTestCase
         self::assertNull($queryCriteria->getOffset());
         self::assertNull($queryCriteria->getLimit());
         self::assertSame([], $queryCriteria->getWhereConditions());
+        self::assertSame([], $queryCriteria->getOrderBy());
         self::assertSame([], $queryCriteria->getParameters());
     }
 }

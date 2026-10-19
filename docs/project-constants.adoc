@@ -1,7 +1,7 @@
 == Project constants
 
 Root-level `constants.php` defines only the global `ROOT_DIR` constant (`__DIR__`).
-Root-level `config.php` defines four global path constants derived from `ROOT_DIR`: `FS_DIRECTORY_WHITELIST`, `FS_APP_LEVEL_WHITELIST`, `MIGRATION_DIR`, and `IMAGE_STORAGE_DIR`; it currently holds no credentials.
+Root-level `config.php` defines the global path constants derived from `ROOT_DIR`: `FS_DIRECTORY_WHITELIST`, `FS_APP_LEVEL_WHITELIST`, `MIGRATION_DIR`, `IMAGE_STORAGE_DIR` (`private/upload/img`, the sanitized originals), `IMAGE_THUMB_DIR` (`public/img/thumb`), `IMAGE_SAMPLE_DIR` (`private/img/sample`), and `IMAGE_DOWNLOAD_DIR` (`private/img/dl`); it currently holds no credentials.
 
 The production entry point `src/app.php` requires, in order, `constants.php` (via `dirname(__DIR__)`), then `config.php`, then `vendor/autoload.php` via `ROOT_DIR`.
 `tests/TestUtils/SimpleTestCase.php` requires `constants.php` then `config.php` at file scope; direct and indirect subclasses (including `FunctionalTestCase`) inherit them via that inclusion, not via per-test requires.

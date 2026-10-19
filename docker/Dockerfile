@@ -62,8 +62,13 @@ RUN rm -f /usr/local/etc/php-fpm.d/docker.conf \
     && mkdir -p \
         private/db \
         private/logs \
+        private/img \
+        private/img/sample \
+        private/img/dl \
         private/upload/img \
         private/upload/tmp \
+        public/img \
+        public/img/thumb \
         /tmp/nginx/client_body \
         /tmp/nginx/fastcgi \
         /tmp/nginx/proxy \
