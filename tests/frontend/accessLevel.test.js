@@ -1,5 +1,5 @@
-import {assertEqual} from './assert.js';
-import {accessLevelName} from '../../public/js/accessLevel.js';
+import {assertEqual, assertTrue} from './assert.js';
+import {AccessLevel, accessLevelName} from '../../public/js/accessLevel.js';
 
 export function testAccessLevelNames() {
     const levels = [
@@ -17,4 +17,23 @@ export function testAccessLevelNames() {
 
 export function testUnknownAccessLevelHasFallbackLabel() {
     assertEqual(accessLevelName(999), 'Unknown');
+}
+
+export function testAccessLevelConstantsMirrorPhpEnum() {
+    const levels = [
+        ['NOVICE', 100],
+        ['FELLOW', 200],
+        ['MASTER', 300],
+        ['WIZARD', 400],
+        ['MOD', 500],
+        ['ADMIN', 600],
+    ];
+    for (const [name, value] of levels) {
+        assertTrue(Object.hasOwn(AccessLevel, name), `AccessLevel.${name} exists`);
+        assertEqual(AccessLevel[name], value, `AccessLevel.${name} === ${value}`);
+    }
+}
+
+export function testAccessLevelConstantsAreFrozen() {
+    assertTrue(Object.isFrozen(AccessLevel));
 }

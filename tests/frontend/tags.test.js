@@ -107,10 +107,12 @@ export async function testModeratorSeesTagTableAndGeneralCategoryDefault() {
 
         const rows = view.querySelectorAll('.tags-table tbody tr.tags-table-row');
         assertEqual(rows.length, 2);
-        assertEqual(rows[0].children[0].textContent, 'popular tag', 'API order should be preserved');
-        assertEqual(rows[0].children[1].textContent, 'Artist');
-        assertEqual(rows[0].children[2].textContent, '12');
-        assertEqual(rows[1].children[0].textContent, 'unused tag');
+        const popularRow = view.querySelector('.tags-table-row[data-tag-name="popular tag"]');
+        const unusedRow = view.querySelector('.tags-table-row[data-tag-name="unused tag"]');
+        assertEqual(popularRow.querySelector('.tags-table-name').textContent, 'popular tag', 'API order should be preserved');
+        assertEqual(popularRow.querySelector('.tags-table-category').textContent, 'Artist');
+        assertEqual(popularRow.querySelector('.tags-count-cell').textContent, '12');
+        assertEqual(unusedRow.querySelector('.tags-table-name').textContent, 'unused tag');
 
         const categories = view.querySelectorAll('select[name="category"] option');
         assertEqual([...categories].map((option) => option.value).join('|'), 'Artist|General|Copyright');
@@ -151,7 +153,8 @@ export async function testTagPaginationUsesOneHundredRowsAndLoadsAdjacentPages()
     try {
         assertEqual(view.querySelectorAll('.tags-table-row').length, 100);
         assertEqual(view.querySelector('.pagination-label').textContent, 'Page 1 of 3');
-        const [previous, next] = view.querySelectorAll('.pagination-button');
+        const previous = view.querySelector('.pagination-button--previous');
+        const next = view.querySelector('.pagination-button--next');
         assertTrue(previous.disabled);
         assertTrue(!next.disabled);
 
@@ -159,7 +162,10 @@ export async function testTagPaginationUsesOneHundredRowsAndLoadsAdjacentPages()
         await settle();
         assertEqual(queryParams(tagListCalls(fetchMock).at(-1)).get('page'), '2');
         assertEqual(view.querySelector('.pagination-label').textContent, 'Page 2 of 3');
-        assertEqual(view.querySelector('.tags-table-row td').textContent, 'page-2-tag-0');
+        assertEqual(
+            view.querySelector('.tags-table-row[data-tag-name="page-2-tag-0"] .tags-table-name').textContent,
+            'page-2-tag-0',
+        );
         assertTrue(!previous.disabled);
 
         next.click();
@@ -208,7 +214,10 @@ export async function testSearchFiltersTagNamesByFirstSegmentAndResetsPage() {
         const filteredCall = tagListCalls(fetchMock).at(-1);
         assertEqual(queryParams(filteredCall).get('q'), 'black thighhighs');
         assertEqual(queryParams(filteredCall).get('page'), '1', 'searching should return to page one');
-        assertEqual(view.querySelector('.tags-table-row td').textContent, 'black thighhighs result');
+        assertEqual(
+            view.querySelector('.tags-table-row[data-tag-name="black thighhighs result"] .tags-table-name').textContent,
+            'black thighhighs result',
+        );
         assertEqual(view.querySelector('.pagination-label').textContent, 'Page 1 of 1');
 
         input.value = '   ';
@@ -216,7 +225,10 @@ export async function testSearchFiltersTagNamesByFirstSegmentAndResetsPage() {
         const clearedCall = tagListCalls(fetchMock).at(-1);
         assertEqual(queryParams(clearedCall).get('q'), null, 'an empty search should clear q');
         assertEqual(queryParams(clearedCall).get('page'), '1');
-        assertEqual(view.querySelector('.tags-table-row td').textContent, 'popular tag');
+        assertEqual(
+            view.querySelector('.tags-table-row[data-tag-name="popular tag"] .tags-table-name').textContent,
+            'popular tag',
+        );
     } finally {
         restore();
     }

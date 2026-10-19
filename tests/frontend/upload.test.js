@@ -29,8 +29,10 @@ export function testUploadViewRendersAccessibleFileInputAndProgressBars() {
     assertEqual(view.querySelector(`label[for="${input.id}"]`).textContent, 'Images');
     assertTrue(view.querySelector('button[type="submit"]') !== null, 'submit button should exist');
 
-    const progressBars = view.querySelectorAll('progress');
-    assertEqual(progressBars.length, 2, 'upload should show file-count and current-file progress bars');
+    const countProgress = view.querySelector('#upload-file-count-progress');
+    const byteProgress = view.querySelector('#upload-file-byte-progress');
+    assertEqual(countProgress?.tagName, 'PROGRESS', 'file-count progress should be a progress bar');
+    assertEqual(byteProgress?.tagName, 'PROGRESS', 'current-file transfer progress should be a progress bar');
     assertEqual(view.querySelector('label[for="upload-file-count-progress"]').textContent, 'Images uploaded');
     assertEqual(view.querySelector('label[for="upload-file-byte-progress"]').textContent, 'Current image transfer');
     assertEqual(view.querySelectorAll('[role="status"]').length, 2, 'progress should include accessible status text');

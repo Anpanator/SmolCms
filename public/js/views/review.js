@@ -5,6 +5,7 @@
  * Importing this module has no side effects.
  */
 import {get, postJson} from '../api.js';
+import {AccessLevel} from '../accessLevel.js';
 import {el} from '../dom.js';
 import {clearMessage, createMessageBox, isAuthError, messageForStatus, showMessage,} from '../forms.js';
 
@@ -12,8 +13,6 @@ const QUEUE_URL = '/api/review/queue';
 const IMAGE_DETAIL_URL = '/api/image/detail';
 const APPROVE_URL = '/api/review/approve';
 const REJECT_URL = '/api/review/reject';
-/** AccessLevel::MOD — keep aligned with src/Data/Constant/AccessLevel.php. */
-const MIN_REVIEW_ACCESS_LEVEL = 500;
 
 export function createReviewView({ session, navigate }) {
     if (!hasReviewAccess(session.getUser())) {
@@ -204,7 +203,11 @@ export function createReviewView({ session, navigate }) {
                 }),
             ],
         });
-        const item = el('li', {className: 'review-item', children: selectButton});
+        const item = el('li', {
+            className: 'review-item',
+            attributes: {'data-image-id': image.id},
+            children: selectButton,
+        });
         selectButton.addEventListener('click', () => selectImageById(image.id));
         return item;
     }
@@ -550,5 +553,5 @@ function formatFileSize(bytes) {
 }
 
 function hasReviewAccess(user) {
-    return (user?.accessLevel ?? 0) >= MIN_REVIEW_ACCESS_LEVEL;
+    return (user?.accessLevel ?? 0) >= AccessLevel.MOD;
 }

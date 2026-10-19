@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace SmolCms\Test\Service\DB;
 
 use PHPUnit\Framework\MockObject\MockObject;
+use SmolCms\Exception\InvalidStateException;
 use SmolCms\Service\Core\CaseConverter;
 use SmolCms\Service\DB\EntityAttributeProcessor;
 use SmolCms\Service\DB\QueryBuilder;
@@ -176,6 +177,58 @@ class QueryBuilderTest extends SimpleTestCase
             ->andWhere('id = :id');
         $resultQuery = $this->queryBuilder->buildQuery($queryCriteria);
         self::assertSame($expectedQuery, strtolower($resultQuery));
+    }
+
+    public function testBuildCountQuery_successWithoutWhere(): void
+    {
+        $expectedQuery = 'select count(*) from test_table';
+        $queryCriteria = new QueryCriteria();
+        $queryCriteria->select(TestEntity::class);
+
+        $resultQuery = $this->queryBuilder->buildCountQuery($queryCriteria);
+
+        self::assertSame($expectedQuery, strtolower($resultQuery));
+    }
+
+    public function testBuildCountQuery_successWithWhere(): void
+    {
+        $expectedQuery = 'select count(*) from test_table where 1 and id = :id or id < :id';
+        $queryCriteria = new QueryCriteria();
+        $queryCriteria
+            ->select(TestEntity::class)
+            ->andWhere('id = :id')
+            ->orWhere('id < :id');
+
+        $resultQuery = $this->queryBuilder->buildCountQuery($queryCriteria);
+
+        self::assertSame($expectedQuery, strtolower($resultQuery));
+    }
+
+    public function testBuildCountQuery_ignoresLimitOffsetAndOrdering(): void
+    {
+        $expectedQuery = 'select count(*) from test_table where 1 and id = :id';
+        $queryCriteria = new QueryCriteria();
+        $queryCriteria
+            ->select(TestEntity::class)
+            ->andWhere('id = :id')
+            ->orderBy('test_field')
+            ->skipResults(40)
+            ->maxResults(10);
+
+        $resultQuery = $this->queryBuilder->buildCountQuery($queryCriteria);
+
+        self::assertSame($expectedQuery, strtolower($resultQuery));
+    }
+
+    public function testBuildCountQuery_rejectsNonSelectCriteria(): void
+    {
+        $queryCriteria = new QueryCriteria();
+        $queryCriteria
+            ->delete(TestEntity::class)
+            ->andWhere('id = :id');
+
+        $this->expectException(InvalidStateException::class);
+        $this->queryBuilder->buildCountQuery($queryCriteria);
     }
 
 

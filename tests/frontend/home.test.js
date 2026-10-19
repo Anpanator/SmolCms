@@ -31,8 +31,8 @@ export async function testHomeViewRendersPageTagsAndImageGrid() {
         assertTrue(view.querySelector('.sidebar .search-view') !== null, 'home should have a tag search');
         assertTrue(view.querySelector('.sidebar .tags') !== null, 'sidebar tag list should exist');
         assertEqual(view.querySelectorAll('.tags .tags-item').length, 2, 'the page tags should replace static tags');
-        assertEqual(view.querySelector('.tags-item:first-child .tags-link')?.textContent, 'nature');
-        assertEqual(view.querySelector('.tags-item:last-child .tags-link')?.textContent, 'sky');
+        assertEqual(view.querySelector('.tags-link[data-tag-name="nature"]')?.textContent, 'nature');
+        assertEqual(view.querySelector('.tags-link[data-tag-name="sky"]')?.textContent, 'sky');
         assertTrue(view.querySelector('.content .grid') !== null, 'content tile grid should exist');
         assertTrue(view.querySelector('.content-title') === null, 'home should not have a Latest uploads header');
 
@@ -42,12 +42,16 @@ export async function testHomeViewRendersPageTagsAndImageGrid() {
 
         const tiles = view.querySelectorAll('.grid a.tile');
         assertEqual(tiles.length, 2, 'each image should become a tile');
-        const image = tiles[0].querySelector('img.tile-image');
+        const image = view.querySelector('.grid a.tile[data-image-id="7"] img.tile-image');
         assertTrue(image !== null, 'tiles should contain images');
         assertEqual(image.getAttribute('src'), '/public/img/thumb/ab/ab89c0.avif');
         assertEqual(image.getAttribute('alt'), '');
-        assertEqual(tiles[0].getAttribute('href'), '/image?id=7', 'tiles should link to the image display view');
-        assertEqual(tiles[1].getAttribute('href'), '/image?id=3');
+        assertEqual(
+            view.querySelector('.grid a.tile[data-image-id="7"]')?.getAttribute('href'),
+            '/image?id=7',
+            'tiles should link to the image display view',
+        );
+        assertEqual(view.querySelector('.grid a.tile[data-image-id="3"]')?.getAttribute('href'), '/image?id=3');
     } finally {
         restore();
     }
@@ -61,10 +65,12 @@ export async function testHomeTagLinksAreDynamicAndClearable() {
     try {
         const links = view.querySelectorAll('.tags .tags-link');
         assertEqual(links.length, 2);
-        assertEqual(links[0].getAttribute('href'), '/?tags=nature');
-        assertTrue(links[0].classList.contains('tags-link--active'), 'the selected tag should be marked active');
-        assertEqual(links[0].getAttribute('aria-current'), 'page');
-        assertTrue(!links[1].classList.contains('tags-link--active'), 'other tags should not be marked active');
+        const natureLink = view.querySelector('.tags .tags-link[data-tag-name="nature"]');
+        const skyLink = view.querySelector('.tags .tags-link[data-tag-name="sky"]');
+        assertEqual(natureLink.getAttribute('href'), '/?tags=nature');
+        assertTrue(natureLink.classList.contains('tags-link--active'), 'the selected tag should be marked active');
+        assertEqual(natureLink.getAttribute('aria-current'), 'page');
+        assertTrue(!skyLink.classList.contains('tags-link--active'), 'other tags should not be marked active');
         assertEqual(view.querySelector('.tags-clear')?.getAttribute('href'), '/', 'active filters should be clearable');
         assertEqual(view.querySelector('.search-input')?.value, 'nature');
     } finally {
@@ -83,7 +89,8 @@ export async function testHomePaginationUsesUrlStateAndKeepsTagFilter() {
         assertEqual(fetchMock.calls[0].url, '/api/images?page=2&tags=nature');
         assertEqual(view.querySelector('.pagination-label')?.textContent, 'Page 2 of 3');
 
-        const [previous, next] = view.querySelectorAll('.pagination-button');
+        const previous = view.querySelector('.pagination-button--previous');
+        const next = view.querySelector('.pagination-button--next');
         assertTrue(!previous.disabled, 'Previous should be enabled after page one');
         assertTrue(!next.disabled, 'Next should be enabled before the last page');
         next.click();
@@ -127,8 +134,8 @@ export async function testHomeGridShowsEmptyStateAndNoTags() {
         assertEqual(view.querySelectorAll('.sidebar .tags-item').length, 0, 'an empty page has no tags');
         assertTrue(view.querySelector('.tags-clear') !== null, 'the active filter remains clearable');
         assertEqual(view.querySelector('.pagination-label')?.textContent, 'Page 1 of 1');
-        assertTrue(view.querySelector('.pagination-button:first-child').disabled);
-        assertTrue(view.querySelector('.pagination-button:last-child').disabled);
+        assertTrue(view.querySelector('.pagination-button--previous').disabled);
+        assertTrue(view.querySelector('.pagination-button--next').disabled);
     } finally {
         restore();
     }

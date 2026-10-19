@@ -1,14 +1,23 @@
 /**
- * Display labels for the numeric AccessLevel enum values returned by the API.
+ * Named references for the numeric AccessLevel enum values returned by the API.
  * Keep these values aligned with src/Data/Constant/AccessLevel.php.
  */
+export const AccessLevel = Object.freeze({
+    NOVICE: 100,
+    FELLOW: 200,
+    MASTER: 300,
+    WIZARD: 400,
+    MOD: 500,
+    ADMIN: 600,
+});
+
 const ACCESS_LEVEL_NAMES = new Map([
-    [100, 'NOVICE'],
-    [200, 'FELLOW'],
-    [300, 'MASTER'],
-    [400, 'WIZARD'],
-    [500, 'MOD'],
-    [600, 'ADMIN'],
+    [AccessLevel.NOVICE, 'NOVICE'],
+    [AccessLevel.FELLOW, 'FELLOW'],
+    [AccessLevel.MASTER, 'MASTER'],
+    [AccessLevel.WIZARD, 'WIZARD'],
+    [AccessLevel.MOD, 'MOD'],
+    [AccessLevel.ADMIN, 'ADMIN'],
 ]);
 
 export function accessLevelName(value) {

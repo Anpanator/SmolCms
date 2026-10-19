@@ -3,12 +3,25 @@ declare(strict_types=1);
 
 namespace SmolCms\Service\DB;
 
-use Throwable;
+use PDO;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Persistence\ImageEntity;
+use SmolCms\Service\Core\CaseConverter;
+use SmolCms\Service\Tag\TagService;
 
 readonly class ImageEntityService extends EntityService
 {
+    public function __construct(
+        PDO                      $pdo,
+        CaseConverter            $caseConverter,
+        QueryBuilder             $queryBuilder,
+        EntityAttributeProcessor $entityAttributeProcessor,
+        private TagService       $tagService,
+    )
+    {
+        parent::__construct($pdo, $caseConverter, $queryBuilder, $entityAttributeProcessor);
+    }
+
     public function findOneById(int $id): ?ImageEntity
     {
         $qc = new QueryCriteria();
@@ -50,6 +63,39 @@ readonly class ImageEntityService extends EntityService
     }
 
     /**
+     * Page of accepted images, newest first. Optionally restricted to images that
+     * carry every requested tag.
+     *
+     * @param list<string> $tagNames
+     * @return array<ImageEntity>
+     */
+    public function findAcceptedPage(int $limit, int $offset, array $tagNames = []): array
+    {
+        $qc = new QueryCriteria();
+        $qc->select(ImageEntity::class)
+            ->orderBy('upload_date', QueryCriteria::ORDER_DESC)
+            ->orderBy('id', QueryCriteria::ORDER_DESC)
+            ->maxResults($limit)
+            ->skipResults($offset);
+        self::applyAcceptedFilter($qc, $tagNames);
+        return $this->execute($qc) ?? [];
+    }
+
+    /**
+     * Total number of accepted images, optionally restricted to images that carry
+     * every requested tag.
+     *
+     * @param list<string> $tagNames
+     */
+    public function countAccepted(array $tagNames = []): int
+    {
+        $qc = new QueryCriteria();
+        $qc->select(ImageEntity::class);
+        self::applyAcceptedFilter($qc, $tagNames);
+        return $this->countResults($qc);
+    }
+
+    /**
      * Finds images whose variants were saved by the processing worker.
      * These rows are also used to retry original-file cleanup after a worker interruption.
      *
@@ -87,36 +133,40 @@ readonly class ImageEntityService extends EntityService
 
     public function deleteById(int $id): void
     {
-        $ownsTransaction = !$this->pdo->inTransaction();
-        if ($ownsTransaction) {
-            $this->pdo->beginTransaction();
-        }
-
-        try {
-            $usageStatement = $this->pdo->prepare(
-                'UPDATE tag SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END '
-                . 'WHERE id IN (SELECT tag_id FROM image_tag WHERE image_id = :image_id)'
-            );
-            $usageStatement->execute(['image_id' => $id]);
-
-            $tagStatement = $this->pdo->prepare('DELETE FROM image_tag WHERE image_id = :image_id');
-            $tagStatement->execute(['image_id' => $id]);
+        $this->withinTransaction(function () use ($id): void {
+            $this->tagService->detachAllFromImage($id);
 
             $qc = new QueryCriteria();
             $qc->delete(ImageEntity::class)
                 ->andWhere('id = :id')
                 ->withParameters(['id' => $id]);
             $this->execute($qc);
+        });
+    }
 
-            if ($ownsTransaction) {
-                $this->pdo->commit();
-            }
-        } catch (Throwable $throwable) {
-            if ($ownsTransaction && $this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            throw $throwable;
+    private static function applyAcceptedFilter(QueryCriteria $qc, array $tagNames): void
+    {
+        $parameters = ['status' => ImageStatus::ACCEPTED->value];
+        $qc->andWhere('status = :status');
+        if ($tagNames === []) {
+            $qc->withParameters($parameters);
+            return;
         }
+
+        $placeholders = [];
+        foreach (array_values($tagNames) as $index => $tagName) {
+            $parameterName = 'tag_' . $index;
+            $placeholders[] = ':' . $parameterName;
+            $parameters[$parameterName] = $tagName;
+        }
+        $parameters['tag_count'] = count($tagNames);
+        $qc->andWhere('id IN ('
+            . 'SELECT it.image_id FROM image_tag it '
+            . 'INNER JOIN tag t ON t.id = it.tag_id '
+            . 'WHERE t.name COLLATE NOCASE IN (' . implode(', ', $placeholders) . ') '
+            . 'GROUP BY it.image_id HAVING COUNT(DISTINCT it.tag_id) = :tag_count'
+            . ')')
+            ->withParameters($parameters);
     }
 
     private function findOneByColumn(string $column, string $value): ?ImageEntity

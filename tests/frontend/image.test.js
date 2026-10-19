@@ -44,8 +44,8 @@ export async function testImageViewRendersSampleImageInLayout() {
         assertTrue(view.querySelector('.sidebar .tags') !== null, 'sidebar tag list should exist');
         assertTrue(view.querySelector('.sidebar .search-view') !== null, 'image sidebar should have tag search');
         assertEqual(view.querySelectorAll('.sidebar .tags-item').length, 2, 'detail tags should replace static tags');
-        assertEqual(view.querySelector('.tags-item:first-child .tags-link')?.textContent, 'nature');
-        assertEqual(view.querySelector('.tags-item:last-child .tags-link')?.textContent, 'sky');
+        assertEqual(view.querySelector('.tags-link[data-tag-name="nature"]')?.textContent, 'nature');
+        assertEqual(view.querySelector('.tags-link[data-tag-name="sky"]')?.textContent, 'sky');
         assertTrue(view.querySelector('.sidebar .image-meta') !== null, 'metadata section should live in the sidebar');
         assertTrue(view.querySelector('.content-title') === null, 'the image view should not have a title header');
         assertTrue(view.querySelector('.image-meta-section .sidebar-title') === null, 'image details should not have a title header');

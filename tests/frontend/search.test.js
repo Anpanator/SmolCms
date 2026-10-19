@@ -96,8 +96,8 @@ export async function testSuggestionListIsLimitedToFifteen(fixture) {
         await settle();
         assertEqual(fetchMock.calls.length, 1);
         assertEqual(suggestions.querySelectorAll('[role="option"]').length, 15);
-        assertEqual(suggestions.querySelector('[role="option"]')?.textContent, 'tag-0');
-        assertEqual(suggestions.lastElementChild?.textContent, 'tag-14');
+        assertEqual(suggestions.querySelector('[data-tag="tag-0"]')?.textContent, 'tag-0', 'API order should be preserved');
+        assertEqual(suggestions.querySelector('[data-tag="tag-14"]')?.textContent, 'tag-14');
     } finally {
         restore();
     }
@@ -115,13 +115,15 @@ export async function testArrowNavigationAndEnterInsertSelectedTag(fixture) {
         await settle();
         assertEqual(suggestions.querySelectorAll('[role="option"]').length, 2);
 
+        const catOption = suggestions.querySelector('[data-tag="cat"]');
+        const caterpillarOption = suggestions.querySelector('[data-tag="caterpillar"]');
         dispatchKey(input, 'ArrowDown');
-        assertTrue(suggestions.children[0].classList.contains('search-suggestion--active'));
+        assertTrue(catOption.classList.contains('search-suggestion--active'));
         dispatchKey(input, 'ArrowDown');
-        assertTrue(suggestions.children[1].classList.contains('search-suggestion--active'));
+        assertTrue(caterpillarOption.classList.contains('search-suggestion--active'));
         dispatchKey(input, 'ArrowUp');
-        assertTrue(suggestions.children[0].classList.contains('search-suggestion--active'));
-        assertEqual(input.getAttribute('aria-activedescendant'), suggestions.children[0].id);
+        assertTrue(catOption.classList.contains('search-suggestion--active'));
+        assertEqual(input.getAttribute('aria-activedescendant'), catOption.id);
 
         dispatchKey(input, 'ArrowDown');
         dispatchKey(input, 'Enter');
@@ -143,7 +145,7 @@ export function testClickingSuggestionInsertsItAndKeepsFocus(fixture) {
         input.value = 'bi';
         dispatchInput(input);
         return wait(280).then(settle).then(() => {
-            suggestions.children[0].click();
+            suggestions.querySelector('[data-tag="bird"]').click();
             assertEqual(input.value, 'bird, ');
             assertTrue(suggestions.hidden);
             assertEqual(document.activeElement, input);

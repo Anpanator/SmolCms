@@ -4,8 +4,6 @@ declare(strict_types=1);
 namespace SmolCms\Service\Image;
 
 use InvalidArgumentException;
-use PDO;
-use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Constant\RouteEnum;
 use SmolCms\Data\Persistence\ImageEntity;
 use SmolCms\Service\DB\ImageEntityService;
@@ -24,7 +22,6 @@ readonly class ImageQueryService
     public function __construct(
         private ImageEntityService $imageEntityService,
         private UserService        $userService,
-        private PDO                $pdo,
         private TagService         $tagService,
     )
     {
@@ -50,33 +47,14 @@ readonly class ImageQueryService
         }
 
         $tagNames = self::deduplicateTagNames($tagNames);
-        [$where, $parameters] = $this->buildAcceptedImageFilter($tagNames);
+        $offset = ($page - 1) * self::IMAGES_PER_PAGE;
 
-        $countStatement = $this->pdo->prepare('SELECT COUNT(*) FROM image i WHERE ' . $where);
-        foreach ($parameters as $name => $value) {
-            $countStatement->bindValue(':' . $name, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
-        }
-        $countStatement->execute();
-        $total = (int)$countStatement->fetchColumn();
-
-        $statement = $this->pdo->prepare(
-            'SELECT i.id, i.thumb_filename FROM image i WHERE ' . $where
-            . ' ORDER BY i.upload_date DESC, i.id DESC LIMIT :limit OFFSET :offset'
-        );
-        foreach ($parameters as $name => $value) {
-            $statement->bindValue(':' . $name, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
-        }
-        $statement->bindValue(':limit', self::IMAGES_PER_PAGE, PDO::PARAM_INT);
-        $statement->bindValue(':offset', ($page - 1) * self::IMAGES_PER_PAGE, PDO::PARAM_INT);
-        $statement->execute();
-
+        $total = $this->imageEntityService->countAccepted($tagNames);
         $images = [];
-        while ($row = $statement->fetch(PDO::FETCH_ASSOC)) {
+        foreach ($this->imageEntityService->findAcceptedPage(self::IMAGES_PER_PAGE, $offset, $tagNames) as $entity) {
             $images[] = [
-                'id' => (int)$row['id'],
-                'thumbSrc' => $this->buildStaticThumbUrl(
-                    $row['thumb_filename'] === null ? null : (string)$row['thumb_filename']
-                ),
+                'id' => $entity->getId(),
+                'thumbSrc' => $this->getThumbSrc($entity),
             ];
         }
         $imageIds = array_column($images, 'id');
@@ -114,31 +92,6 @@ readonly class ImageQueryService
             'downloadSrc' => $this->getDownloadSrc($entity),
             'tags' => $this->tagService->getTagsForImage($id),
         ];
-    }
-
-    /** @return array{0: string, 1: array<string, string|int>} */
-    private function buildAcceptedImageFilter(array $tagNames): array
-    {
-        $where = 'i.status = :status';
-        $parameters = ['status' => ImageStatus::ACCEPTED->value];
-        if ($tagNames === []) {
-            return [$where, $parameters];
-        }
-
-        $placeholders = [];
-        foreach ($tagNames as $index => $tagName) {
-            $parameterName = 'tag_' . $index;
-            $placeholders[] = ':' . $parameterName;
-            $parameters[$parameterName] = $tagName;
-        }
-        $parameters['tag_count'] = count($tagNames);
-        $where .= ' AND i.id IN ('
-            . 'SELECT it.image_id FROM image_tag it '
-            . 'INNER JOIN tag t ON t.id = it.tag_id '
-            . 'WHERE t.name COLLATE NOCASE IN (' . implode(', ', $placeholders) . ') '
-            . 'GROUP BY it.image_id HAVING COUNT(DISTINCT it.tag_id) = :tag_count'
-            . ')';
-        return [$where, $parameters];
     }
 
     /** @param list<string> $tagNames @return list<string> */

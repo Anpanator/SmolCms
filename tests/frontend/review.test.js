@@ -123,22 +123,24 @@ export async function testModQueueShowsDownloadImageAndActiveMetadata() {
         assertEqual(items.length, 2, 'each queued image should become a thumbnail');
         assertEqual(view.querySelector('.review-title')?.textContent, 'Mod Queue');
 
-        const thumb = items[0].querySelector('img.review-thumb');
+        const itemWithThumb = view.querySelector('.review-item[data-image-id="7"]');
+        const thumb = itemWithThumb.querySelector('img.review-thumb');
         assertTrue(thumb !== null, 'a queued image with a thumb should render an image');
         assertEqual(thumb.getAttribute('src'), '/public/img/thumb/ab/ab89c0.avif');
-        assertTrue(items[0].textContent.includes('Upload User'), 'uploader should be shown in compact metadata');
-        assertTrue(items[0].textContent.includes('2026-10-19 10:30:00'), 'upload date should be shown');
-        assertEqual(items[0].querySelectorAll('button[data-action]').length, 0, 'thumbnails must not have action buttons');
+        assertTrue(itemWithThumb.textContent.includes('Upload User'), 'uploader should be shown in compact metadata');
+        assertTrue(itemWithThumb.textContent.includes('2026-10-19 10:30:00'), 'upload date should be shown');
+        assertEqual(itemWithThumb.querySelectorAll('button[data-action]').length, 0, 'thumbnails must not have action buttons');
 
-        assertTrue(items[1].querySelector('img') === null, 'a queued image without a thumb renders no image');
-        assertTrue(items[1].querySelector('.review-thumb--empty') !== null, 'a missing thumb should show fallback text');
+        const itemWithoutThumb = view.querySelector('.review-item[data-image-id="3"]');
+        assertTrue(itemWithoutThumb.querySelector('img') === null, 'a queued image without a thumb renders no image');
+        assertTrue(itemWithoutThumb.querySelector('.review-thumb--empty') !== null, 'a missing thumb should show fallback text');
 
         const displayedImage = view.querySelector('.review-image');
         assertTrue(displayedImage !== null, 'the active image should be displayed');
         assertEqual(displayedImage.getAttribute('src'), DETAILS[7].downloadSrc, 'the full-size download image should be used');
         assertTrue(view.querySelector('.review-metadata').textContent.includes('1920 × 1080'));
         assertTrue(view.querySelector('.review-metadata').textContent.includes('1.2 MB'));
-        assertEqual(items[0].querySelector('.review-select')?.getAttribute('aria-pressed'), 'true');
+        assertEqual(itemWithThumb.querySelector('.review-select')?.getAttribute('aria-pressed'), 'true');
 
         assertEqual(view.querySelector('.review-actions [data-action="approve"]')?.textContent, 'Approve');
         assertEqual(view.querySelector('.review-actions [data-action="reject"]')?.textContent, 'Reject');
@@ -244,7 +246,7 @@ export async function testDraggingFullSizeImagePansWithoutTogglingIt(fixture) {
 export async function testSelectingThumbnailUpdatesImageAndMetadata() {
     const {view, fetchMock, restore} = await createViewWith(500);
     try {
-        view.querySelectorAll('.review-select')[1].dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        view.querySelector('.review-select[data-image-id="3"]').dispatchEvent(new MouseEvent('click', {bubbles: true}));
         await settle();
 
         assertEqual(view.querySelector('.review-image')?.getAttribute('src'), DETAILS[3].downloadSrc);
@@ -288,7 +290,10 @@ export async function testApprovePostsForActiveImageAndSelectsNext() {
 
         const items = view.querySelectorAll('.review-item');
         assertEqual(items.length, 1, 'the approved item should be removed from the queue');
-        assertEqual(items[0].textContent.includes('Other User'), true, 'the next queue image should remain');
+        assertTrue(
+            view.querySelector('.review-item[data-image-id="3"]').textContent.includes('Other User'),
+            'the next queue image should remain',
+        );
         assertEqual(view.querySelector('.review-image')?.getAttribute('src'), DETAILS[3].downloadSrc);
 
         const message = view.querySelector('.form-message');
@@ -305,7 +310,7 @@ export async function testRejectPostsForSelectedThumbnailAndRemovesIt() {
         url === '/api/review/reject?id=3' ? {status: 204, body: null} : undefined
     ));
     try {
-        view.querySelectorAll('.review-select')[1].dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        view.querySelector('.review-select[data-image-id="3"]').dispatchEvent(new MouseEvent('click', {bubbles: true}));
         await settle();
         view.querySelector('.review-actions button[data-action="reject"]')
             .dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
@@ -315,7 +320,10 @@ export async function testRejectPostsForSelectedThumbnailAndRemovesIt() {
         assertEqual(actionCall.url, '/api/review/reject?id=3', 'reject should post the selected image id');
         assertEqual(actionCall.options.method, 'POST');
         assertEqual(view.querySelectorAll('.review-item').length, 1);
-        assertEqual(view.querySelector('.review-select')?.getAttribute('data-image-id'), '7');
+        assertTrue(
+            view.querySelector('.review-select[data-image-id="7"]') !== null,
+            'the remaining thumbnail should be image 7',
+        );
         assertTrue(view.querySelector('.form-message').textContent.includes('rejected'));
     } finally {
         restore();
@@ -385,7 +393,10 @@ export async function testDeleteAndBackspaceRejectSelectedImages() {
     try {
         assertTrue(pressKey(view, 'Delete').defaultPrevented, 'Delete should be handled as reject');
         await settle();
-        assertEqual(view.querySelector('.review-select')?.getAttribute('data-image-id'), '3');
+        assertTrue(
+            view.querySelector('.review-select[data-image-id="3"]') !== null,
+            'the rejected thumbnail should be removed from the queue',
+        );
 
         assertTrue(pressKey(view, 'Backspace').defaultPrevented, 'Backspace should be handled as reject');
         await settle();

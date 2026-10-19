@@ -5,24 +5,24 @@ declare(strict_types=1);
 namespace SmolCms\Service\Tag;
 
 use InvalidArgumentException;
-use PDO;
-use PDOException;
 use RuntimeException;
+use SmolCms\Data\Persistence\ImageEntity;
+use SmolCms\Data\Persistence\ImageTagEntity;
+use SmolCms\Data\Persistence\TagCategoryEntity;
+use SmolCms\Data\Persistence\TagEntity;
+use SmolCms\Exception\PersistenceException;
+use SmolCms\Service\DB\EntityService;
+use SmolCms\Service\DB\QueryCriteria;
 use Throwable;
 
 /**
  * Tag and tag-category persistence, including the maintained image usage counter.
  */
-readonly class TagService
+readonly class TagService extends EntityService
 {
     private const string DEFAULT_CATEGORY = 'General';
     private const int BROWSE_PER_PAGE = 25;
-
-    public function __construct(
-        private PDO $pdo,
-    )
-    {
-    }
+    private const int SUGGEST_LIMIT = 15;
 
     /** Normalizes and validates a tag name using Unicode lowercase folding. */
     public static function normalizeName(string $name): string
@@ -51,19 +51,13 @@ readonly class TagService
             if ($category === null) {
                 throw new InvalidArgumentException("Unknown tag category: $normalizedCategory");
             }
-            if ($this->findTagId($normalizedName) !== null) {
+            if ($this->findTag($normalizedName) !== null) {
                 return null;
             }
 
             try {
-                $statement = $this->pdo->prepare(
-                    'INSERT INTO tag (name, category_id) VALUES (:name, :category_id)'
-                );
-                $statement->execute([
-                    'name' => $normalizedName,
-                    'category_id' => $category['id'],
-                ]);
-            } catch (PDOException $exception) {
+                $this->saveAsNew(new TagEntity(null, $normalizedName, $category->getId()));
+            } catch (PersistenceException $exception) {
                 if (self::isUniqueConstraintViolation($exception)) {
                     return null;
                 }
@@ -72,7 +66,7 @@ readonly class TagService
 
             return [
                 'name' => $normalizedName,
-                'category' => $category['name'],
+                'category' => $category->getName(),
                 'usageCount' => 0,
             ];
         });
@@ -91,9 +85,8 @@ readonly class TagService
             }
 
             try {
-                $statement = $this->pdo->prepare('INSERT INTO tag_category (name) VALUES (:name)');
-                $statement->execute(['name' => $normalizedName]);
-            } catch (PDOException $exception) {
+                $this->saveAsNew(new TagCategoryEntity(null, $normalizedName));
+            } catch (PersistenceException $exception) {
                 if (self::isUniqueConstraintViolation($exception)) {
                     return null;
                 }
@@ -114,9 +107,9 @@ readonly class TagService
         $normalizedCategory = self::normalizeCategoryName($categoryName ?? self::DEFAULT_CATEGORY);
 
         return $this->withinTransaction(function () use ($normalizedName, $normalizedCategory): int {
-            $tagId = $this->findTagId($normalizedName);
-            if ($tagId !== null) {
-                return $tagId;
+            $tag = $this->findTag($normalizedName);
+            if ($tag !== null) {
+                return $tag->getId();
             }
 
             $category = $this->findCategory($normalizedCategory);
@@ -124,19 +117,19 @@ readonly class TagService
                 throw new InvalidArgumentException("Unknown tag category: $normalizedCategory");
             }
 
-            $statement = $this->pdo->prepare(
-                'INSERT OR IGNORE INTO tag (name, category_id) VALUES (:name, :category_id)'
-            );
-            $statement->execute([
-                'name' => $normalizedName,
-                'category_id' => $category['id'],
-            ]);
+            try {
+                $this->saveAsNew(new TagEntity(null, $normalizedName, $category->getId()));
+            } catch (PersistenceException $exception) {
+                if (!self::isUniqueConstraintViolation($exception)) {
+                    throw $exception;
+                }
+            }
 
-            $tagId = $this->findTagId($normalizedName);
-            if ($tagId === null) {
+            $tag = $this->findTag($normalizedName);
+            if ($tag === null) {
                 throw new RuntimeException('Could not find or create the requested tag.');
             }
-            return $tagId;
+            return $tag->getId();
         });
     }
 
@@ -152,28 +145,26 @@ readonly class TagService
         $normalizedName = self::normalizeName($tagName);
 
         return $this->withinTransaction(function () use ($imageId, $normalizedName): bool {
-            $imageStatement = $this->pdo->prepare('SELECT 1 FROM image WHERE id = :image_id LIMIT 1');
-            $imageStatement->execute(['image_id' => $imageId]);
-            if ($imageStatement->fetchColumn() === false) {
+            if (!$this->imageExists($imageId)) {
                 return false;
             }
 
             $tagId = $this->findOrCreateTagId($normalizedName);
-            $statement = $this->pdo->prepare(
-                'INSERT OR IGNORE INTO image_tag (image_id, tag_id) VALUES (:image_id, :tag_id)'
-            );
-            $statement->execute([
-                'image_id' => $imageId,
-                'tag_id' => $tagId,
-            ]);
-            if ($statement->rowCount() === 0) {
-                return false;
+            try {
+                $this->saveAsNew(new ImageTagEntity($imageId, $tagId));
+            } catch (PersistenceException $exception) {
+                if (self::isUniqueConstraintViolation($exception)) {
+                    return false;
+                }
+                throw $exception;
             }
 
-            $usageStatement = $this->pdo->prepare(
-                'UPDATE tag SET usage_count = usage_count + 1 WHERE id = :tag_id'
-            );
-            $usageStatement->execute(['tag_id' => $tagId]);
+            $tag = $this->findTagById($tagId);
+            if ($tag === null) {
+                throw new RuntimeException('Could not find the tag that was just attached.');
+            }
+            $tag->setUsageCount($tag->getUsageCount() + 1);
+            $this->update($tag);
             return true;
         });
     }
@@ -189,27 +180,23 @@ readonly class TagService
         $normalizedName = self::normalizeName($tagName);
 
         return $this->withinTransaction(function () use ($imageId, $normalizedName): bool {
-            $tagId = $this->findTagId($normalizedName);
-            if ($tagId === null) {
+            $tag = $this->findTag($normalizedName);
+            if ($tag === null) {
                 return false;
             }
 
-            $statement = $this->pdo->prepare(
-                'DELETE FROM image_tag WHERE image_id = :image_id AND tag_id = :tag_id'
-            );
-            $statement->execute([
-                'image_id' => $imageId,
-                'tag_id' => $tagId,
-            ]);
+            $associationCriteria = new QueryCriteria();
+            $associationCriteria->delete(ImageTagEntity::class)
+                ->andWhere('image_id = :image_id')
+                ->andWhere('tag_id = :tag_id')
+                ->withParameters(['image_id' => $imageId, 'tag_id' => $tag->getId()]);
+            $statement = $this->prepare($associationCriteria);
+            $statement->execute();
             if ($statement->rowCount() === 0) {
                 return false;
             }
 
-            $usageStatement = $this->pdo->prepare(
-                'UPDATE tag SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END '
-                . 'WHERE id = :tag_id'
-            );
-            $usageStatement->execute(['tag_id' => $tagId]);
+            $this->decrementUsageCount($tag);
             return true;
         });
     }
@@ -220,15 +207,15 @@ readonly class TagService
     public function detachAllFromImage(int $imageId): int
     {
         return $this->withinTransaction(function () use ($imageId): int {
-            $usageStatement = $this->pdo->prepare(
-                'UPDATE tag SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END '
-                . 'WHERE id IN (SELECT tag_id FROM image_tag WHERE image_id = :image_id)'
-            );
-            $usageStatement->execute(['image_id' => $imageId]);
+            $this->decrementUsageCounts($this->getTagsAttachedToImage($imageId));
 
-            $deleteStatement = $this->pdo->prepare('DELETE FROM image_tag WHERE image_id = :image_id');
-            $deleteStatement->execute(['image_id' => $imageId]);
-            return $deleteStatement->rowCount();
+            $associationCriteria = new QueryCriteria();
+            $associationCriteria->delete(ImageTagEntity::class)
+                ->andWhere('image_id = :image_id')
+                ->withParameters(['image_id' => $imageId]);
+            $statement = $this->prepare($associationCriteria);
+            $statement->execute();
+            return $statement->rowCount();
         });
     }
 
@@ -239,8 +226,8 @@ readonly class TagService
     {
         $normalizedName = self::normalizeName($name);
         return $this->withinTransaction(function () use ($normalizedName): bool {
-            $tagId = $this->findTagId($normalizedName);
-            return $tagId !== null && $this->deleteTagByIdWithinTransaction($tagId);
+            $tag = $this->findTag($normalizedName);
+            return $tag !== null && $this->deleteTagEntityWithinTransaction($tag);
         });
     }
 
@@ -261,10 +248,15 @@ readonly class TagService
      */
     public function getCategoryNames(): array
     {
-        $statement = $this->pdo->query(
-            'SELECT name FROM tag_category ORDER BY name COLLATE NOCASE ASC, name ASC'
+        $criteria = new QueryCriteria();
+        $criteria->select(TagCategoryEntity::class)
+            ->orderBy('name COLLATE NOCASE')
+            ->orderBy('name');
+        $categories = $this->execute($criteria) ?? [];
+        return array_map(
+            static fn(TagCategoryEntity $category): string => $category->getName(),
+            $categories
         );
-        return array_map('strval', $statement->fetchAll(PDO::FETCH_COLUMN));
     }
 
     /**
@@ -272,14 +264,8 @@ readonly class TagService
      */
     public function getTagsForImage(int $imageId): array
     {
-        $statement = $this->pdo->prepare(
-            'SELECT t.name FROM tag t '
-            . 'INNER JOIN image_tag it ON it.tag_id = t.id '
-            . 'WHERE it.image_id = :image_id '
-            . 'ORDER BY t.name COLLATE NOCASE ASC, t.name ASC'
-        );
-        $statement->execute(['image_id' => $imageId]);
-        return array_map('strval', $statement->fetchAll(PDO::FETCH_COLUMN));
+        $tags = $this->getTagsAttachedToImage($imageId);
+        return array_map(static fn(TagEntity $tag): string => $tag->getName(), $tags);
     }
 
     /**
@@ -294,13 +280,15 @@ readonly class TagService
             return [];
         }
 
-        $escapedPrefix = self::escapeLikePattern($normalizedPrefix) . '%';
-        $statement = $this->pdo->prepare(
-            "SELECT name FROM tag WHERE name COLLATE NOCASE LIKE :prefix ESCAPE '\\' "
-            . 'ORDER BY usage_count DESC, name COLLATE NOCASE ASC LIMIT 15'
-        );
-        $statement->execute(['prefix' => $escapedPrefix]);
-        return array_map('strval', $statement->fetchAll(PDO::FETCH_COLUMN));
+        $criteria = new QueryCriteria();
+        $criteria->select(TagEntity::class)
+            ->andWhere("name COLLATE NOCASE LIKE :prefix ESCAPE '\\'")
+            ->withParameters(['prefix' => self::escapeLikePattern($normalizedPrefix) . '%'])
+            ->orderBy('usage_count', QueryCriteria::ORDER_DESC)
+            ->orderBy('name COLLATE NOCASE')
+            ->maxResults(self::SUGGEST_LIMIT);
+        $tags = $this->execute($criteria) ?? [];
+        return array_map(static fn(TagEntity $tag): string => $tag->getName(), $tags);
     }
 
     /**
@@ -315,42 +303,23 @@ readonly class TagService
         }
 
         $query = self::normalizeTagName($query);
-        $where = '';
-        $parameters = [];
-        if ($query !== '') {
-            $where = " WHERE t.name COLLATE NOCASE LIKE :query ESCAPE '\\'";
-            $parameters['query'] = '%' . self::escapeLikePattern($query) . '%';
-        }
 
-        $countStatement = $this->pdo->prepare('SELECT COUNT(*) FROM tag t' . $where);
-        $countStatement->execute($parameters);
-        $total = (int)$countStatement->fetchColumn();
+        $countCriteria = new QueryCriteria();
+        $countCriteria->select(TagEntity::class);
+        self::applyBrowseFilter($countCriteria, $query);
+        $total = $this->countResults($countCriteria);
 
-        $statement = $this->pdo->prepare(
-            'SELECT t.name, c.name AS category, t.usage_count '
-            . 'FROM tag t INNER JOIN tag_category c ON c.id = t.category_id'
-            . $where
-            . ' ORDER BY t.usage_count DESC, t.name COLLATE NOCASE ASC'
-            . ' LIMIT :limit OFFSET :offset'
-        );
-        foreach ($parameters as $name => $value) {
-            $statement->bindValue(':' . $name, $value, PDO::PARAM_STR);
-        }
-        $statement->bindValue(':limit', self::BROWSE_PER_PAGE, PDO::PARAM_INT);
-        $statement->bindValue(':offset', ($page - 1) * self::BROWSE_PER_PAGE, PDO::PARAM_INT);
-        $statement->execute();
-
-        $tags = [];
-        while ($row = $statement->fetch(PDO::FETCH_ASSOC)) {
-            $tags[] = [
-                'name' => (string)$row['name'],
-                'category' => (string)$row['category'],
-                'usageCount' => (int)$row['usage_count'],
-            ];
-        }
+        $pageCriteria = new QueryCriteria();
+        $pageCriteria->select(TagEntity::class)
+            ->orderBy('usage_count', QueryCriteria::ORDER_DESC)
+            ->orderBy('name COLLATE NOCASE')
+            ->maxResults(self::BROWSE_PER_PAGE)
+            ->skipResults(($page - 1) * self::BROWSE_PER_PAGE);
+        self::applyBrowseFilter($pageCriteria, $query);
+        $tags = $this->execute($pageCriteria) ?? [];
 
         return [
-            'tags' => $tags,
+            'tags' => $this->withCategoryNames($tags),
             'page' => $page,
             'perPage' => self::BROWSE_PER_PAGE,
             'total' => $total,
@@ -375,71 +344,266 @@ readonly class TagService
             return [];
         }
 
-        $placeholders = [];
-        $parameters = [];
-        foreach (array_values($uniqueIds) as $index => $imageId) {
-            $parameterName = 'image_id_' . $index;
-            $placeholders[] = ':' . $parameterName;
-            $parameters[$parameterName] = $imageId;
+        // image_tag rows are unique per image/tag pair, so per-tag row counts
+        // equal the distinct image counts
+        $usageCounts = [];
+        foreach ($this->findAssociationsByImageIds(array_values($uniqueIds)) as $association) {
+            $tagId = $association->getTagId();
+            $usageCounts[$tagId] = ($usageCounts[$tagId] ?? 0) + 1;
+        }
+        if ($usageCounts === []) {
+            return [];
         }
 
-        $statement = $this->pdo->prepare(
-            'SELECT t.name, COUNT(DISTINCT it.image_id) AS image_count '
-            . 'FROM image_tag it INNER JOIN tag t ON t.id = it.tag_id '
-            . 'WHERE it.image_id IN (' . implode(', ', $placeholders) . ') '
-            . 'GROUP BY t.id '
-            . 'ORDER BY image_count DESC, t.name COLLATE NOCASE ASC, t.name ASC '
-            . 'LIMIT :limit'
-        );
-        foreach ($parameters as $name => $imageId) {
-            $statement->bindValue(':' . $name, $imageId, PDO::PARAM_INT);
-        }
-        $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
-        $statement->execute();
+        $tags = $this->findTagsByIds(array_keys($usageCounts));
+        usort($tags, static function (TagEntity $a, TagEntity $b) use ($usageCounts): int {
+            $countDifference = $usageCounts[$b->getId()] <=> $usageCounts[$a->getId()];
+            if ($countDifference !== 0) {
+                return $countDifference;
+            }
+            // strcasecmp mirrors the case-insensitive (ASCII) NOCASE collation,
+            // strcmp breaks remaining ties exactly like the second ORDER BY term
+            return strcasecmp($a->getName(), $b->getName()) ?: strcmp($a->getName(), $b->getName());
+        });
 
-        $tags = [];
-        while ($row = $statement->fetch(PDO::FETCH_ASSOC)) {
-            $tags[] = [
-                'name' => (string)$row['name'],
-                'imageCount' => (int)$row['image_count'],
+        $result = [];
+        foreach (array_slice($tags, 0, $limit) as $tag) {
+            $result[] = [
+                'name' => $tag->getName(),
+                'imageCount' => $usageCounts[$tag->getId()],
             ];
         }
-        return $tags;
+        return $result;
     }
 
     public function getUsageCount(string $tagName): ?int
     {
         $normalizedName = self::normalizeName($tagName);
-        $statement = $this->pdo->prepare(
-            'SELECT usage_count FROM tag WHERE name = :name COLLATE NOCASE LIMIT 1'
-        );
-        $statement->execute(['name' => $normalizedName]);
-        $usageCount = $statement->fetchColumn();
-        return $usageCount === false ? null : (int)$usageCount;
+        return $this->findTag($normalizedName)?->getUsageCount();
     }
 
-    /** @return array{id: int, name: string}|null */
-    private function findCategory(string $name): ?array
+    private function findTag(string $name): ?TagEntity
     {
-        $statement = $this->pdo->prepare(
-            'SELECT id, name FROM tag_category WHERE name = :name COLLATE NOCASE LIMIT 1'
-        );
-        $statement->execute(['name' => $name]);
-        $row = $statement->fetch(PDO::FETCH_ASSOC);
-        if ($row === false) {
-            return null;
+        $criteria = new QueryCriteria();
+        $criteria->select(TagEntity::class)
+            ->andWhere('name = :name COLLATE NOCASE')
+            ->withParameters(['name' => $name])
+            ->maxResults(1);
+        return ($this->execute($criteria) ?? [])[0] ?? null;
+    }
+
+    private function findTagById(int $tagId): ?TagEntity
+    {
+        $criteria = new QueryCriteria();
+        $criteria->select(TagEntity::class)
+            ->andWhere('id = :tag_id')
+            ->withParameters(['tag_id' => $tagId])
+            ->maxResults(1);
+        return ($this->execute($criteria) ?? [])[0] ?? null;
+    }
+
+    private function findCategory(string $name): ?TagCategoryEntity
+    {
+        $criteria = new QueryCriteria();
+        $criteria->select(TagCategoryEntity::class)
+            ->andWhere('name = :name COLLATE NOCASE')
+            ->withParameters(['name' => $name])
+            ->maxResults(1);
+        return ($this->execute($criteria) ?? [])[0] ?? null;
+    }
+
+    /**
+     * @param list<int> $tagIds
+     * @return array<TagEntity>
+     */
+    private function findTagsByIds(array $tagIds): array
+    {
+        if ($tagIds === []) {
+            return [];
         }
-        return ['id' => (int)$row['id'], 'name' => (string)$row['name']];
+        [$placeholders, $parameters] = $this->buildInClause('tag_id', $tagIds);
+        $criteria = new QueryCriteria();
+        $criteria->select(TagEntity::class)
+            ->andWhere('id IN (' . implode(', ', $placeholders) . ')')
+            ->withParameters($parameters)
+            ->orderBy('name COLLATE NOCASE')
+            ->orderBy('name');
+        return $this->execute($criteria) ?? [];
     }
 
-    private function findTagId(string $name): ?int
+    /**
+     * @param list<int> $categoryIds
+     * @return array<TagCategoryEntity>
+     */
+    private function findCategoriesByIds(array $categoryIds): array
     {
-        $statement = $this->pdo->prepare(
-            'SELECT id FROM tag WHERE name = :name COLLATE NOCASE LIMIT 1'
-        );
-        $statement->execute(['name' => $name]);
-        $tagId = $statement->fetchColumn();
-        return $tagId === false ? null : (int)$tagId;
+        if ($categoryIds === []) {
+            return [];
+        }
+        [$placeholders, $parameters] = $this->buildInClause('category_id', $categoryIds);
+        $criteria = new QueryCriteria();
+        $criteria->select(TagCategoryEntity::class)
+            ->andWhere('id IN (' . implode(', ', $placeholders) . ')')
+            ->withParameters($parameters)
+            ->orderBy('name COLLATE NOCASE')
+            ->orderBy('name');
+        return $this->execute($criteria) ?? [];
+    }
+
+    /**
+     * @param list<int> $imageIds
+     * @return array<ImageTagEntity>
+     */
+    private function findAssociationsByImageIds(array $imageIds): array
+    {
+        [$placeholders, $parameters] = $this->buildInClause('image_id', $imageIds);
+        $criteria = new QueryCriteria();
+        $criteria->select(ImageTagEntity::class)
+            ->andWhere('image_id IN (' . implode(', ', $placeholders) . ')')
+            ->withParameters($parameters);
+        return $this->execute($criteria) ?? [];
+    }
+
+    /** @return array<TagEntity> tags attached to the image, ordered by name */
+    private function getTagsAttachedToImage(int $imageId): array
+    {
+        $associationCriteria = new QueryCriteria();
+        $associationCriteria->select(ImageTagEntity::class)
+            ->andWhere('image_id = :image_id')
+            ->withParameters(['image_id' => $imageId]);
+        $associations = $this->execute($associationCriteria) ?? [];
+        if ($associations === []) {
+            return [];
+        }
+
+        $tagIds = [];
+        foreach ($associations as $association) {
+            $tagIds[$association->getTagId()] = $association->getTagId();
+        }
+        return $this->findTagsByIds(array_values($tagIds));
+    }
+
+    private function imageExists(int $imageId): bool
+    {
+        $criteria = new QueryCriteria();
+        $criteria->select(ImageEntity::class)
+            ->andWhere('id = :image_id')
+            ->withParameters(['image_id' => $imageId])
+            ->maxResults(1);
+        return ($this->execute($criteria) ?? []) !== [];
+    }
+
+    /** Decrements the usage counter, never letting it drop below zero. */
+    private function decrementUsageCount(TagEntity $tag): void
+    {
+        if ($tag->getUsageCount() < 1) {
+            return;
+        }
+        $tag->setUsageCount($tag->getUsageCount() - 1);
+        $this->update($tag);
+    }
+
+    /**
+     * Bulk-decrements the usage counters through the entity save mechanism within
+     * one transaction.
+     *
+     * @param array<TagEntity> $tags
+     */
+    private function decrementUsageCounts(array $tags): void
+    {
+        foreach ($tags as $tag) {
+            if ($tag->getUsageCount() > 0) {
+                $tag->setUsageCount($tag->getUsageCount() - 1);
+            }
+        }
+        $this->saveAll($tags);
+    }
+
+    /**
+     * @param array<TagEntity> $tags
+     * @return list<array{name: string, category: string, usageCount: int}>
+     */
+    private function withCategoryNames(array $tags): array
+    {
+        if ($tags === []) {
+            return [];
+        }
+
+        $categoryIds = [];
+        foreach ($tags as $tag) {
+            $categoryIds[$tag->getCategoryId()] = $tag->getCategoryId();
+        }
+        $categoryNames = [];
+        foreach ($this->findCategoriesByIds(array_values($categoryIds)) as $category) {
+            $categoryNames[$category->getId()] = $category->getName();
+        }
+
+        $result = [];
+        foreach ($tags as $tag) {
+            // missing categories behave like the INNER JOIN they replace: the row is dropped
+            $categoryName = $categoryNames[$tag->getCategoryId()] ?? null;
+            if ($categoryName === null) {
+                continue;
+            }
+            $result[] = [
+                'name' => $tag->getName(),
+                'category' => $categoryName,
+                'usageCount' => $tag->getUsageCount(),
+            ];
+        }
+        return $result;
+    }
+
+    private function deleteTagByIdWithinTransaction(int $tagId): bool
+    {
+        $tag = $this->findTagById($tagId);
+        return $tag !== null && $this->deleteTagEntityWithinTransaction($tag);
+    }
+
+    private function deleteTagEntityWithinTransaction(TagEntity $tag): bool
+    {
+        if (mb_strtolower($tag->getName(), 'UTF-8') === 'tagme') {
+            return false;
+        }
+
+        $associationCriteria = new QueryCriteria();
+        $associationCriteria->delete(ImageTagEntity::class)
+            ->andWhere('tag_id = :tag_id')
+            ->withParameters(['tag_id' => $tag->getId()]);
+        $this->execute($associationCriteria);
+
+        $tagCriteria = new QueryCriteria();
+        $tagCriteria->delete(TagEntity::class)
+            ->andWhere('id = :tag_id')
+            ->withParameters(['tag_id' => $tag->getId()]);
+        $statement = $this->prepare($tagCriteria);
+        $statement->execute();
+        return $statement->rowCount() > 0;
+    }
+
+    private static function applyBrowseFilter(QueryCriteria $criteria, string $query): void
+    {
+        if ($query === '') {
+            return;
+        }
+        $criteria->andWhere("name COLLATE NOCASE LIKE :query ESCAPE '\\'")
+            ->withParameters(['query' => '%' . self::escapeLikePattern($query) . '%']);
+    }
+
+    /**
+     * @param list<int> $values
+     * @return array{0: list<string>, 1: array<string, int>}
+     */
+    private static function buildInClause(string $parameterPrefix, array $values): array
+    {
+        $placeholders = [];
+        $parameters = [];
+        foreach (array_values($values) as $index => $value) {
+            $parameterName = "{$parameterPrefix}_$index";
+            $placeholders[] = ":$parameterName";
+            $parameters[$parameterName] = $value;
+        }
+        return [$placeholders, $parameters];
     }
 
     private static function normalizeCategoryName(string $name): string
@@ -466,51 +630,19 @@ readonly class TagService
         }
     }
 
-    private function deleteTagByIdWithinTransaction(int $tagId): bool
+    private static function isUniqueConstraintViolation(Throwable $throwable): bool
     {
-        $statement = $this->pdo->prepare('SELECT name FROM tag WHERE id = :tag_id LIMIT 1');
-        $statement->execute(['tag_id' => $tagId]);
-        $tagName = $statement->fetchColumn();
-        if ($tagName === false || mb_strtolower((string)$tagName, 'UTF-8') === 'tagme') {
-            return false;
+        for ($current = $throwable; $current !== null; $current = $current->getPrevious()) {
+            $message = mb_strtolower($current->getMessage(), 'UTF-8');
+            if (str_contains($message, 'unique constraint') || str_contains($message, 'duplicate entry')) {
+                return true;
+            }
         }
-
-        $associationStatement = $this->pdo->prepare('DELETE FROM image_tag WHERE tag_id = :tag_id');
-        $associationStatement->execute(['tag_id' => $tagId]);
-        $deleteStatement = $this->pdo->prepare('DELETE FROM tag WHERE id = :tag_id');
-        $deleteStatement->execute(['tag_id' => $tagId]);
-        return $deleteStatement->rowCount() > 0;
-    }
-
-    private static function isUniqueConstraintViolation(PDOException $exception): bool
-    {
-        $message = mb_strtolower($exception->getMessage(), 'UTF-8');
-        return str_contains($message, 'unique constraint') || str_contains($message, 'duplicate entry');
+        return false;
     }
 
     private static function escapeLikePattern(string $value): string
     {
         return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
-    }
-
-    private function withinTransaction(callable $operation): mixed
-    {
-        $ownsTransaction = !$this->pdo->inTransaction();
-        if ($ownsTransaction) {
-            $this->pdo->beginTransaction();
-        }
-
-        try {
-            $result = $operation();
-            if ($ownsTransaction) {
-                $this->pdo->commit();
-            }
-            return $result;
-        } catch (Throwable $throwable) {
-            if ($ownsTransaction && $this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            throw $throwable;
-        }
     }
 }

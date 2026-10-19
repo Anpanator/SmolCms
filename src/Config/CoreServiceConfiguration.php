@@ -175,7 +175,6 @@ class CoreServiceConfiguration
                 parameters: [
                     ImageEntityService::class,
                     UserService::class,
-                    PDO::class,
                     TagService::class,
                 ]
             ),

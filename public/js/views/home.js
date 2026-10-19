@@ -5,7 +5,7 @@
  */
 import {get} from '../api.js';
 import {el} from '../dom.js';
-import {normalizeTags, createSearchView} from '../search.js';
+import {createSearchView, normalizeTags} from '../search.js';
 import {messageForStatus} from '../forms.js';
 
 const IMAGES_URL = '/api/images';
@@ -25,6 +25,7 @@ export function createTagList(tags = [], activeTags = []) {
                     className: `tags-link${isActive ? ' tags-link--active' : ''}`,
                     attributes: {
                         href: buildHomePath(1, tag.name),
+                        'data-tag-name': tag.name,
                         ...(isActive ? { 'aria-current': 'page' } : {}),
                     },
                     children: tag.name,
@@ -131,13 +132,13 @@ async function loadImages({grid, tagView, pagination, page, tags, navigate}) {
 function createPagination(initialPage, onPageChange) {
     let currentPage = initialPage;
     const previous = el('button', {
-        className: 'pagination-button',
+        className: 'pagination-button pagination-button--previous',
         attributes: { type: 'button', disabled: '' },
         children: 'Previous',
     });
     const label = el('span', { className: 'pagination-label', children: 'Loading…' });
     const next = el('button', {
-        className: 'pagination-button',
+        className: 'pagination-button pagination-button--next',
         attributes: { type: 'button', disabled: '' },
         children: 'Next',
     });
@@ -231,7 +232,7 @@ function createTile(image) {
         : el('span', { className: 'tile-placeholder', children: 'No preview' });
     return el('a', {
         className: 'tile tile--link',
-        attributes: { href: `/image?id=${image.id}` },
+        attributes: {href: `/image?id=${image.id}`, 'data-image-id': image.id},
         children: child,
     });
 }

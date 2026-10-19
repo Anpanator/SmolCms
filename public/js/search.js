@@ -145,6 +145,7 @@ export function createSearchView({onSearch = () => {}, initialTags = ''} = {}) {
                     id: `${suggestionsId}-option-${index}`,
                     role: 'option',
                     'aria-selected': 'false',
+                    'data-tag': tag,
                 },
                 children: tag,
             });

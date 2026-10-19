@@ -8,11 +8,8 @@
  * Importing this module has no side effects.
  */
 import {postJson} from './api.js';
-import {accessLevelName} from './accessLevel.js';
+import {AccessLevel, accessLevelName} from './accessLevel.js';
 import {el} from './dom.js';
-
-/** AccessLevel::MOD — keep aligned with src/Data/Constant/AccessLevel.php. */
-const MIN_REVIEW_ACCESS_LEVEL = 500;
 
 function navLink(path, label, activePath) {
     return el('a', {
@@ -32,7 +29,7 @@ function sessionItems(user, activePath) {
             navItem(navLink('/', 'Home', activePath)),
             navItem(navLink('/upload-image', 'Upload Image', activePath)),
         ];
-        if ((user.accessLevel ?? 0) >= MIN_REVIEW_ACCESS_LEVEL) {
+        if ((user.accessLevel ?? 0) >= AccessLevel.MOD) {
             items.push(navItem(navLink('/review', 'Mod Queue', activePath)));
             items.push(navItem(navLink('/tags', 'Tags', activePath)));
         }

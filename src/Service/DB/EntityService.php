@@ -90,7 +90,8 @@ abstract readonly class EntityService
             $data = $this->getFieldValueMap($entity);
             $insertQuery = $this->queryBuilder->buildInsertQuery($entity::class);
             $stmt = $this->pdo->prepare($insertQuery);
-            $stmt->execute($data);
+            self::bindParameters($stmt, $data);
+            $stmt->execute();
             $idField = $this->entityAttributeProcessor->getEntityIdFieldName($entity::class);
             if ($idField && $idVal = $this->pdo->lastInsertId()) {
                 $entity->{"set$idField"}((int)$idVal);
@@ -113,6 +114,30 @@ abstract readonly class EntityService
         }
     }
 
+    /**
+     * Bulk save: persists every entity through the regular save mechanism within a
+     * single transaction, so either all or none of the entities are written. Joins
+     * an already open transaction instead of nesting.
+     *
+     * @param array<object> $entities
+     */
+    public function saveAll(array $entities): void
+    {
+        if ($entities === []) {
+            return;
+        }
+        foreach ($entities as $entity) {
+            if (!is_object($entity)) {
+                throw new PersistenceException('saveAll() only accepts entity objects.');
+            }
+        }
+        $this->withinTransaction(function () use ($entities): void {
+            foreach ($entities as $entity) {
+                $this->saveOrUpdate($entity);
+            }
+        });
+    }
+
     public function update(object $entity): void
     {
         try {
@@ -130,7 +155,8 @@ abstract readonly class EntityService
 
             $query = $this->queryBuilder->buildQuery($qc);
             $stmt = $this->pdo->prepare($query);
-            $stmt->execute($qc->getParameters());
+            self::bindParameters($stmt, $qc->getParameters());
+            $stmt->execute();
             // TODO: potential re-sync with db for db-generated values?
         } catch (Throwable $t) {
             throw new PersistenceException('Failed to update entity: ' . $entity::class, $t);
@@ -139,7 +165,8 @@ abstract readonly class EntityService
 
     /**
      * Use this if you want to run a particular query multiple times with different values.
-     * You'll get a PDOStatement where you can update the parameters manually or simply re-execute it if needed.
+     * You'll get a PDOStatement with the criteria's parameters already bound, so you can
+     * update them manually or simply re-execute it if needed.
      *
      * @param QueryCriteria $qc
      * @return PDOStatement
@@ -147,7 +174,49 @@ abstract readonly class EntityService
     protected function prepare(QueryCriteria $qc): PDOStatement
     {
         $query = $this->queryBuilder->buildQuery($qc);
-        return $this->pdo->prepare($query);
+        $stmt = $this->pdo->prepare($query);
+        self::bindParameters($stmt, $qc->getParameters());
+        return $stmt;
+    }
+
+    /**
+     * Counts the rows matching a SELECT criteria. Limit, offset and ordering of the
+     * criteria do not affect the count.
+     */
+    protected function countResults(QueryCriteria $qc): int
+    {
+        $stmt = $this->pdo->prepare($this->queryBuilder->buildCountQuery($qc));
+        self::bindParameters($stmt, $qc->getParameters());
+        $stmt->execute();
+        return (int)$stmt->fetchColumn();
+    }
+
+    /**
+     * Runs the operation inside a transaction. Joins an already open transaction instead
+     * of nesting; only the caller that opened the transaction commits or rolls back.
+     *
+     * @param callable(): mixed $operation
+     * @return mixed
+     */
+    protected function withinTransaction(callable $operation): mixed
+    {
+        $ownsTransaction = !$this->pdo->inTransaction();
+        if ($ownsTransaction) {
+            $this->pdo->beginTransaction();
+        }
+
+        try {
+            $result = $operation();
+            if ($ownsTransaction) {
+                $this->pdo->commit();
+            }
+            return $result;
+        } catch (Throwable $throwable) {
+            if ($ownsTransaction && $this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $throwable;
+        }
     }
 
     /**
@@ -158,15 +227,15 @@ abstract readonly class EntityService
     {
         $stmt = $this->prepare($qc);
         if ($qc->getType() === QueryCriteria::TYPE_SELECT) {
-            return $this->fetchResults($stmt, $qc->getParameters(), $qc->getMainEntity());
+            return $this->fetchResults($stmt, $qc->getMainEntity());
         }
-        $stmt->execute($qc->getParameters());
+        $stmt->execute();
         return null;
     }
 
-    protected function fetchResults(PDOStatement $stmt, array $parameters, string $mappingClass): array
+    protected function fetchResults(PDOStatement $stmt, string $mappingClass): array
     {
-        $success = $stmt->execute($parameters);
+        $success = $stmt->execute();
         $result = [];
         if (!$success) {
             return $result;
@@ -176,6 +245,25 @@ abstract readonly class EntityService
         }
 
         return $result;
+    }
+
+    /**
+     * Binds parameters with their PHP-native types, so comparisons against untyped
+     * expressions (e.g. COUNT(*)) receive integers instead of strings.
+     *
+     * @param array<string, mixed> $parameters
+     */
+    private static function bindParameters(PDOStatement $stmt, array $parameters): void
+    {
+        foreach ($parameters as $name => $value) {
+            $type = match (true) {
+                is_int($value) => PDO::PARAM_INT,
+                is_bool($value) => PDO::PARAM_BOOL,
+                is_null($value) => PDO::PARAM_NULL,
+                default => PDO::PARAM_STR,
+            };
+            $stmt->bindValue(":$name", $value, $type);
+        }
     }
 
     /**

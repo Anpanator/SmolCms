@@ -14,9 +14,9 @@ use SmolCms\Service\Core\CaseConverter;
 use SmolCms\Service\DB\EntityAttributeProcessor;
 use SmolCms\Service\DB\EntityService;
 use SmolCms\Service\DB\QueryBuilder;
+use SmolCms\Service\DB\QueryCriteria;
 use SmolCms\TestUtils\Attributes\Mock;
 use SmolCms\TestUtils\Attributes\Stub;
-use SmolCms\TestUtils\Helper\Capture;
 use SmolCms\TestUtils\SimpleTestCase;
 
 class EntityServiceTest extends SimpleTestCase
@@ -144,7 +144,9 @@ class EntityServiceTest extends SimpleTestCase
             ->seal();
         $this->PDOStatement
             ->expects($this->once())
-            ->method('execute')
+            ->method('execute');
+        $this->PDOStatement
+            ->method('bindValue')
             ->seal();
         $entity = new TestData('test_field_one', null, new DateTime(), null);
         $this->entityService->saveAsNew($entity);
@@ -157,7 +159,7 @@ class EntityServiceTest extends SimpleTestCase
         $dbFieldName = 'date_time';
         $expectedDateStr = '2000-01-01 12:00:00';
         $expectedDate = new DateTime($expectedDateStr);
-        $capturedParams = null;
+        $boundParameters = null;
 
         $entity = new TestEntityWithDateField($expectedDate);
         $this->caseConverter
@@ -181,19 +183,25 @@ class EntityServiceTest extends SimpleTestCase
             ->seal();
         $this->PDOStatement
             ->expects($this->once())
-            ->method('execute')
-            ->with(Capture::arg($capturedParams))
+            ->method('execute');
+        $this->PDOStatement
+            ->method('bindValue')
+            ->willReturnCallback(function (string $parameter, mixed $value) use (&$boundParameters): bool {
+                $boundParameters[$parameter] = $value;
+                return true;
+            })
             ->seal();
 
         $this->entityService->saveAsNew($entity);
 
-        self::assertSame($expectedDateStr, $capturedParams[$dbFieldName]);
+        self::assertSame($expectedDateStr, $boundParameters[":$dbFieldName"]);
     }
 
     public function testUpdate_success(): void
     {
         $expectedDate = new DateTime('2000-01-01 12:00:00');
         $entity = new TestData('updated', 123, $expectedDate, 'optional');
+        $boundParameters = null;
 
         $this->caseConverter
             ->method('camelCaseToSnakeCase')
@@ -220,18 +228,26 @@ class EntityServiceTest extends SimpleTestCase
             ->seal();
         $this->PDOStatement
             ->expects($this->once())
-            ->method('execute')
-            ->with(
-                [
-                    'test_field_one' => 'updated',
-                    'test_field_number_two' => 123,
-                    'test_date_field' => '2000-01-01 12:00:00',
-                    'optional' => 'optional',
-                ]
-            )
+            ->method('execute');
+        $this->PDOStatement
+            ->method('bindValue')
+            ->willReturnCallback(function (string $parameter, mixed $value) use (&$boundParameters): bool {
+                $boundParameters[$parameter] = $value;
+                return true;
+            })
             ->seal();
 
         $this->entityService->update($entity);
+
+        self::assertSame(
+            [
+                ':test_field_one' => 'updated',
+                ':test_field_number_two' => 123,
+                ':test_date_field' => '2000-01-01 12:00:00',
+                ':optional' => 'optional',
+            ],
+            $boundParameters
+        );
     }
 
     public function testSaveAsNew_databaseFailure_isWrapped(): void
@@ -258,7 +274,9 @@ class EntityServiceTest extends SimpleTestCase
         $this->PDOStatement
             ->expects($this->once())
             ->method('execute')
-            ->willThrowException($databaseException)
+            ->willThrowException($databaseException);
+        $this->PDOStatement
+            ->method('bindValue')
             ->seal();
 
         try {
@@ -301,7 +319,9 @@ class EntityServiceTest extends SimpleTestCase
         $this->PDOStatement
             ->expects($this->once())
             ->method('execute')
-            ->willThrowException($databaseException)
+            ->willThrowException($databaseException);
+        $this->PDOStatement
+            ->method('bindValue')
             ->seal();
 
         try {
@@ -344,10 +364,186 @@ class EntityServiceTest extends SimpleTestCase
 
         $this->entityService->update($testEntity);
     }
+
+    public function testSaveAll_savesEveryEntityInOneTransaction(): void
+    {
+        $this->caseConverter
+            ->method('camelCaseToSnakeCase')
+            ->willReturnMap(
+                [
+                    ['testFieldOne', 'test_field_one'],
+                    ['testFieldNumberTwo', 'test_field_number_two'],
+                    ['testDateField', 'test_date_field'],
+                    ['optional', 'optional'],
+                ]
+            )
+            ->seal();
+        $this->entityAttributeProcessor
+            ->method('getEntityIdFieldName')
+            ->willReturn('testFieldNumberTwo')
+            ->seal();
+        $this->queryBuilder
+            ->method('buildInsertQuery')
+            ->willReturn('INSERT INTO test_table (test_field_one) VALUES (:test_field_one)')
+            ->seal();
+        $this->PDOStatement
+            ->expects($this->exactly(2))
+            ->method('execute');
+        $this->PDOStatement
+            ->method('bindValue')
+            ->seal();
+        $this->pdo
+            ->method('prepare')
+            ->willReturn($this->PDOStatement);
+        $this->pdo
+            ->method('inTransaction')
+            ->willReturn(false);
+        $this->pdo
+            ->method('lastInsertId')
+            ->willReturn('7');
+        $this->pdo
+            ->expects($this->once())
+            ->method('beginTransaction');
+        $this->pdo
+            ->expects($this->once())
+            ->method('commit');
+        $this->pdo
+            ->expects($this->never())
+            ->method('rollBack')
+            ->seal();
+
+        $first = new TestData('first', null, new DateTime(), null);
+        $second = new TestData('second', null, new DateTime(), null);
+        $this->entityService->saveAll([$first, $second]);
+
+        self::assertSame(7, $first->testFieldNumberTwo);
+        self::assertSame(7, $second->testFieldNumberTwo);
+    }
+
+    public function testSaveAll_rollsBackAndRethrowsWhenASaveFails(): void
+    {
+        $databaseException = new RuntimeException('database unavailable');
+        $this->caseConverter
+            ->method('camelCaseToSnakeCase')
+            ->willReturnMap(
+                [
+                    ['testFieldOne', 'test_field_one'],
+                    ['testFieldNumberTwo', 'test_field_number_two'],
+                    ['testDateField', 'test_date_field'],
+                    ['optional', 'optional'],
+                ]
+            )
+            ->seal();
+        $this->entityAttributeProcessor
+            ->method('getEntityIdFieldName')
+            ->willReturn('testFieldNumberTwo')
+            ->seal();
+        $this->queryBuilder
+            ->method('buildInsertQuery')
+            ->willReturn('INSERT INTO test_table (test_field_one) VALUES (:test_field_one)')
+            ->seal();
+        $this->PDOStatement
+            ->expects($this->once())
+            ->method('execute')
+            ->willThrowException($databaseException);
+        $this->PDOStatement
+            ->method('bindValue')
+            ->seal();
+        $this->pdo
+            ->method('prepare')
+            ->willReturn($this->PDOStatement);
+        $this->pdo
+            ->method('inTransaction')
+            ->willReturn(false, true);
+        $this->pdo
+            ->expects($this->once())
+            ->method('beginTransaction');
+        $this->pdo
+            ->expects($this->once())
+            ->method('rollBack');
+        $this->pdo
+            ->expects($this->never())
+            ->method('commit')
+            ->seal();
+
+        $first = new TestData('first', null, new DateTime(), null);
+        $second = new TestData('second', null, new DateTime(), null);
+
+        try {
+            $this->entityService->saveAll([$first, $second]);
+            self::fail('Expected saveAll() to throw a PersistenceException when a save fails.');
+        } catch (PersistenceException $exception) {
+            self::assertSame($databaseException, $exception->getPrevious());
+        }
+        self::assertNull($second->testFieldNumberTwo, 'failed bulk save must not reach the second entity');
+    }
+
+    public function testSaveAll_ignoresEmptyList(): void
+    {
+        $this->pdo
+            ->expects($this->never())
+            ->method('prepare');
+        $this->pdo
+            ->expects($this->never())
+            ->method('beginTransaction')
+            ->seal();
+        $this->PDOStatement
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+
+        $this->entityService->saveAll([]);
+        self::assertTrue(true);
+    }
+
+    public function testSaveAll_rejectsNonEntityValues(): void
+    {
+        $this->pdo
+            ->expects($this->never())
+            ->method('prepare')
+            ->seal();
+        $this->PDOStatement
+            ->expects($this->never())
+            ->method('execute')
+            ->seal();
+
+        $this->expectException(PersistenceException::class);
+        $this->entityService->saveAll(['not-an-entity']);
+    }
+
+    public function testCountResults_countsMatchingRows(): void
+    {
+        $this->queryBuilder
+            ->method('buildCountQuery')
+            ->willReturn('SELECT COUNT(*) FROM test_table')
+            ->seal();
+        $this->PDOStatement
+            ->expects($this->once())
+            ->method('execute');
+        $this->PDOStatement
+            ->method('fetchColumn')
+            ->willReturn('4');
+        $this->PDOStatement
+            ->method('bindValue')
+            ->seal();
+        $this->pdo
+            ->method('prepare')
+            ->willReturn($this->PDOStatement)
+            ->seal();
+
+        $criteria = new QueryCriteria();
+        $criteria->select(TestData::class);
+
+        self::assertSame(4, $this->entityService->countResults($criteria));
+    }
 }
 
 readonly class TestEntityService extends EntityService
 {
+    public function countResults(QueryCriteria $qc): int
+    {
+        return parent::countResults($qc);
+    }
 }
 
 class TestEntityWithDateField

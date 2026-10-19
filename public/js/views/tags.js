@@ -3,6 +3,7 @@
  * Importing this module has no side effects.
  */
 import {get, postJson} from '../api.js';
+import {AccessLevel} from '../accessLevel.js';
 import {el} from '../dom.js';
 import {createSearchView, normalizeTags} from '../search.js';
 import {
@@ -19,8 +20,6 @@ import {normalizeTagName, validateTagCategoryName, validateTagName} from '../val
 const TAGS_URL = '/api/tags';
 const CATEGORIES_URL = '/api/tag-categories';
 const PER_PAGE = 25;
-/** AccessLevel::MOD — keep aligned with src/Data/Constant/AccessLevel.php. */
-const MIN_TAG_ACCESS_LEVEL = 500;
 
 /**
  * @param {{ session: *, navigate?: (path: string) => void, query?: URLSearchParams|string }} [context]
@@ -368,13 +367,13 @@ export function createTagsView({
 function createPagination(initialPage, onPageChange) {
     let currentPage = initialPage;
     const previous = el('button', {
-        className: 'pagination-button',
+        className: 'pagination-button pagination-button--previous',
         attributes: {type: 'button', disabled: ''},
         children: 'Previous',
     });
     const label = el('span', {className: 'pagination-label', children: 'Loading…'});
     const next = el('button', {
-        className: 'pagination-button',
+        className: 'pagination-button pagination-button--next',
         attributes: {type: 'button', disabled: ''},
         children: 'Next',
     });
@@ -416,9 +415,10 @@ function createTagRow(tag) {
     const usageCount = Number.isSafeInteger(tag?.usageCount) && tag.usageCount >= 0 ? tag.usageCount : 0;
     return el('tr', {
         className: 'tags-table-row',
+        attributes: {'data-tag-name': tag?.name ?? ''},
         children: [
-            el('td', {children: tag?.name ?? ''}),
-            el('td', {children: tag?.category ?? ''}),
+            el('td', {className: 'tags-table-name', children: tag?.name ?? ''}),
+            el('td', {className: 'tags-table-category', children: tag?.category ?? ''}),
             el('td', {className: 'tags-count-cell', children: usageCount}),
         ],
     });
@@ -472,5 +472,5 @@ function parsePositiveInteger(value, fallback) {
 }
 
 function hasTagsAccess(user) {
-    return (user?.accessLevel ?? 0) >= MIN_TAG_ACCESS_LEVEL;
+    return (user?.accessLevel ?? 0) >= AccessLevel.MOD;
 }

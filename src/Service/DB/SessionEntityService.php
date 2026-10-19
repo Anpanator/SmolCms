@@ -36,7 +36,7 @@ readonly class SessionEntityService extends EntityService
             ->andWhere("created < :created")
             ->withParameters(["created" => date("Y-m-d H:i:s", time() - $seconds)]);
         $statement = $this->prepare($qc);
-        $statement->execute($qc->getParameters());
+        $statement->execute();
         return $statement->rowCount();
     }
 

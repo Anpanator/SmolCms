@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace SmolCms\Service\DB;
 
 use ReflectionClass;
+use SmolCms\Exception\InvalidStateException;
 use SmolCms\Service\Core\CaseConverter;
 
 class QueryBuilder
@@ -75,6 +76,27 @@ class QueryBuilder
             . ')';
 
         return $query;
+    }
+
+    /**
+     * Builds a `SELECT COUNT(*)` for the table of the criteria's main entity,
+     * keeping the criteria's where conditions.
+     */
+    public function buildCountQuery(QueryCriteria $qc): string
+    {
+        if ($qc->getType() !== QueryCriteria::TYPE_SELECT) {
+            throw new InvalidStateException('Count queries can only be built for SELECT criteria.');
+        }
+        $table = $this->entityAttributeProcessor->getEntityTableName($qc->getMainEntity());
+
+        $queryParts = ['SELECT', 'COUNT(*)', 'FROM', $table];
+        $whereParts = $this->buildWhereParts($qc);
+        if (!empty($whereParts)) {
+            $queryParts[] = 'WHERE 1';
+            array_push($queryParts, ...$whereParts);
+        }
+
+        return implode(' ', $queryParts);
     }
 
     private function buildWhereParts(QueryCriteria $qc): array
