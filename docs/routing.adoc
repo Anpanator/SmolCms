@@ -66,16 +66,26 @@ The current configuration contains these user-facing routes:
 | `GET` | `/register` | `IndexController::getAction` | None
 | `GET` | `/settings` | `IndexController::getAction` | None
 | `GET` | `/upload-image` | `IndexController::getAction` | None
+| `GET` | `/image` | `IndexController::getAction` | None
+| `GET` | `/review` | `IndexController::getAction` | None
 | `GET` | `/api/session` | `AuthController::getSessionAction` | None
 | `POST` | `/login` | `AuthController::postAction` | None
 | `POST` | `/register` | `RegisterController::postAction` | None
 | `POST` | `/settings` | `UserProfileController::postAction` | `NOVICE` or higher
 | `POST` | `/logout` | `AuthController::logoutAction` | None
 | `POST` | `/upload-image` | `ImageUploadController::postAction` | `NOVICE` or higher
+| `GET` | `/api/images` | `ImageApiController::getImageListAction` | None
+| `GET` | `/api/image/detail` | `ImageApiController::getImageDetailAction` | `NOVICE` or higher
+| `GET` | `/api/image/sample` | `ImageFileController::sampleAction` | `NOVICE` or higher
+| `GET` | `/api/image/download` | `ImageFileController::downloadAction` | `NOVICE` or higher
+| `GET` | `/api/review/queue` | `ImageReviewController::queueAction` | `MOD` or higher
+| `POST` | `/api/review/approve` | `ImageReviewController::approveAction` | `MOD` or higher
+| `POST` | `/api/review/reject` | `ImageReviewController::rejectAction` | `MOD` or higher
 |===
 
-The five `GET` client paths all return the same HTML shell (see <<_running_the_application>> and <<_frontend_single_page_application>>); the client-side router decides which view to render from the URL path.
+The seven `GET` client paths all return the same HTML shell (see <<_running_the_application>> and <<_frontend_single_page_application>>); the client-side router decides which view to render from the URL path.
 Every other route returns a `JsonResponse` or an empty framework error response (see <<_error_handling_and_responses>>).
+The image endpoints are specified in detail in <<_image_serving_and_review>>.
 
 === Request construction
 

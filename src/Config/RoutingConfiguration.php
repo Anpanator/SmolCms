@@ -6,6 +6,9 @@ namespace SmolCms\Config;
 
 
 use SmolCms\Controller\AuthController;
+use SmolCms\Controller\ImageApiController;
+use SmolCms\Controller\ImageFileController;
+use SmolCms\Controller\ImageReviewController;
 use SmolCms\Controller\ImageUploadController;
 use SmolCms\Controller\IndexController;
 use SmolCms\Controller\RegisterController;
@@ -81,6 +84,58 @@ class RoutingConfiguration
                 path: RouteEnum::UPLOAD_IMAGE->value,
                 method: HttpMethod::POST,
                 controller: ImageUploadController::class,
+            ),
+            RouteEnum::IMAGE_DISPLAY->name => new Route(
+                path: RouteEnum::IMAGE_DISPLAY->value,
+                method: HttpMethod::GET,
+                controller: IndexController::class,
+            ),
+            RouteEnum::IMAGE_REVIEW->name => new Route(
+                path: RouteEnum::IMAGE_REVIEW->value,
+                method: HttpMethod::GET,
+                controller: IndexController::class,
+            ),
+            RouteEnum::API_IMAGES->name => new Route(
+                path: RouteEnum::API_IMAGES->value,
+                method: HttpMethod::GET,
+                controller: ImageApiController::class,
+                handler: 'getImageListAction',
+            ),
+            RouteEnum::API_IMAGE_DETAIL->name => new Route(
+                path: RouteEnum::API_IMAGE_DETAIL->value,
+                method: HttpMethod::GET,
+                controller: ImageApiController::class,
+                handler: 'getImageDetailAction',
+            ),
+            RouteEnum::API_IMAGE_SAMPLE->name => new Route(
+                path: RouteEnum::API_IMAGE_SAMPLE->value,
+                method: HttpMethod::GET,
+                controller: ImageFileController::class,
+                handler: 'sampleAction',
+            ),
+            RouteEnum::API_IMAGE_DOWNLOAD->name => new Route(
+                path: RouteEnum::API_IMAGE_DOWNLOAD->value,
+                method: HttpMethod::GET,
+                controller: ImageFileController::class,
+                handler: 'downloadAction',
+            ),
+            RouteEnum::API_REVIEW_QUEUE->name => new Route(
+                path: RouteEnum::API_REVIEW_QUEUE->value,
+                method: HttpMethod::GET,
+                controller: ImageReviewController::class,
+                handler: 'queueAction',
+            ),
+            RouteEnum::API_REVIEW_APPROVE->name => new Route(
+                path: RouteEnum::API_REVIEW_APPROVE->value,
+                method: HttpMethod::POST,
+                controller: ImageReviewController::class,
+                handler: 'approveAction',
+            ),
+            RouteEnum::API_REVIEW_REJECT->name => new Route(
+                path: RouteEnum::API_REVIEW_REJECT->value,
+                method: HttpMethod::POST,
+                controller: ImageReviewController::class,
+                handler: 'rejectAction',
             ),
         ];
     }
