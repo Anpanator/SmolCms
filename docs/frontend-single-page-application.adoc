@@ -9,7 +9,7 @@ Run `php src/app.php --generate-js-integrity` to refresh the hash; Docker image 
 === Module map
 
 * `main.js`: entry point.
-Loads the session, builds the header/footer navigation, maps client routes (`/`, `/login`, `/register`, `/settings` for Profile, `/upload-image`) to view factories, mounts everything into `#app`, and starts the router.
+Loads the session, builds the header/footer navigation, maps client routes (`/`, `/login`, `/register`, `/settings` for Profile, `/upload-image`, `/image` for the image display view, `/review` for the moderation view) to view factories, mounts everything into `#app`, and starts the router.
 * `api.js`: `fetch` wrapper.
 JSON bodies are serialized and sent with `Content-Type: application/json`; `FormData` instances pass through untouched (the browser sets the multipart boundary).
 Responses are decoded from JSON (raw text for other bodies, `null` for empty ones such as `204`); non-2xx statuses and network failures reject with `ApiError`, which carries the status (`0` for network errors).
@@ -18,11 +18,24 @@ Renders the active view into a container element, intercepts clicks on internal 
 * `session.js`: session state store.
 Loads `GET /api/session` once, caches the user, and exposes `refresh()` plus subscriber notification on every change.
 * `nav.js`: header and footer navigation rendered from session state — anonymous users see Home/Login/Register, logged-in users see Home/Upload Image plus an account dropdown titled with the display name and containing Profile, the named access level, and Logout.
-* `views/`: `home` (tag sidebar plus placeholder tile grid), `login`, `register`, `profile` (editable display name and read-only access level from session state), `upload` (multipart `FormData` with the field `image`), and `notFound`.
+Moderators (`accessLevel >= 500`, `AccessLevel::MOD`) additionally get a Review link in the header; the footer navigation never shows it.
+* `views/`: `home` (tag sidebar plus a tile grid of the newest accepted images loaded from `GET /api/images` — each tile is a link to `/image?id=<id>` with loading skeletons, an empty state, and a non-blocking error message), `login`, `register`, `profile` (editable display name and read-only access level from session state), `upload` (multipart `FormData` with the field `image`), `image` (image display view), `review` (moderation queue for MOD+), and `notFound`.
 * `accessLevel.js`: maps the numeric API values to user-facing names matching the `AccessLevel` enum cases.
 * `dom.js`: the `el()` element-builder helper used by all view and nav modules.
 * `forms.js`: form-field and message builders plus the status-to-message mapping.
 * `validation.js`: client-side validation mirroring the backend field rules.
+
+=== Image display and review
+
+* The home grid fetches `GET /api/images` (public) and renders the returned `thumbSrc` URLs directly as `<img>` sources inside tiles linking to `/image?id=<id>`; an empty list shows "No images uploaded yet." and a failed request a non-blocking error inside the grid, while the tag sidebar stays usable.
+* The image display view (`/image`) reads the `id` from the URL query string (`new URLSearchParams(window.location.search)`, like the login view's `registered` flag) and fetches `GET /api/image/detail?id=<id>`.
+It shares the two-column layout with the home view: tags plus an image-metadata section (upload date, uploader, dimensions, format, human-readable file size) in the sidebar, the image itself in the content area.
+The image uses the `sampleSrc` viewing variant and the download link ("Download full size") the `downloadSrc` variant, always taken verbatim from the API; both are hidden while the values are still `null` ("Image is still being processed.").
+A `401` navigates to the login view, an unknown id shows "Image not found." (a missing or malformed query id is treated the same without a request), and other failures map through `messageForStatus`.
+* The review view (`/review`) is gated client-side to `accessLevel >= 500`; other users see an access-denied message and no queue request is made (the server still enforces the real rules).
+Moderators see the `GET /api/review/queue` items — thumbnail (with fallback text while `thumbSrc` is `null`), uploader, upload date — each with Approve (`POST /api/review/approve?id=<id>`) and Reject (`POST /api/review/reject?id=<id>`) buttons.
+A `204` removes the item from the displayed queue and shows a brief success message; `401` navigates to login, `403` shows a permission message, and `404`/other failures map through `messageForStatus` and refresh the queue.
+* Deep links to `/image?id=7` and `/review` work after a reload because the backend serves the SPA shell for both client-page routes (see <<_image_serving_and_review>>).
 
 === Client behavior
 

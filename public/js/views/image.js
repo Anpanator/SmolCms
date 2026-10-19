@@ -1,0 +1,124 @@
+/**
+ * Image display view: shows the viewing image for a single image together
+ * with its metadata in the sidebar (GET /api/image/detail). Deep-linkable
+ * via /image?id=<id>; the id is read from the URL query string.
+ * Importing this module has no side effects.
+ */
+import { get } from '../api.js';
+import { el } from '../dom.js';
+import { createMessageBox, isAuthError, messageForStatus, showMessage } from '../forms.js';
+import { createTagList } from './home.js';
+
+const DETAIL_URL = '/api/image/detail';
+const NOT_FOUND_MESSAGE = 'Image not found.';
+
+export function createImageView({ navigate, query = new URLSearchParams(window.location.search) } = {}) {
+    const metaList = el('dl', { className: 'image-meta' });
+    const metaSection = el('div', {
+        className: 'image-meta-section',
+        children: [el('h2', { className: 'sidebar-title', children: 'Image details' }), metaList],
+    });
+    const sidebar = el('aside', {
+        className: 'sidebar',
+        children: [
+            el('h2', { className: 'sidebar-title', children: 'Tags' }),
+            createTagList(),
+            metaSection,
+        ],
+    });
+
+    const status = createMessageBox();
+    const imageHolder = el('div', { className: 'image-view' });
+    const content = el('section', {
+        className: 'content',
+        children: [el('h1', { className: 'content-title', children: 'Image' }), status, imageHolder],
+    });
+
+    loadImage(parseImageId(query.get('id')), { navigate, imageHolder, metaList, metaSection, status });
+
+    return el('div', { className: 'layout image-layout', children: [sidebar, content] });
+}
+
+/** Positive-integer string or null (anything else is rejected server-side with 400). */
+function parseImageId(raw) {
+    return /^[1-9][0-9]*$/.test(raw ?? '') ? Number(raw) : null;
+}
+
+async function loadImage(id, { navigate, imageHolder, metaList, metaSection, status }) {
+    if (id === null) {
+        showMessage(status, NOT_FOUND_MESSAGE);
+        return;
+    }
+    try {
+        const data = await get(`${DETAIL_URL}?id=${id}`);
+        renderImage(data?.image ?? null, { imageHolder, metaList, metaSection, status });
+    } catch (error) {
+        if (isAuthError(error)) {
+            navigate('/login');
+            return;
+        }
+        showMessage(status, error?.status === 404 ? NOT_FOUND_MESSAGE : messageForStatus(error?.status ?? 0));
+    }
+}
+
+function renderImage(image, { imageHolder, metaList, metaSection, status }) {
+    if (!image) {
+        showMessage(status, NOT_FOUND_MESSAGE);
+        return;
+    }
+
+    if (image.sampleSrc) {
+        imageHolder.append(el('img', {
+            className: 'image-view-image',
+            attributes: { src: image.sampleSrc, alt: 'Uploaded image' },
+        }));
+    } else {
+        imageHolder.append(el('p', {
+            className: 'image-processing',
+            children: 'Image is still being processed.',
+        }));
+    }
+
+    metaList.append(
+        createMetaItem('Uploaded', image.uploadDate ?? '—'),
+        createMetaItem('Uploader', image.uploader ?? '—'),
+        createMetaItem('Dimensions', formatDimensions(image.width, image.height)),
+        createMetaItem('Format', image.format ?? '—'),
+        createMetaItem('File size', formatFileSize(image.fileSize)),
+    );
+
+    if (image.downloadSrc) {
+        metaSection.append(el('a', {
+            className: 'button button--primary image-download',
+            attributes: { href: image.downloadSrc, download: 'download' },
+            children: 'Download full size',
+        }));
+    }
+}
+
+function createMetaItem(term, value) {
+    return el('div', { className: 'image-meta-item', children: [
+        el('dt', { className: 'image-meta-term', children: term }),
+        el('dd', { className: 'image-meta-value', children: value }),
+    ]});
+}
+
+function formatDimensions(width, height) {
+    return width === null || width === undefined || height === null || height === undefined
+        ? '—'
+        : `${width} × ${height}`;
+}
+
+/** Human-readable file size in B/KB/MB; "—" when unknown. */
+export function formatFileSize(bytes) {
+    if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0) {
+        return '—';
+    }
+    if (bytes < 1024) {
+        return `${bytes} B`;
+    }
+    if (bytes < 1024 ** 2) {
+        return `${(bytes / 1024).toFixed(1)} KB`;
+    }
+    return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+}
