@@ -30,6 +30,7 @@ const IMAGE_STORAGE_DIR = ROOT_DIR . '/private/upload/img';
 const IMAGE_THUMB_DIR = ROOT_DIR . '/public/img/thumb';
 const IMAGE_SAMPLE_DIR = ROOT_DIR . '/private/img/sample';
 const IMAGE_DOWNLOAD_DIR = ROOT_DIR . '/private/img/dl';
+const IMAGE_PROCESSING_LOCK_FILE = ROOT_DIR . '/private/img/processing.lock';
 
 const INFO_LOG_FILE_PATH = ROOT_DIR . '/private/logs/info.log';
 const ERROR_LOG_FILE_PATH = ROOT_DIR . '/private/logs/error.log';

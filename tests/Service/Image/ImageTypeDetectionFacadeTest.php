@@ -9,6 +9,7 @@ use SmolCms\Service\Image\AvifImageTypeDetector;
 use SmolCms\Service\Image\ImageTypeDetectionFacade;
 use SmolCms\Service\Image\JpegImageTypeDetector;
 use SmolCms\Service\Image\PngImageTypeDetector;
+use SmolCms\Service\Image\WebpImageTypeDetector;
 use SmolCms\TestUtils\SimpleTestCase;
 
 class ImageTypeDetectionFacadeTest extends SimpleTestCase
@@ -20,7 +21,8 @@ class ImageTypeDetectionFacadeTest extends SimpleTestCase
         $this->facade = new ImageTypeDetectionFacade(
             new PngImageTypeDetector(),
             new JpegImageTypeDetector(),
-            new AvifImageTypeDetector()
+            new AvifImageTypeDetector(),
+            new WebpImageTypeDetector()
         );
     }
 
@@ -40,6 +42,12 @@ class ImageTypeDetectionFacadeTest extends SimpleTestCase
     {
         $avifContent = '....ftypavif';
         $this->assertEquals(ImageType::AVIF, $this->facade->getImageType($avifContent));
+    }
+
+    public function testDetectsWebp(): void
+    {
+        $webpContent = 'RIFF' . "\x00\x00\x00\x00" . 'WEBP';
+        $this->assertEquals(ImageType::WEBP, $this->facade->getImageType($webpContent));
     }
 
     public function testReturnsNullForUnknownType(): void

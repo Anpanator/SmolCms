@@ -4,7 +4,7 @@
 The application supports CLI commands through `php src/app.php`.
 Flags use a `--` prefix.
 Non-flag tokens following a recognized flag are collected as that flag's `$arguments` array in `$argv` order and passed to `execute()`; separate arguments with spaces and quote values containing spaces.
-Currently only `--generate-migration` uses positional arguments. `--reset` is a modifier forwarded to `--init-db` as an argument.
+Currently only `--generate-migration` and `--process-images` use positional arguments. `--reset` is a modifier forwarded to `--init-db` as an argument.
 Recognized command executors are registered positionally as parameters to `CliCommandHandler` in `CoreServiceConfiguration`.
 A single invocation may contain several distinct flags; each executor whose flag is present runs at most once, in the order its flag first appears on the command line.
 Repeating a flag does not re-run it; the last occurrence's arguments win.
@@ -53,6 +53,12 @@ Reset confirmation is required unless `--noconfirm` is supplied. The prompt is u
 | `--reset`
 a|Modifier for `--init-db`; drops existing tables before loading the schema. It does not run by itself.
 
+| `--process-images [batch-size]`
+a|Processes one batch of `pending` image uploads into their variants (see "Post-upload processing pipeline" in the image uploads documentation).
+`batch-size` must be a positive integer literal and defaults to `100` when omitted; invalid, non-positive, or fractional input prints the usage message and processes nothing.
+The processor fetches up to `batch-size` pending images (oldest uploads first); a failing image is logged and left `pending` for the next run, and the rest of the batch still completes.
+Concurrency guard: the run takes a non-blocking `flock()` on `IMAGE_PROCESSING_LOCK_FILE` (`private/img/processing.lock`), so only one worker can process at a time; if the lock is held, a short notice is printed and the command exits cleanly without processing.
+
 | `--noconfirm`
 a|Modifier for `--migrations` and `--init-db --reset`; suppresses their confirmation prompts.
 It does not execute by itself and has no effect on `--generate-migration` or `--generate-js-integrity`.
@@ -87,6 +93,16 @@ Reset the database with confirmation:
 Reset the database without confirmation:
 
 `php src/app.php --init-db --reset --noconfirm`
+
+Process up to 100 pending images (the default batch size):
+
+`php src/app.php --process-images`
+
+Process up to 25 pending images per run:
+
+`php src/app.php --process-images 25`
+
+`--process-images` is also run by a background worker loop in the Docker container (every minute, up to 100 images per run).
 
 `--noconfirm` and `--reset` may appear before or after `--init-db`; `--reset` has no effect without `--init-db`.
 The position of `--noconfirm` does not affect suppression, but non-flag tokens immediately after `--noconfirm` are consumed as its ignored arguments.

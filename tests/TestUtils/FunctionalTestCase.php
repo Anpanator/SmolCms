@@ -35,6 +35,15 @@ class FunctionalTestCase extends SimpleTestCase
     public static function setUpBeforeClass(): void
     {
         parent::setUpBeforeClass();
+        // Whitelisted directories are runtime directories (untracked); in a fresh checkout
+        // they may be absent, and FileSystemAccessService refuses to be constructed when
+        // an allowed directory does not exist.
+        foreach (FS_APP_LEVEL_WHITELIST as $allowedDir) {
+            if (!is_dir($allowedDir)) {
+                mkdir($allowedDir, 0777, true);
+            }
+        }
+
         self::$serviceConfiguration = new CoreServiceConfiguration();
 
         self::registerTestServices(
