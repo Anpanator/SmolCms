@@ -64,6 +64,23 @@ class ImageUploadValidatorTest extends SimpleTestCase
         $this->assertEquals(HttpStatus::BAD_REQUEST, $this->validator->getStatus($request));
     }
 
+    public function testGetStatus_moreThanTenImages_returnsBadRequest(): void
+    {
+        $request = new Request(
+            url: $this->createUploadUrl(),
+            method: HttpMethod::POST,
+            files: [
+                'image' => [
+                    'name' => array_fill(0, 11, 'test.jpg'),
+                    'tmp_name' => array_fill(0, 11, '/tmp/phpupload'),
+                    'error' => array_fill(0, 11, UPLOAD_ERR_OK),
+                ],
+            ],
+        );
+
+        $this->assertEquals(HttpStatus::BAD_REQUEST, $this->validator->getStatus($request));
+    }
+
     public static function malformedFileProvider(): array
     {
         return [

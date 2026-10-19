@@ -45,8 +45,14 @@ class LoggingServiceTest extends SimpleTestCase
 
         self::assertIsString($infoLog);
         self::assertIsString($errorLog);
-        self::assertStringContainsString('[INFO] Informational message', $infoLog);
-        self::assertStringContainsString('[ERROR] Error message', $errorLog);
+        self::assertMatchesRegularExpression(
+            '/^\[\d{2}-[A-Za-z]{3}-\d{4} \d{2}:\d{2}:\d{2} [^\]]+\] \[INFO\] Informational message$/m',
+            $infoLog,
+        );
+        self::assertMatchesRegularExpression(
+            '/^\[\d{2}-[A-Za-z]{3}-\d{4} \d{2}:\d{2}:\d{2} [^\]]+\] \[ERROR\] Error message$/m',
+            $errorLog,
+        );
     }
 
     public function testLog_UsesTheSelectedPhpErrorLogMode(): void

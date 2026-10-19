@@ -7,7 +7,7 @@
 - **Docker Compose v2** CLI plugin (`docker compose`) — `deploy.sh` delegates building and running to Compose.
 - **Docker Buildx** CLI plugin (`docker buildx`) — required for BuildKit builds; without it Compose falls back to the
   deprecated classic builder.
-- **POSIX shell and GNU coreutils** for `deploy.sh` (`stat`, `chgrp`, `chmod`).
+- **POSIX shell, GNU coreutils, and findutils** for `deploy.sh` (`stat`, `chgrp`, `chmod`, `find`).
 - Base images pulled during the build: `php:8.5-fpm` and `composer:2`.
 
 Both image targets run Nginx and PHP-FPM as the unprivileged `10001:10001` user, listen on container port `8080`, and
@@ -28,8 +28,9 @@ The script prepares the host state directories, then uses Docker Compose v2 (Bui
 target and start the `smolcms-dev` container at <http://localhost:8080>. The port is bound to localhost only; set
 `SMOLCMS_DEV_PORT` to change it.
 SQLite, uploaded images, and logs persist in bind-mounted directories under `~/SmolCms` (`db`, `upload`, `img`,
-`public-img`, `logs`); the script creates them with setgid group-write permissions so the rootless Docker user namespace
-can write while the data stays host-accessible. `display_errors` is enabled in this image.
+`public-img`, `logs`); the script creates them with setgid group-write permissions and repairs group permissions on
+host-owned existing data so the rootless Docker user namespace can write while the data stays host-accessible.
+`display_errors` is enabled in this image.
 On startup the container initializes the database, runs pending migrations, and starts a background loop that processes
 pending image uploads every minute (up to 100 per run).
 

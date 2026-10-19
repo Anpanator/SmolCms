@@ -17,19 +17,26 @@ async function createLoggedInSession() {
     return { session, restore };
 }
 
-function chooseFile(view, name = 'cat.png') {
-    const input = view.querySelector('input[name="image"]');
+function chooseFiles(view, names = ['cat.png']) {
+    const input = view.querySelector('input[name="image[]"]');
     const transfer = new DataTransfer();
-    transfer.items.add(new File(['image-bytes'], name, { type: 'image/png' }));
+    for (const name of names) {
+        transfer.items.add(new File(['image-bytes'], name, {type: 'image/png'}));
+    }
     input.files = transfer.files;
     return input;
 }
 
+function chooseFile(view, name = 'cat.png') {
+    return chooseFiles(view, [name]);
+}
+
 export function testUploadViewRendersFileInput() {
     const view = createUploadView({ navigate: () => {} });
-    const input = view.querySelector('input[name="image"]');
+    const input = view.querySelector('input[name="image[]"]');
     assertTrue(input !== null, 'image file input should exist');
     assertEqual(input.type, 'file');
+    assertTrue(input.multiple, 'image file input should allow multiple files');
     assertTrue(view.querySelector('button[type="submit"]') !== null, 'submit button should exist');
 }
 
@@ -50,6 +57,28 @@ export async function testMissingFileShowsErrorWithoutFetching() {
     }
 }
 
+export async function testMoreThanTenFilesShowsErrorWithoutFetching() {
+    const fetchMock = mockFetch(() => {
+        throw new Error('fetch must not be called with more than 10 files');
+    });
+    const restore = useFetch(fetchMock);
+    try {
+        const view = createUploadView({
+            navigate: () => {
+            }
+        });
+        chooseFiles(view, Array.from({length: 11}, (_, index) => `image-${index}.png`));
+        await submitForm(view.querySelector('form'));
+
+        const error = view.querySelector('.field-error');
+        assertTrue(!error.hidden, 'too many files should show an error');
+        assertTrue(error.textContent.includes('no more than 10'), 'error should state the maximum file count');
+        assertEqual(fetchMock.calls.length, 0);
+    } finally {
+        restore();
+    }
+}
+
 export async function testValidSubmitPostsFormData() {
     const { session, restore } = await createLoggedInSession();
     try {
@@ -60,15 +89,18 @@ export async function testValidSubmitPostsFormData() {
         const restoreUpload = useFetch(fetchMock);
         try {
             const view = createUploadView({ session, navigate: () => {} });
-            const input = chooseFile(view);
+            const input = chooseFiles(view, ['cat.png', 'dog.png']);
             await submitForm(view.querySelector('form'));
 
             assertEqual(fetchMock.calls.length, 1);
             const { options } = fetchMock.calls[0];
             assertEqual(options.method, 'POST');
             assertTrue(options.body instanceof FormData, 'upload must use multipart FormData');
-            assertTrue(options.body.get('image') instanceof File, 'file must be sent in field "image"');
-            assertEqual(options.body.get('image').name, 'cat.png');
+            const files = options.body.getAll('image[]');
+            assertEqual(files.length, 2, 'all selected images must be sent');
+            assertTrue(files.every((file) => file instanceof File), 'files must be sent in field "image[]"');
+            assertEqual(files[0].name, 'cat.png');
+            assertEqual(files[1].name, 'dog.png');
             assertTrue(!(HttpHeader.CONTENT_TYPE in options.headers), 'no manual content-type for multipart');
 
             const message = view.querySelector('.form-message');

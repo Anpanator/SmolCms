@@ -22,7 +22,12 @@ class LoggingService
         LoggingMode $mode = LoggingMode::FILE,
     ): void
     {
-        $formattedMessage = sprintf('[%s] %s', strtoupper($level->value), $message);
+        $formattedMessage = sprintf(
+            '[%s] [%s] %s',
+            date('d-M-Y H:i:s T'),
+            strtoupper($level->value),
+            $message,
+        );
 
         if ($mode === LoggingMode::FILE) {
             error_log($formattedMessage, $mode->value, $this->getLogFilePath($level));

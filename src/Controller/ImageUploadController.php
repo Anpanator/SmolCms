@@ -32,19 +32,34 @@ readonly class ImageUploadController
             return new Response($validationStatus);
         }
 
-        $file = $request->files['image'];
-        $tmpPath = $file['tmp_name'];
-        $fileContent = is_readable($tmpPath) ? file_get_contents($tmpPath) : false;
-        if ($fileContent === false) {
-            return new Response(HttpStatus::INTERNAL_SERVER_ERROR);
+        // Validate every file's readability and type before storing any of the batch.
+        // Keep only paths and types here so a batch does not retain all file contents
+        // in memory at once.
+        $uploads = [];
+        foreach ($this->imageUploadValidator->getFiles($request) as $file) {
+            $tmpPath = $file['tmp_name'];
+            $fileContent = is_readable($tmpPath) ? file_get_contents($tmpPath) : false;
+            if ($fileContent === false) {
+                return new Response(HttpStatus::INTERNAL_SERVER_ERROR);
+            }
+
+            $imageType = $this->imageTypeDetectionFacade->getImageType($fileContent);
+            if ($imageType === null) {
+                return new Response(HttpStatus::BAD_REQUEST);
+            }
+
+            $uploads[] = ['tmpPath' => $tmpPath, 'imageType' => $imageType];
         }
 
-        $imageType = $this->imageTypeDetectionFacade->getImageType($fileContent);
-        if ($imageType === null) {
-            return new Response(HttpStatus::BAD_REQUEST);
-        }
+        foreach ($uploads as $upload) {
+            $tmpPath = $upload['tmpPath'];
+            $fileContent = is_readable($tmpPath) ? file_get_contents($tmpPath) : false;
+            if ($fileContent === false) {
+                return new Response(HttpStatus::INTERNAL_SERVER_ERROR);
+            }
 
-        $this->imageUploadService->upload($fileContent, $imageType);
+            $this->imageUploadService->upload($fileContent, $upload['imageType']);
+        }
 
         return new JsonResponse(
             ['message' => 'Image uploaded successfully.'],

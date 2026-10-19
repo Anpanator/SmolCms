@@ -2,8 +2,8 @@
  * Shared form-building and status-mapping helpers for views.
  * Importing this module has no side effects.
  */
-import { ApiError } from './api.js';
-import { el } from './dom.js';
+import {ApiError} from './api.js';
+import {el} from './dom.js';
 
 /**
  * Maps an API error status code to a user-facing message
@@ -20,7 +20,7 @@ export function messageForStatus(status) {
         case 409:
             return 'This login name is already taken.';
         case 413:
-            return 'The file is too large. The maximum upload size is 100 MB.';
+            return 'The upload is too large. Each image is limited to 100 MB, and a batch to 1001 MB.';
         case 500:
             return 'Something went wrong on the server. Please try again later.';
         default:

@@ -1,13 +1,14 @@
 == Image uploads
 
-Users with `NOVICE` or higher (`401` when anonymous, `403` when below the level) can submit a multipart `POST /upload-image` with the field `image`; `GET /upload-image` serves the same HTML shell as every other client path, and the upload form is rendered client-side.
-`ImageUploadController::postAction` manually runs `ImageUploadValidator` (it is not a `ValidatedRequest`): the validator requires `files['image']` to be an array with `tmp_name` and `name` and requires `is_uploaded_file()`.
-It maps the PHP upload `error` code to explicit response statuses instead of failing silently: `UPLOAD_ERR_INI_SIZE`/`UPLOAD_ERR_FORM_SIZE` → `413`, `UPLOAD_ERR_NO_FILE`/`UPLOAD_ERR_PARTIAL` → `400`, `UPLOAD_ERR_NO_TMP_DIR`/`UPLOAD_ERR_CANT_WRITE`/`UPLOAD_ERR_EXTENSION` → `500`; structural failures and non-SAPI paths → `400`.
+Users with `NOVICE` or higher (`401` when anonymous, `403` when below the level) can submit a multipart `POST /upload-image` with one to ten files in the field `image[]`; `GET /upload-image` serves the same HTML shell as every other client path, and the upload form is rendered client-side.
+`ImageUploadController::postAction` manually runs `ImageUploadValidator` (it is not a `ValidatedRequest`): the validator normalizes PHP's column-oriented multi-file `files['image']` structure, requires each entry to have `tmp_name` and `name`, checks `is_uploaded_file()`, and rejects batches above ten files.
+It maps each PHP upload `error` code to explicit response statuses instead of failing silently: `UPLOAD_ERR_INI_SIZE`/`UPLOAD_ERR_FORM_SIZE` → `413`, `UPLOAD_ERR_NO_FILE`/`UPLOAD_ERR_PARTIAL` → `400`, `UPLOAD_ERR_NO_TMP_DIR`/`UPLOAD_ERR_CANT_WRITE`/`UPLOAD_ERR_EXTENSION` → `500`; structural failures and non-SAPI paths → `400`.
 
-Uploads are limited to **100 MB** per file (`upload_max_filesize = 100M`, `post_max_size = 101M`, nginx `client_max_body_size 101m` — keep these three in sync; larger bodies are rejected by nginx with `413` before PHP sees them).
+Uploads are limited to **100 MB per file** (`upload_max_filesize = 100M`) and **1001 MB per request** (`post_max_size = 1001M`, nginx `client_max_body_size 1001m` — keep the aggregate limits in sync; larger bodies are rejected by nginx with `413` before PHP sees them).
 `memory_limit = 1024M` gives GD headroom for decoding large uploads into uncompressed RGBA buffers.
 
-On success the controller runs `file_get_contents(tmp_name)` (guarded by `is_readable()`, `false` returns `500`; in docker `php.ini` pins `upload_tmp_dir` to the whitelisted `private/upload/tmp`, and for local runs `config.php` adds `sys_get_temp_dir()` to `FS_DIRECTORY_WHITELIST`), then gates on `ImageTypeDetectionFacade` (`Png`, `Jpeg`, `Avif`, and `Webp` detectors, first match wins; `null` returns `400`).
+For every file the controller runs `file_get_contents(tmp_name)` (guarded by `is_readable()`, `false` returns `500`; in docker `php.ini` pins `upload_tmp_dir` to the whitelisted `private/upload/tmp`, and for local runs `config.php` adds `sys_get_temp_dir()` to `FS_DIRECTORY_WHITELIST`), then gates on `ImageTypeDetectionFacade` (`Png`, `Jpeg`, `Avif`, and `Webp` detectors, first match wins; `null` returns `400`).
+It checks all files before storing any, then rereads and uploads them one at a time to bound memory use.
 PNG checks the first 4 bytes for `89504E47`, JPEG checks `FFD8FF`, AVIF checks `ftypavif` or `ftypavis` at offset 4, and WebP checks `RIFF` at offset 0 plus `WEBP` at offset 8.
 
 The rest of the flow is orchestrated by `ImageUploadService::upload(string $imageData, ImageType $imageType): ImageEntity`, which takes the uploader identity from `SessionService::getUserData()` (an unauthenticated session throws `InvalidStateException`; the controller relies on `#[Authenticated]` so this does not occur in practice):

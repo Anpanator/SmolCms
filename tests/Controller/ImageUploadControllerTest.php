@@ -179,6 +179,43 @@ class ImageUploadControllerTest extends FunctionalTestCase
         $this->assertNull($entity->getDownloadFilename());
     }
 
+    public function testPostAction_multipleImages_uploadsEachImage(): void
+    {
+        $this->loginUser('testuser', 'Test User');
+        $existingImageIds = array_map(
+            static fn($entity) => $entity->getId(),
+            $this->imageEntityService->findByStatus(ImageStatus::PENDING)
+        );
+        $jpegPath = ROOT_DIR . '/tests/TestUtils/TestFiles/image.jpg';
+        $pngPath = ROOT_DIR . '/tests/TestUtils/TestFiles/image.png';
+
+        $request = new Request(
+            url: $this->uploadUrl,
+            method: HttpMethod::POST,
+            files: [
+                'image' => [
+                    'name' => ['first.jpg', 'second.png'],
+                    'tmp_name' => [$jpegPath, $pngPath],
+                    'size' => [filesize($jpegPath), filesize($pngPath)],
+                    'type' => ['image/jpeg', 'image/png'],
+                    'error' => [UPLOAD_ERR_OK, UPLOAD_ERR_OK],
+                ],
+            ],
+        );
+
+        $response = $this->simulateRequest($request);
+
+        $this->assertEquals(HttpStatus::CREATED, $response->getStatus());
+        $uploadedEntities = array_values(array_filter(
+            $this->imageEntityService->findByStatus(ImageStatus::PENDING),
+            static fn($entity) => !in_array($entity->getId(), $existingImageIds, true)
+        ));
+        $this->assertCount(2, $uploadedEntities);
+        $extensions = array_map(static fn($entity) => $entity->getOriginalExtension(), $uploadedEntities);
+        sort($extensions);
+        $this->assertSame(['jpeg', 'png'], $extensions);
+    }
+
     private function cleanImageStorage(): void
     {
         $dir = IMAGE_STORAGE_DIR;

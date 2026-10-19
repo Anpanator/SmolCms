@@ -1,5 +1,5 @@
 /**
- * Upload view: file input submitted as multipart FormData (field "image").
+ * Upload view: file input submitted as multipart FormData (field "image[]").
  * On 401 the user is sent to the login view; on 403/500 mapped messages
  * are shown. Importing this module has no side effects.
  */
@@ -15,15 +15,18 @@ import {
     showMessage,
 } from '../forms.js';
 
+const MAX_IMAGES = 10;
+
 export function createUploadView({ navigate }) {
     const fields = {
         image: createField({
-            label: 'Image',
-            name: 'image',
+            label: 'Images (up to 10)',
+            name: 'image[]',
             type: 'file',
             accept: 'image/*',
         }),
     };
+    fields.image.input.multiple = true;
     const message = createMessageBox();
     const submit = el('button', { className: 'button button--primary', attributes: { type: 'submit' }, children: 'Upload' });
 
@@ -36,15 +39,23 @@ export function createUploadView({ navigate }) {
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
         clearMessage(message);
-        const file = fields.image.input.files?.[0];
-        const errors = { image: file ? null : 'Please choose an image file.' };
+        const files = Array.from(fields.image.input.files ?? []);
+        const errors = {
+            image: files.length === 0
+                ? 'Please choose an image file.'
+                : files.length > MAX_IMAGES
+                    ? `Please choose no more than ${MAX_IMAGES} images.`
+                    : null,
+        };
         setFieldErrors(fields, errors);
         if (Object.values(errors).some(Boolean)) {
             return;
         }
 
         const formData = new FormData();
-        formData.append('image', file);
+        for (const file of files) {
+            formData.append('image[]', file);
+        }
         try {
             await postForm('/upload-image', formData);
             showMessage(message, 'Image uploaded successfully.', 'success');
@@ -60,6 +71,6 @@ export function createUploadView({ navigate }) {
 
     return el('section', {
         className: 'page upload-page',
-        children: [el('h1', { className: 'page-title', children: 'Upload image' }), form],
+        children: [el('h1', {className: 'page-title', children: 'Upload images'}), form],
     });
 }
