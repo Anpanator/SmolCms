@@ -5,6 +5,7 @@
 import {get, postJson} from '../api.js';
 import {AccessLevel} from '../accessLevel.js';
 import {el} from '../dom.js';
+import {createPagination} from '../pagination.js';
 import {createSearchView, normalizeTags} from '../search.js';
 import {
     clearMessage,
@@ -119,6 +120,7 @@ export function createTagsView({
         currentPage = page;
         loadTags(currentPage, currentQuery);
     });
+    pagination.element.setAttribute('aria-label', 'Tag pages');
 
     const page = el('section', {
         className: 'tags-page',
@@ -362,53 +364,6 @@ export function createTagsView({
             categorySubmit.disabled = false;
         }
     }
-}
-
-function createPagination(initialPage, onPageChange) {
-    let currentPage = initialPage;
-    const previous = el('button', {
-        className: 'pagination-button pagination-button--previous',
-        attributes: {type: 'button', disabled: ''},
-        children: 'Previous',
-    });
-    const label = el('span', {className: 'pagination-label', children: 'Loading…'});
-    const next = el('button', {
-        className: 'pagination-button pagination-button--next',
-        attributes: {type: 'button', disabled: ''},
-        children: 'Next',
-    });
-
-    previous.addEventListener('click', () => {
-        if (!previous.disabled) {
-            onPageChange(currentPage - 1);
-        }
-    });
-    next.addEventListener('click', () => {
-        if (!next.disabled) {
-            onPageChange(currentPage + 1);
-        }
-    });
-
-    return {
-        element: el('nav', {
-            className: 'pagination',
-            attributes: {'aria-label': 'Tag pages'},
-            children: [previous, label, next],
-        }),
-        loading(page) {
-            currentPage = page;
-            label.textContent = 'Loading…';
-            previous.disabled = true;
-            next.disabled = true;
-        },
-        update({page, total, perPage}) {
-            currentPage = page;
-            const pageCount = Math.max(1, Math.ceil(total / perPage));
-            label.textContent = `Page ${page} of ${pageCount}`;
-            previous.disabled = page <= 1;
-            next.disabled = page >= pageCount;
-        },
-    };
 }
 
 function createTagRow(tag) {

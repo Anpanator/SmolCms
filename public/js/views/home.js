@@ -5,6 +5,7 @@
  */
 import {get} from '../api.js';
 import {el} from '../dom.js';
+import {createPagination} from '../pagination.js';
 import {createSearchView, normalizeTags} from '../search.js';
 import {messageForStatus} from '../forms.js';
 
@@ -79,6 +80,7 @@ export function createHomeView({navigate = () => {}, query = new URLSearchParams
     const pagination = createPagination(requestedPage, (page) => {
         navigate(buildHomePath(page, tags));
     });
+    pagination.element.setAttribute('aria-label', 'Image pages');
 
     const content = el('section', {
         className: 'content',
@@ -127,47 +129,6 @@ async function loadImages({grid, tagView, pagination, page, tags, navigate}) {
         pagination.update({ page, total: 0, perPage: DEFAULT_PER_PAGE });
         grid.replaceChildren(createGridStatus(messageForStatus(error?.status ?? 0), 'error'));
     }
-}
-
-function createPagination(initialPage, onPageChange) {
-    let currentPage = initialPage;
-    const previous = el('button', {
-        className: 'pagination-button pagination-button--previous',
-        attributes: { type: 'button', disabled: '' },
-        children: 'Previous',
-    });
-    const label = el('span', { className: 'pagination-label', children: 'Loading…' });
-    const next = el('button', {
-        className: 'pagination-button pagination-button--next',
-        attributes: { type: 'button', disabled: '' },
-        children: 'Next',
-    });
-
-    previous.addEventListener('click', () => {
-        if (!previous.disabled) {
-            onPageChange(currentPage - 1);
-        }
-    });
-    next.addEventListener('click', () => {
-        if (!next.disabled) {
-            onPageChange(currentPage + 1);
-        }
-    });
-
-    return {
-        element: el('nav', {
-            className: 'pagination',
-            attributes: { 'aria-label': 'Image pages' },
-            children: [previous, label, next],
-        }),
-        update({page, total, perPage}) {
-            currentPage = page;
-            const pageCount = Math.max(1, Math.ceil(total / perPage));
-            label.textContent = `Page ${page} of ${pageCount}`;
-            previous.disabled = page <= 1;
-            next.disabled = page >= pageCount;
-        },
-    };
 }
 
 function buildImagesUrl(page, tags) {

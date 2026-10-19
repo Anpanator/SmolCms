@@ -7,6 +7,7 @@
 import {get, postJson} from '../api.js';
 import {AccessLevel} from '../accessLevel.js';
 import {el} from '../dom.js';
+import {createImageViewer} from '../imageViewer.js';
 import {clearMessage, createMessageBox, isAuthError, messageForStatus, showMessage,} from '../forms.js';
 
 const QUEUE_URL = '/api/review/queue';
@@ -30,12 +31,10 @@ export function createReviewView({ session, navigate }) {
     }
 
     const status = createMessageBox();
-    const imageHolder = el('div', {
-        className: 'review-image-frame',
-        attributes: {'aria-live': 'polite'},
-        children: el('p', {className: 'image-processing', children: 'Loading moderation queue…'}),
-    });
-    const metadataList = el('dl', {className: 'review-metadata'});
+    const imageViewer = createImageViewer();
+    imageViewer.showStatus('Loading moderation queue…');
+    const imageHolder = imageViewer.element;
+    const metadataList = imageViewer.metadata;
     const queueList = el('ul', {
         className: 'review-list',
         children: el('li', {className: 'review-empty', children: 'Loading queue…'}),
@@ -57,8 +56,6 @@ export function createReviewView({ session, navigate }) {
     let detailRequestId = 0;
     let loadingImageId = null;
     let actionPending = false;
-    let imagePan = null;
-    let suppressImageClick = false;
     const imageDetails = new Map();
 
     const page = el('section', {
@@ -134,11 +131,7 @@ export function createReviewView({ session, navigate }) {
                 className: 'review-empty',
                 children: 'Could not load the moderation queue.',
             }));
-            resetImageFrame();
-            imageHolder.replaceChildren(el('p', {
-                className: 'image-processing',
-                children: 'The moderation queue could not be loaded.',
-            }));
+            imageViewer.showStatus('The moderation queue could not be loaded.');
         }
     }
 
@@ -152,12 +145,7 @@ export function createReviewView({ session, navigate }) {
                 className: 'review-empty',
                 children: 'No images are waiting for moderation.',
             }));
-            resetImageFrame();
-            imageHolder.replaceChildren(el('p', {
-                className: 'image-processing',
-                children: 'No images are waiting for moderation.',
-            }));
-            metadataList.replaceChildren();
+            imageViewer.clear('No images are waiting for moderation.');
             setActionButtonsDisabled(true);
             return;
         }
@@ -243,12 +231,7 @@ export function createReviewView({ session, navigate }) {
             return;
         }
 
-        resetImageFrame();
-        imageHolder.replaceChildren(el('p', {
-            className: 'image-processing',
-            children: 'Loading full-size image…',
-        }));
-        renderMetadata(image);
+        imageViewer.update(image, {status: 'Loading full-size image…'});
         const requestId = ++detailRequestId;
         loadingImageId = image.id;
         get(`${IMAGE_DETAIL_URL}?id=${image.id}`)
@@ -259,10 +242,7 @@ export function createReviewView({ session, navigate }) {
                 loadingImageId = null;
                 const details = data?.image;
                 if (!details) {
-                    imageHolder.replaceChildren(el('p', {
-                        className: 'image-processing',
-                        children: 'Full-size image details are unavailable.',
-                    }));
+                    imageViewer.update(image, {status: 'Full-size image details are unavailable.'});
                     return;
                 }
                 if (details.downloadSrc) {
@@ -275,10 +255,7 @@ export function createReviewView({ session, navigate }) {
                     return;
                 }
                 loadingImageId = null;
-                imageHolder.replaceChildren(el('p', {
-                    className: 'image-processing',
-                    children: 'Full-size image could not be loaded.',
-                }));
+                imageViewer.showStatus('Full-size image could not be loaded.');
                 if (isAuthError(error)) {
                     navigate('/login');
                     return;
@@ -288,153 +265,7 @@ export function createReviewView({ session, navigate }) {
     }
 
     function renderActiveImage(queueImage, details) {
-        renderMetadata({...queueImage, ...details});
-        if (!details.downloadSrc) {
-            resetImageFrame();
-            imageHolder.replaceChildren(el('p', {
-                className: 'image-processing',
-                children: 'The full-size image is still being processed.',
-            }));
-            return;
-        }
-        resetImageFrame();
-        const image = el('img', {
-            className: 'review-image',
-            attributes: {
-                src: details.downloadSrc,
-                alt: `Full-size image ${queueImage.id} for moderation`,
-                role: 'button',
-                tabindex: '0',
-                'aria-label': 'View image at full size; drag to pan',
-                'aria-pressed': 'false',
-                draggable: 'false',
-            },
-        });
-        let fullSize = false;
-        image.addEventListener('click', (event) => {
-            if (suppressImageClick) {
-                suppressImageClick = false;
-                event.preventDefault();
-                event.stopPropagation();
-                return;
-            }
-            toggleImageSize();
-        });
-        image.addEventListener('keydown', (event) => {
-            if (event.key !== 'Enter' && event.key !== ' ') {
-                return;
-            }
-            event.preventDefault();
-            event.stopPropagation();
-            suppressImageClick = false;
-            toggleImageSize();
-        });
-        image.addEventListener('pointerdown', (event) => {
-            if (imagePan || !fullSize || !event.isPrimary || event.button !== 0 || !imageOverflows()) {
-                return;
-            }
-            suppressImageClick = false;
-            imagePan = {
-                pointerId: event.pointerId,
-                startX: event.clientX,
-                startY: event.clientY,
-                scrollLeft: imageHolder.scrollLeft,
-                scrollTop: imageHolder.scrollTop,
-                moved: false,
-            };
-            imageHolder.classList.add('review-image-frame--panning');
-            document.addEventListener('pointermove', moveImage, {passive: false});
-            document.addEventListener('pointerup', finishImagePan);
-            document.addEventListener('pointercancel', cancelImagePan);
-        });
-        image.addEventListener('dragstart', (event) => event.preventDefault());
-        imageHolder.replaceChildren(image);
-
-        function toggleImageSize() {
-            fullSize = !fullSize;
-            setImageSize(fullSize);
-        }
-    }
-
-    function setImageSize(fullSize) {
-        cancelImagePan(null);
-        imageHolder.classList.toggle('review-image-frame--full-size', fullSize);
-        imageHolder.scrollLeft = 0;
-        imageHolder.scrollTop = 0;
-        const image = imageHolder.querySelector('.review-image');
-        if (!image) {
-            return;
-        }
-        image.classList.toggle('review-image--full-size', fullSize);
-        image.setAttribute('aria-pressed', fullSize ? 'true' : 'false');
-        image.setAttribute('aria-label', fullSize
-            ? 'Return to fitted image; drag to pan'
-            : 'View image at full size; drag to pan');
-    }
-
-    function imageOverflows() {
-        return imageHolder.scrollWidth > imageHolder.clientWidth
-            || imageHolder.scrollHeight > imageHolder.clientHeight;
-    }
-
-    function moveImage(event) {
-        if (!imagePan || event.pointerId !== imagePan.pointerId) {
-            return;
-        }
-        const deltaX = event.clientX - imagePan.startX;
-        const deltaY = event.clientY - imagePan.startY;
-        if (!imagePan.moved && Math.hypot(deltaX, deltaY) < 3) {
-            return;
-        }
-        imagePan.moved = true;
-        imageHolder.scrollLeft = imagePan.scrollLeft - deltaX;
-        imageHolder.scrollTop = imagePan.scrollTop - deltaY;
-        event.preventDefault();
-    }
-
-    function finishImagePan(event) {
-        if (!imagePan || event.pointerId !== imagePan.pointerId) {
-            return;
-        }
-        suppressImageClick = imagePan.moved;
-        imagePan = null;
-        imageHolder.classList.remove('review-image-frame--panning');
-        removeImagePanListeners();
-    }
-
-    function cancelImagePan(event) {
-        if (!imagePan || (event && event.pointerId !== imagePan.pointerId)) {
-            return;
-        }
-        imagePan = null;
-        suppressImageClick = false;
-        imageHolder.classList.remove('review-image-frame--panning');
-        removeImagePanListeners();
-    }
-
-    function removeImagePanListeners() {
-        document.removeEventListener('pointermove', moveImage);
-        document.removeEventListener('pointerup', finishImagePan);
-        document.removeEventListener('pointercancel', cancelImagePan);
-    }
-
-    function resetImageFrame() {
-        cancelImagePan(null);
-        suppressImageClick = false;
-        imageHolder.classList.remove('review-image-frame--full-size');
-        imageHolder.scrollLeft = 0;
-        imageHolder.scrollTop = 0;
-    }
-
-    function renderMetadata(image) {
-        metadataList.replaceChildren(
-            createMetaItem('Image ID', image.id ?? '—'),
-            createMetaItem('Uploaded', image.uploadDate ?? '—'),
-            createMetaItem('Uploader', image.uploader ?? '—'),
-            createMetaItem('Dimensions', formatDimensions(image.width, image.height)),
-            createMetaItem('Format', image.format ?? '—'),
-            createMetaItem('File size', formatFileSize(image.fileSize)),
-        );
+        imageViewer.update({...queueImage, ...details});
     }
 
     async function act(action) {
@@ -521,35 +352,6 @@ export function createReviewView({ session, navigate }) {
         approveButton.disabled = disabled;
         rejectButton.disabled = disabled;
     }
-}
-
-function createMetaItem(term, value) {
-    return el('div', {
-        className: 'review-meta-item',
-        children: [
-            el('dt', {className: 'review-meta-term', children: term}),
-            el('dd', {className: 'review-meta-value', children: value}),
-        ],
-    });
-}
-
-function formatDimensions(width, height) {
-    return width === null || width === undefined || height === null || height === undefined
-        ? '—'
-        : `${width} × ${height}`;
-}
-
-function formatFileSize(bytes) {
-    if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0) {
-        return '—';
-    }
-    if (bytes < 1024) {
-        return `${bytes} B`;
-    }
-    if (bytes < 1024 ** 2) {
-        return `${(bytes / 1024).toFixed(1)} KB`;
-    }
-    return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 }
 
 function hasReviewAccess(user) {
