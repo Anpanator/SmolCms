@@ -1,6 +1,6 @@
-import { assertEqual, assertTrue, settle } from './assert.js';
-import { mockFetch, useFetch } from './mocks.js';
-import { createImageView, formatFileSize } from '../../public/js/views/image.js';
+import {assertEqual, assertTrue, settle} from './assert.js';
+import {mockFetch, useFetch} from './mocks.js';
+import {createImageView, formatFileSize} from '../../public/js/views/image.js';
 
 const DETAIL = {
     id: 7,
@@ -42,6 +42,9 @@ export async function testImageViewRendersSampleImageInLayout() {
         assertTrue(view.matches('.layout'), 'image view should use the .layout grid');
         assertTrue(view.querySelector('.sidebar .tags') !== null, 'sidebar tag list should exist');
         assertTrue(view.querySelector('.sidebar .image-meta') !== null, 'metadata section should live in the sidebar');
+        assertTrue(view.querySelector('.content-title') === null, 'the image view should not have a title header');
+        assertTrue(view.querySelector('.image-meta-section .sidebar-title') === null, 'image details should not have a title header');
+        assertTrue(view.querySelector('.image-meta-separator') !== null, 'image details should be separated by a horizontal rule');
 
         assertEqual(fetchMock.calls.length, 1);
         assertEqual(fetchMock.calls[0].url, '/api/image/detail?id=7');
@@ -68,7 +71,7 @@ export async function testImageViewShowsMetadataAndDownloadLink() {
         assertTrue(download !== null, 'download link should exist in the sidebar');
         assertEqual(download.getAttribute('href'), '/api/image/download?name=ab89c0d0ef.jpeg');
         assertTrue(download.hasAttribute('download'), 'download link should carry the download attribute');
-        assertTrue(download.textContent.includes('Download full size'));
+        assertEqual(download.textContent, 'Download');
     } finally {
         restore();
     }

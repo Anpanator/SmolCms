@@ -2,7 +2,6 @@ name: smolcms
 
 services:
   dev:
-    profiles: [ dev ]
     image: smolcms:dev
     build:
       context: ..
@@ -13,39 +12,6 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:${SMOLCMS_DEV_PORT:-8080}:8080"
-    user: "10001:10001"
-    group_add:
-      - "0"
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    read_only: true
-    tmpfs:
-      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
-    volumes:
-      - dev-db:/var/www/html/private/db
-      - dev-upload:/var/www/html/private/upload
-      - dev-img:/var/www/html/private/img
-      - dev-img-public:/var/www/html/public/img
-      - type: bind
-        source: "${HOME:?HOME must be set}/SmolCms/logs"
-        target: /var/www/html/private/logs
-        bind:
-          create_host_path: true
-
-  prod:
-    profiles: [ prod ]
-    image: smolcms:prod
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-      target: prod
-    container_name: smolcms-prod
-    init: true
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:${SMOLCMS_PROD_PORT:-8080}:8080"
     user: "10001:10001"
     group_add:
       - "0"
@@ -82,13 +48,3 @@ services:
         target: /var/www/html/private/logs
         bind:
           create_host_path: true
-
-volumes:
-  dev-db:
-    name: smolcms-dev-db
-  dev-upload:
-    name: smolcms-dev-upload
-  dev-img:
-    name: smolcms-dev-img
-  dev-img-public:
-    name: smolcms-dev-img-public

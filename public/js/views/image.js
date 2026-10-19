@@ -4,10 +4,10 @@
  * via /image?id=<id>; the id is read from the URL query string.
  * Importing this module has no side effects.
  */
-import { get } from '../api.js';
-import { el } from '../dom.js';
-import { createMessageBox, isAuthError, messageForStatus, showMessage } from '../forms.js';
-import { createTagList } from './home.js';
+import {get} from '../api.js';
+import {el} from '../dom.js';
+import {createMessageBox, isAuthError, messageForStatus, showMessage} from '../forms.js';
+import {createTagList} from './home.js';
 
 const DETAIL_URL = '/api/image/detail';
 const NOT_FOUND_MESSAGE = 'Image not found.';
@@ -16,7 +16,7 @@ export function createImageView({ navigate, query = new URLSearchParams(window.l
     const metaList = el('dl', { className: 'image-meta' });
     const metaSection = el('div', {
         className: 'image-meta-section',
-        children: [el('h2', { className: 'sidebar-title', children: 'Image details' }), metaList],
+        children: [el('hr', {className: 'image-meta-separator'}), metaList],
     });
     const sidebar = el('aside', {
         className: 'sidebar',
@@ -31,7 +31,7 @@ export function createImageView({ navigate, query = new URLSearchParams(window.l
     const imageHolder = el('div', { className: 'image-view' });
     const content = el('section', {
         className: 'content',
-        children: [el('h1', { className: 'content-title', children: 'Image' }), status, imageHolder],
+        children: [status, imageHolder],
     });
 
     loadImage(parseImageId(query.get('id')), { navigate, imageHolder, metaList, metaSection, status });
@@ -91,7 +91,7 @@ function renderImage(image, { imageHolder, metaList, metaSection, status }) {
         metaSection.append(el('a', {
             className: 'button button--primary image-download',
             attributes: { href: image.downloadSrc, download: 'download' },
-            children: 'Download full size',
+            children: 'Download',
         }));
     }
 }

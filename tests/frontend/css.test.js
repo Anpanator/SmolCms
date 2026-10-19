@@ -3,7 +3,7 @@
  * plus computed styles of a mounted fixture. The runner page links
  * ../../public/css/main.css.
  */
-import { assertEqual, assertTrue, assertMatches } from './assert.js';
+import {assertEqual, assertMatches, assertTrue} from './assert.js';
 
 function findMainStylesheet() {
     for (const sheet of document.styleSheets) {
@@ -77,6 +77,39 @@ export function testImageTileAndReviewStylesExist() {
     assertTrue(findRule(rules, '.button--danger') !== undefined, 'a danger button style should exist for Reject');
     assertTrue(findRule(rules, '.image-meta') !== undefined, 'the image metadata list should be styled');
     assertTrue(findRule(rules, '.image-download') !== undefined, 'the download link should be styled');
+}
+
+export function testImageMetadataSeparatorUsesBorderColorAndSidebarPadding() {
+    const fixture = document.getElementById('test-fixture');
+    const sidebar = document.createElement('aside');
+    sidebar.className = 'sidebar';
+    const section = document.createElement('div');
+    section.className = 'image-meta-section';
+    const separator = document.createElement('hr');
+    separator.className = 'image-meta-separator';
+    section.append(separator);
+    sidebar.append(section);
+    fixture.append(sidebar);
+
+    try {
+        const sidebarStyle = getComputedStyle(sidebar);
+        const borderColor = getComputedStyle(document.documentElement).getPropertyValue('--color-border').trim();
+        const expectedColor = hexToRgbString(borderColor);
+        assertEqual(getComputedStyle(separator).borderTopColor, expectedColor, 'the separator should use the border color');
+
+        const sidebarRect = sidebar.getBoundingClientRect();
+        const separatorRect = separator.getBoundingClientRect();
+        const contentLeft = sidebarRect.left
+            + parseFloat(sidebarStyle.borderLeftWidth)
+            + parseFloat(sidebarStyle.paddingLeft);
+        const contentRight = sidebarRect.right
+            - parseFloat(sidebarStyle.borderRightWidth)
+            - parseFloat(sidebarStyle.paddingRight);
+        assertEqual(separatorRect.left, contentLeft, 'the separator should start at the sidebar content edge');
+        assertEqual(separatorRect.right, contentRight, 'the separator should end at the sidebar content edge');
+    } finally {
+        sidebar.remove();
+    }
 }
 
 export function testLayoutAndGridUseCssGrid() {

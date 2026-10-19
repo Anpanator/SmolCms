@@ -10,9 +10,24 @@ PORT=${SMOLCMS_DEV_PORT:-8080}
 # DOCKER_CONTEXT or DOCKER_HOST from the caller takes precedence.
 . "$PROJECT_DIR/docker/use-rootless-context.sh"
 
-mkdir -p "$LOG_DIR"
-chgrp "$(id -g)" "$LOG_DIR"
-chmod 2770 "$LOG_DIR"
+for data_dir in \
+    "$STATE_DIR/db" \
+    "$STATE_DIR/upload" \
+    "$STATE_DIR/img" \
+    "$STATE_DIR/public-img" \
+    "$LOG_DIR"
+do
+    mkdir -p "$data_dir"
+    chgrp "$(id -g)" "$data_dir"
+    chmod 2770 "$data_dir"
+done
+
+DATABASE_FILE=$STATE_DIR/db/smolcms.sq3
+if [ -f "$DATABASE_FILE" ] && [ "$(stat -c %u "$DATABASE_FILE")" = "$(id -u)" ]; then
+    chgrp "$(id -g)" "$DATABASE_FILE"
+    chmod 0660 "$DATABASE_FILE"
+fi
+
 for log_file in "$LOG_DIR"/*.log; do
     if [ -f "$log_file" ] && [ "$(stat -c %u "$log_file")" = "$(id -u)" ]; then
         chgrp "$(id -g)" "$log_file"
@@ -20,31 +35,6 @@ for log_file in "$LOG_DIR"/*.log; do
     fi
 done
 
-docker build \
-    --file "$PROJECT_DIR/docker/Dockerfile" \
-    --target dev \
-    --tag smolcms:dev \
-    "$PROJECT_DIR"
-
-if docker container inspect smolcms-dev >/dev/null 2>&1; then
-    docker container rm --force smolcms-dev
-fi
-
-docker run --detach \
-    --name smolcms-dev \
-    --restart unless-stopped \
-    --publish "127.0.0.1:$PORT:8080" \
-    --user 10001:10001 \
-    --group-add 0 \
-    --read-only \
-    --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777 \
-    --cap-drop ALL \
-    --security-opt no-new-privileges:true \
-    --mount type=volume,source=smolcms-dev-db,target=/var/www/html/private/db \
-    --mount type=volume,source=smolcms-dev-upload,target=/var/www/html/private/upload \
-    --mount type=volume,source=smolcms-dev-img,target=/var/www/html/private/img \
-    --mount type=volume,source=smolcms-dev-img-public,target=/var/www/html/public/img \
-    --mount "type=bind,source=$LOG_DIR,target=/var/www/html/private/logs" \
-    smolcms:dev
+docker compose --file "$PROJECT_DIR/docker/compose.yaml" up --build --detach
 
 printf 'SmolCms dev is running at http://localhost:%s\n' "$PORT"

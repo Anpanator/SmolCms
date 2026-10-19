@@ -4,9 +4,9 @@
  * skeleton tiles, an empty state and a non-blocking error message.
  * Importing this module has no side effects.
  */
-import { get } from '../api.js';
-import { el } from '../dom.js';
-import { messageForStatus } from '../forms.js';
+import {get} from '../api.js';
+import {el} from '../dom.js';
+import {messageForStatus} from '../forms.js';
 
 const IMAGES_URL = '/api/images';
 const LOADING_TILE_COUNT = 6;
@@ -38,7 +38,7 @@ export function createHomeView() {
 
     const content = el('section', {
         className: 'content',
-        children: [el('h1', { className: 'content-title', children: 'Latest uploads' }), grid],
+        children: [grid],
     });
 
     loadImages(grid);

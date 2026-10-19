@@ -1,6 +1,6 @@
-import { assertEqual, assertTrue, settle } from './assert.js';
-import { mockFetch, useFetch } from './mocks.js';
-import { createHomeView } from '../../public/js/views/home.js';
+import {assertEqual, assertTrue, settle} from './assert.js';
+import {mockFetch, useFetch} from './mocks.js';
+import {createHomeView} from '../../public/js/views/home.js';
 
 const IMAGES = {
     images: [
@@ -24,6 +24,7 @@ export async function testHomeViewRendersSidebarTagsAndImageGrid() {
         assertTrue(view.querySelector('.sidebar .tags') !== null, 'sidebar tag list should exist');
         assertTrue(view.querySelectorAll('.tags .tags-item').length >= 5, 'several tags should be listed');
         assertTrue(view.querySelector('.content .grid') !== null, 'content tile grid should exist');
+        assertTrue(view.querySelector('.content-title') === null, 'home should not have a Latest uploads header');
 
         assertEqual(fetchMock.calls.length, 1, 'home should fetch the image list once');
         assertEqual(fetchMock.calls[0].url, '/api/images');

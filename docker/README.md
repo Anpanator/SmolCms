@@ -1,8 +1,20 @@
 # Docker images
 
-Both targets run Nginx and PHP-FPM as the unprivileged `10001:10001` user, listen on container port `8080`, and mount
-writable data paths separately from the read-only application image. The Docker build copies only the application
+## Build dependencies
+
+- **Docker engine** with a reachable daemon — rootless Docker on this machine (`deploy.sh` selects the `rootless`
+  context when available; `DOCKER_CONTEXT`/`DOCKER_HOST` override it).
+- **Docker Compose v2** CLI plugin (`docker compose`) — `deploy.sh` delegates building and running to Compose.
+- **Docker Buildx** CLI plugin (`docker buildx`) — required for BuildKit builds; without it Compose falls back to the
+  deprecated classic builder.
+- **POSIX shell and GNU coreutils** for `deploy.sh` (`stat`, `chgrp`, `chmod`).
+- Base images pulled during the build: `php:8.5-fpm` and `composer:2`.
+
+Both image targets run Nginx and PHP-FPM as the unprivileged `10001:10001` user, listen on container port `8080`, and
+mount writable data paths separately from the read-only application image. The Docker build copies only the application
 runtime files into `/var/www/html`; the `docker/` and `docs/` directories are not deployed into the application tree.
+The `prod` target (display errors disabled) remains in the Dockerfile for when a production deployment becomes a
+requirement.
 
 ## Local development
 
@@ -12,40 +24,14 @@ Run from the project root:
 ./deploy.sh
 ```
 
-The script builds the `smolcms:dev` target and runs it at <http://localhost:8080>. The port is bound to localhost only.
-SQLite and uploaded images persist in rootless Docker volumes; logs are written to `~/SmolCms/logs` on the host.
-`display_errors` is enabled in this image.
-On startup the container initializes the database, runs pending migrations, and starts a background loop that processes pending image uploads every minute (up to 100 per run).
+The script prepares the host state directories, then uses Docker Compose v2 (BuildKit) to build the `smolcms:dev`
+target and start the `smolcms-dev` container at <http://localhost:8080>. The port is bound to localhost only; set
+`SMOLCMS_DEV_PORT` to change it.
+SQLite, uploaded images, and logs persist in bind-mounted directories under `~/SmolCms` (`db`, `upload`, `img`,
+`public-img`, `logs`); the script creates them with setgid group-write permissions so the rootless Docker user namespace
+can write while the data stays host-accessible. `display_errors` is enabled in this image.
+On startup the container initializes the database, runs pending migrations, and starts a background loop that processes
+pending image uploads every minute (up to 100 per run).
 
-The script uses a working Docker context named `rootless` when available. Set `DOCKER_CONTEXT` or `DOCKER_HOST` to
-select another daemon explicitly.
-
-## Production image
-
-Run:
-
-```sh
-./docker/run-prod.sh
-```
-
-This builds and runs the `smolcms:prod` target with `display_errors` disabled. Host directories are created under
-`~/SmolCms` and mounted as follows:
-
-| Host path          | Container path                 |
-|--------------------|--------------------------------|
-| `~/SmolCms/db`     | `/var/www/html/private/db`     |
-| `~/SmolCms/upload` | `/var/www/html/private/upload` |
-| `~/SmolCms/logs`   | `/var/www/html/private/logs`   |
-
-The production script sets the bind-mount directories to the current user's primary group with setgid group-write
-permissions. This allows the non-root container user to write through a rootless Docker user namespace while keeping the
-data accessible to the host user. Use the rootless Docker context owned by the same host user. The application runs
-`php src/app.php --init-db` on startup, initializing the SQLite schema only when the mounted database has no tables; it
-does not reset an existing database. Pending SQL migrations are then executed with `--migrations --noconfirm`, and a
-background worker loop runs `--process-images 100` every minute to generate image variants (see
-`docs/image-uploads.adoc`); concurrent worker runs are prevented by an advisory lock.
-
-Both variants use host port `8080` by default and cannot run simultaneously on that port. Set `SMOLCMS_DEV_PORT` or
-`SMOLCMS_PROD_PORT` to use another localhost port. The Compose profiles can also be invoked directly with
-`docker compose -f docker/compose.yaml --profile dev up --build -d` or `--profile prod` after preparing the host
-directories as above.
+The script uses a working Docker context named `rootless` when available. Compose can also be invoked directly with
+`docker compose -f docker/compose.yaml up --build -d` after preparing the host directories as above.
