@@ -132,3 +132,49 @@ export async function testFooterNavMirrorsSession() {
         restore();
     }
 }
+
+export async function testReviewLinkVisibleForModerators() {
+    for (const accessLevel of [500, 600]) {
+        const { session, restore } = await createLoadedSession(() => sessionResponse(testUser({ accessLevel })));
+        try {
+            const nav = createHeaderNav({ session, navigate: () => {} });
+            const reviewLink = nav.element.querySelector('a.nav-link[href="/review"]');
+            assertTrue(reviewLink !== null, `access level ${accessLevel} should see the Review link`);
+            assertEqual(reviewLink.textContent, 'Review');
+
+            const links = [...nav.element.querySelectorAll('a.nav-link')].map((link) => link.getAttribute('href'));
+            assertEqual(
+                JSON.stringify(links),
+                JSON.stringify(['/', '/upload-image', '/review', '/settings']),
+                'Review should sit between Upload Image and the account dropdown',
+            );
+        } finally {
+            restore();
+        }
+    }
+}
+
+export async function testReviewLinkHiddenBelowModerators() {
+    const { session, restore } = await createLoadedSession(() => sessionResponse(testUser({ accessLevel: 100 })));
+    try {
+        const nav = createHeaderNav({ session, navigate: () => {} });
+        assertEqual(nav.element.querySelector('a.nav-link[href="/review"]'), null, 'novices must not see the Review link');
+    } finally {
+        restore();
+    }
+}
+
+export async function testFooterNavHasNoReviewLinkForModerators() {
+    const { session, restore } = await createLoadedSession(() => sessionResponse(testUser({ accessLevel: 500 })));
+    try {
+        const footer = createFooterNav({ session });
+        const links = [...footer.element.querySelectorAll('a.nav-link')].map((link) => link.getAttribute('href'));
+        assertEqual(
+            JSON.stringify(links),
+            JSON.stringify(['/', '/upload-image']),
+            'the footer navigation must not gain a Review link',
+        );
+    } finally {
+        restore();
+    }
+}

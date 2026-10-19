@@ -11,6 +11,9 @@ import {postJson} from './api.js';
 import {accessLevelName} from './accessLevel.js';
 import {el} from './dom.js';
 
+/** AccessLevel::MOD — keep aligned with src/Data/Constant/AccessLevel.php. */
+const MIN_REVIEW_ACCESS_LEVEL = 500;
+
 function navLink(path, label, activePath) {
     return el('a', {
         className: `nav-link${activePath === path ? ' active' : ''}`,
@@ -25,10 +28,14 @@ function navItem(children) {
 
 function sessionItems(user, activePath) {
     if (user) {
-        return [
+        const items = [
             navItem(navLink('/', 'Home', activePath)),
             navItem(navLink('/upload-image', 'Upload Image', activePath)),
         ];
+        if ((user.accessLevel ?? 0) >= MIN_REVIEW_ACCESS_LEVEL) {
+            items.push(navItem(navLink('/review', 'Review', activePath)));
+        }
+        return items;
     }
     return [
         navItem(navLink('/', 'Home', activePath)),

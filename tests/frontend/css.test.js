@@ -56,6 +56,29 @@ export function testTileHoverRuleExists() {
     assertTrue(findRule(rules, '.tile:hover') !== undefined, 'tiles should have a hover style');
 }
 
+export function testImageTileAndReviewStylesExist() {
+    const rules = collectRules(findMainStylesheet());
+
+    const tileImageRule = findRule(rules, '.tile-image', 'object-fit:cover');
+    assertTrue(tileImageRule !== undefined, 'tile images should be cropped with object-fit: cover');
+
+    const skeletonRule = findRule(rules, '.tile--skeleton', 'animation');
+    assertTrue(skeletonRule !== undefined, 'loading skeleton tiles should have an animation');
+
+    const gridStatusRule = findRule(rules, '.grid-status');
+    assertTrue(gridStatusRule !== undefined, 'grid status messages (loading/empty/error) should be styled');
+
+    const reviewThumbRule = findRule(rules, '.review-thumb', 'object-fit:cover');
+    assertTrue(reviewThumbRule !== undefined, 'review thumbnails should be cropped with object-fit: cover');
+
+    const reviewItemRule = findRule(rules, '.review-item', 'display:flex');
+    assertTrue(reviewItemRule !== undefined, 'review items should be laid out with flexbox');
+
+    assertTrue(findRule(rules, '.button--danger') !== undefined, 'a danger button style should exist for Reject');
+    assertTrue(findRule(rules, '.image-meta') !== undefined, 'the image metadata list should be styled');
+    assertTrue(findRule(rules, '.image-download') !== undefined, 'the download link should be styled');
+}
+
 export function testLayoutAndGridUseCssGrid() {
     const fixture = document.getElementById('test-fixture');
     const layout = document.createElement('div');
@@ -82,6 +105,23 @@ export function testLayoutAndGridUseCssGrid() {
         assertTrue(gridRule !== undefined, '.grid should use repeat(auto-fill, minmax(...)) columns');
     } finally {
         layout.remove();
+    }
+}
+
+export function testTileImageCoversTheTile() {
+    const fixture = document.getElementById('test-fixture');
+    const tile = document.createElement('a');
+    tile.className = 'tile tile--link';
+    const image = document.createElement('img');
+    image.className = 'tile-image';
+    tile.append(image);
+    fixture.append(tile);
+    try {
+        const style = getComputedStyle(image);
+        assertEqual(style.objectFit, 'cover', 'tile images should use object-fit: cover');
+        assertEqual(getComputedStyle(tile).aspectRatio, '1 / 1', 'tiles should stay square-ish');
+    } finally {
+        tile.remove();
     }
 }
 

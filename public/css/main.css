@@ -1,8 +1,8 @@
 /*
  * SmolCms SPA stylesheet.
  * Organized in sections: custom properties, base reset, layout shell,
- * top navigation with hover dropdowns, sidebar, content grid, footer,
- * pages/forms, buttons and messages.
+ * top navigation with hover dropdowns, sidebar, content grid, image
+ * display view, review queue, footer, pages/forms, buttons and messages.
  */
 
 /* ------------------------------------------------------------------ */
@@ -284,6 +284,165 @@ h3 {
     font-size: 0.9rem;
 }
 
+.tile--link:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+}
+
+.tile-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.tile--skeleton {
+    background: linear-gradient(100deg,
+        var(--color-surface-alt) 40%,
+        var(--color-surface) 50%,
+        var(--color-surface-alt) 60%);
+    background-size: 200% 100%;
+    animation: tile-shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes tile-shimmer {
+    from {
+        background-position: 120% 0;
+    }
+
+    to {
+        background-position: -80% 0;
+    }
+}
+
+.grid-status {
+    grid-column: 1 / -1;
+    padding: var(--space-4);
+    color: var(--color-muted);
+    text-align: center;
+}
+
+.grid-status--error {
+    color: var(--color-danger);
+}
+
+/* ------------------------------------------------------------------ */
+/* Image display view                                                  */
+/* ------------------------------------------------------------------ */
+
+.image-view-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.image-processing {
+    color: var(--color-muted);
+    font-style: italic;
+}
+
+.image-meta {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin: 0;
+}
+
+.image-meta-term {
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.image-meta-value {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.image-download {
+    margin-top: var(--space-3);
+    align-self: stretch;
+    text-align: center;
+}
+
+/* ------------------------------------------------------------------ */
+/* Review queue                                                        */
+/* ------------------------------------------------------------------ */
+
+.review-page {
+    max-width: 48rem;
+}
+
+.review-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    list-style: none;
+}
+
+.review-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.review-thumb {
+    flex: 0 0 auto;
+    width: 5rem;
+    height: 5rem;
+    object-fit: cover;
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+}
+
+.review-thumb--empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-muted);
+    font-size: 0.8rem;
+    text-align: center;
+}
+
+.review-info {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+}
+
+.review-uploader {
+    font-weight: 600;
+}
+
+.review-date {
+    color: var(--color-muted);
+    font-size: 0.85rem;
+}
+
+.review-actions {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.review-empty {
+    padding: var(--space-4);
+    color: var(--color-muted);
+    text-align: center;
+}
+
 /* ------------------------------------------------------------------ */
 /* Pages and forms                                                     */
 /* ------------------------------------------------------------------ */
@@ -396,6 +555,16 @@ h3 {
     background: var(--color-accent-strong);
 }
 
+.button--danger {
+    background: var(--color-danger);
+    color: var(--color-accent-contrast);
+}
+
+.button--danger:hover,
+.button--danger:focus-visible {
+    background: color-mix(in srgb, var(--color-danger) 80%, black);
+}
+
 .button--link {
     width: 100%;
     text-align: left;
@@ -467,6 +636,10 @@ h3 {
 
     .tags {
         flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .review-item {
         flex-wrap: wrap;
     }
 }

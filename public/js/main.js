@@ -7,10 +7,12 @@ import {createRouter} from './router.js';
 import {createSession} from './session.js';
 import {el} from './dom.js';
 import {createHomeView} from './views/home.js';
+import {createImageView} from './views/image.js';
 import {createLoginView} from './views/login.js';
 import {createNotFoundView} from './views/notFound.js';
 import {createRegisterView} from './views/register.js';
 import {createProfileView} from './views/profile.js';
+import {createReviewView} from './views/review.js';
 import {createUploadView} from './views/upload.js';
 
 async function bootstrap() {
@@ -37,6 +39,8 @@ async function bootstrap() {
         '/register': (context) => createRegisterView(context),
         '/settings': (context) => createProfileView({session, ...context}),
         '/upload-image': (context) => createUploadView(context),
+        '/image': (context) => createImageView(context),
+        '/review': (context) => createReviewView({session, ...context}),
     };
 
     const router = createRouter({
