@@ -1,47 +1,90 @@
 /**
- * Home view: static tag sidebar plus a live tile grid of the newest
- * accepted images (GET /api/images). The grid loads asynchronously with
+ * Home view: paginated image grid with page-specific tags, tag search,
  * skeleton tiles, an empty state and a non-blocking error message.
  * Importing this module has no side effects.
  */
 import {get} from '../api.js';
 import {el} from '../dom.js';
+import {normalizeTags, createSearchView} from '../search.js';
 import {messageForStatus} from '../forms.js';
 
 const IMAGES_URL = '/api/images';
+const DEFAULT_PER_PAGE = 25;
 const LOADING_TILE_COUNT = 6;
 
-export const TAGS = [
-    'landscape', 'portrait', 'anime', 'cityscape', 'nature', 'monochrome',
-    'food', 'architecture', 'night', 'sky', 'water', 'cats',
-];
-
-/** Shared tag list, used by the home sidebar and the image display sidebar. */
-export function createTagList() {
+/** Build the shared list of tag links used by the home and image sidebars. */
+export function createTagList(tags = [], activeTags = []) {
+    const active = toActiveTagSet(activeTags);
     return el('ul', {
         className: 'tags',
-        children: TAGS.map((tag) => el('li', {
-            className: 'tags-item',
-            children: el('a', { className: 'tags-link', attributes: { href: '#' }, children: tag }),
-        })),
+        children: normalizeTagEntries(tags).map((tag) => {
+            const isActive = active.has(tag.name);
+            return el('li', {
+                className: 'tags-item',
+                children: el('a', {
+                    className: `tags-link${isActive ? ' tags-link--active' : ''}`,
+                    attributes: {
+                        href: buildHomePath(1, tag.name),
+                        ...(isActive ? { 'aria-current': 'page' } : {}),
+                    },
+                    children: tag.name,
+                }),
+            });
+        }),
     });
 }
 
-export function createHomeView() {
+/** Render the tag list and an affordance to clear any active filters. */
+export function createTagView(tags = [], activeTags = []) {
+    const active = toActiveTagSet(activeTags);
+    return el('div', {
+        className: 'tag-view',
+        children: [
+            active.size > 0 ? el('a', {
+                className: 'tags-clear',
+                attributes: { href: '/' },
+                children: 'Clear filters',
+            }) : null,
+            createTagList(tags, active),
+        ],
+    });
+}
+
+/**
+ * @param {{ navigate?: (path: string, options?: object) => void, query?: URLSearchParams|string }} [context]
+ */
+export function createHomeView({navigate = () => {}, query = new URLSearchParams(window.location.search)} = {}) {
+    const params = query instanceof URLSearchParams ? query : new URLSearchParams(query);
+    const requestedPage = parsePositiveInteger(params.get('page'), 1);
+    const tags = normalizeTags(params.get('tags') ?? '');
+    const activeTags = tags === '' ? [] : tags.split(',');
+
+    const search = createSearchView({
+        initialTags: tags,
+        onSearch: (searchTags) => navigate(buildHomePath(1, searchTags)),
+    });
+    const tagView = createTagView([], activeTags);
     const sidebar = el('aside', {
         className: 'sidebar',
-        children: [el('h2', { className: 'sidebar-title', children: 'Tags' }), createTagList()],
+        children: [
+            search.element,
+            el('h2', { className: 'sidebar-title', children: 'Tags' }),
+            tagView,
+        ],
     });
 
     const grid = el('div', { className: 'grid' });
     showLoadingTiles(grid);
+    const pagination = createPagination(requestedPage, (page) => {
+        navigate(buildHomePath(page, tags));
+    });
 
     const content = el('section', {
         className: 'content',
-        children: [grid],
+        children: [grid, pagination.element],
     });
 
-    loadImages(grid);
+    loadImages({ grid, tagView, pagination, page: requestedPage, tags, navigate });
 
     return el('div', { className: 'layout', children: [sidebar, content] });
 }
@@ -53,18 +96,129 @@ function showLoadingTiles(grid) {
     })));
 }
 
-async function loadImages(grid) {
+async function loadImages({grid, tagView, pagination, page, tags, navigate}) {
     try {
-        const data = await get(IMAGES_URL);
+        const data = await get(buildImagesUrl(page, tags));
         const images = Array.isArray(data?.images) ? data.images : [];
+        const total = Number.isSafeInteger(data?.total) && data.total >= 0 ? data.total : images.length;
+        const perPage = parsePositiveInteger(data?.perPage, DEFAULT_PER_PAGE);
+        const responsePage = parsePositiveInteger(data?.page, page);
+        const totalPages = Math.max(1, Math.ceil(total / perPage));
+
+        if (responsePage > totalPages) {
+            navigate(buildHomePath(totalPages, tags), { replace: true });
+            return;
+        }
+
+        if (responsePage !== page) {
+            navigate(buildHomePath(responsePage, tags), { replace: true });
+        }
+
+        tagView.replaceWith(createTagView(Array.isArray(data?.tags) ? data.tags : [], tags.split(',').filter(Boolean)));
+        pagination.update({ page: responsePage, total, perPage });
+
         if (images.length === 0) {
             grid.replaceChildren(createGridStatus('No images uploaded yet.', 'empty'));
             return;
         }
         grid.replaceChildren(...images.map(createTile));
     } catch (error) {
+        pagination.update({ page, total: 0, perPage: DEFAULT_PER_PAGE });
         grid.replaceChildren(createGridStatus(messageForStatus(error?.status ?? 0), 'error'));
     }
+}
+
+function createPagination(initialPage, onPageChange) {
+    let currentPage = initialPage;
+    const previous = el('button', {
+        className: 'pagination-button',
+        attributes: { type: 'button', disabled: '' },
+        children: 'Previous',
+    });
+    const label = el('span', { className: 'pagination-label', children: 'Loading…' });
+    const next = el('button', {
+        className: 'pagination-button',
+        attributes: { type: 'button', disabled: '' },
+        children: 'Next',
+    });
+
+    previous.addEventListener('click', () => {
+        if (!previous.disabled) {
+            onPageChange(currentPage - 1);
+        }
+    });
+    next.addEventListener('click', () => {
+        if (!next.disabled) {
+            onPageChange(currentPage + 1);
+        }
+    });
+
+    return {
+        element: el('nav', {
+            className: 'pagination',
+            attributes: { 'aria-label': 'Image pages' },
+            children: [previous, label, next],
+        }),
+        update({page, total, perPage}) {
+            currentPage = page;
+            const pageCount = Math.max(1, Math.ceil(total / perPage));
+            label.textContent = `Page ${page} of ${pageCount}`;
+            previous.disabled = page <= 1;
+            next.disabled = page >= pageCount;
+        },
+    };
+}
+
+function buildImagesUrl(page, tags) {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    if (tags !== '') {
+        params.set('tags', tags);
+    }
+    return `${IMAGES_URL}?${params}`;
+}
+
+function buildHomePath(page, tags) {
+    const params = new URLSearchParams();
+    if (page > 1) {
+        params.set('page', String(page));
+    }
+    const normalizedTags = normalizeTags(tags);
+    if (normalizedTags !== '') {
+        params.set('tags', normalizedTags);
+    }
+    const query = params.toString();
+    return query === '' ? '/' : `/?${query}`;
+}
+
+function parsePositiveInteger(value, fallback) {
+    if (typeof value === 'number') {
+        return Number.isSafeInteger(value) && value > 0 ? value : fallback;
+    }
+    if (!/^[1-9][0-9]*$/.test(value ?? '')) {
+        return fallback;
+    }
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) ? parsed : fallback;
+}
+
+function normalizeTagEntries(tags) {
+    if (!Array.isArray(tags)) {
+        return [];
+    }
+    return tags
+        .map((tag) => typeof tag === 'string' ? { name: tag } : tag)
+        .filter((tag) => typeof tag?.name === 'string' && tag.name !== '');
+}
+
+function toActiveTagSet(activeTags) {
+    if (activeTags instanceof Set) {
+        return activeTags;
+    }
+    const tags = Array.isArray(activeTags)
+        ? activeTags
+        : typeof activeTags === 'string' ? activeTags.split(',') : [activeTags];
+    return new Set(tags.map((tag) => String(tag ?? '').trim()).filter(Boolean));
 }
 
 function createGridStatus(text, kind) {

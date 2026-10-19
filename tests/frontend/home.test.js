@@ -7,27 +7,37 @@ const IMAGES = {
         { id: 7, thumbSrc: '/public/img/thumb/ab/ab89c0.avif' },
         { id: 3, thumbSrc: '/public/img/thumb/cd/cd1234.avif' },
     ],
+    page: 1,
+    perPage: 25,
+    total: 27,
+    tags: [
+        { name: 'nature', imageCount: 2 },
+        { name: 'sky', imageCount: 1 },
+    ],
 };
 
-async function createLoadedView(handler) {
+async function createLoadedView(handler, query = '', navigate = () => {}) {
     const fetchMock = mockFetch(handler);
     const restore = useFetch(fetchMock);
-    const view = createHomeView();
+    const view = createHomeView({ navigate, query: new URLSearchParams(query) });
     await settle();
     return { view, fetchMock, restore };
 }
 
-export async function testHomeViewRendersSidebarTagsAndImageGrid() {
+export async function testHomeViewRendersPageTagsAndImageGrid() {
     const { view, fetchMock, restore } = await createLoadedView(() => ({ status: 200, body: IMAGES }));
     try {
         assertTrue(view.matches('.layout'), 'home should use the .layout grid');
+        assertTrue(view.querySelector('.sidebar .search-view') !== null, 'home should have a tag search');
         assertTrue(view.querySelector('.sidebar .tags') !== null, 'sidebar tag list should exist');
-        assertTrue(view.querySelectorAll('.tags .tags-item').length >= 5, 'several tags should be listed');
+        assertEqual(view.querySelectorAll('.tags .tags-item').length, 2, 'the page tags should replace static tags');
+        assertEqual(view.querySelector('.tags-item:first-child .tags-link')?.textContent, 'nature');
+        assertEqual(view.querySelector('.tags-item:last-child .tags-link')?.textContent, 'sky');
         assertTrue(view.querySelector('.content .grid') !== null, 'content tile grid should exist');
         assertTrue(view.querySelector('.content-title') === null, 'home should not have a Latest uploads header');
 
         assertEqual(fetchMock.calls.length, 1, 'home should fetch the image list once');
-        assertEqual(fetchMock.calls[0].url, '/api/images');
+        assertEqual(fetchMock.calls[0].url, '/api/images?page=1');
         assertEqual(fetchMock.calls[0].options.method, 'GET');
 
         const tiles = view.querySelectorAll('.grid a.tile');
@@ -43,22 +53,53 @@ export async function testHomeViewRendersSidebarTagsAndImageGrid() {
     }
 }
 
-export function testHomeTagLinksAreStatic() {
-    const fetchMock = mockFetch(() => ({ status: 200, body: IMAGES }));
-    const restore = useFetch(fetchMock);
-    const view = createHomeView();
-    restore();
+export async function testHomeTagLinksAreDynamicAndClearable() {
+    const { view, restore } = await createLoadedView(
+        () => ({ status: 200, body: IMAGES }),
+        'tags=nature',
+    );
+    try {
+        const links = view.querySelectorAll('.tags .tags-link');
+        assertEqual(links.length, 2);
+        assertEqual(links[0].getAttribute('href'), '/?tags=nature');
+        assertTrue(links[0].classList.contains('tags-link--active'), 'the selected tag should be marked active');
+        assertEqual(links[0].getAttribute('aria-current'), 'page');
+        assertTrue(!links[1].classList.contains('tags-link--active'), 'other tags should not be marked active');
+        assertEqual(view.querySelector('.tags-clear')?.getAttribute('href'), '/', 'active filters should be clearable');
+        assertEqual(view.querySelector('.search-input')?.value, 'nature');
+    } finally {
+        restore();
+    }
+}
 
-    const firstTag = view.querySelector('.tags .tags-link');
-    assertEqual(firstTag?.tagName, 'A');
-    assertTrue(firstTag?.textContent.length > 0, 'tags should have labels');
+export async function testHomePaginationUsesUrlStateAndKeepsTagFilter() {
+    const navigation = [];
+    const { view, fetchMock, restore } = await createLoadedView(
+        () => ({ status: 200, body: { ...IMAGES, page: 2, total: 51 } }),
+        'page=2&tags=nature',
+        (path) => navigation.push(path),
+    );
+    try {
+        assertEqual(fetchMock.calls[0].url, '/api/images?page=2&tags=nature');
+        assertEqual(view.querySelector('.pagination-label')?.textContent, 'Page 2 of 3');
+
+        const [previous, next] = view.querySelectorAll('.pagination-button');
+        assertTrue(!previous.disabled, 'Previous should be enabled after page one');
+        assertTrue(!next.disabled, 'Next should be enabled before the last page');
+        next.click();
+        previous.click();
+        assertEqual(navigation[0], '/?page=3&tags=nature');
+        assertEqual(navigation[1], '/?tags=nature');
+    } finally {
+        restore();
+    }
 }
 
 export function testHomeGridShowsLoadingStateFirst() {
     const fetchMock = mockFetch(() => ({ status: 200, body: IMAGES }));
     const restore = useFetch(fetchMock);
     try {
-        const view = createHomeView();
+        const view = createHomeView({ query: new URLSearchParams() });
         assertTrue(
             view.querySelector('.grid .tile--skeleton') !== null,
             'grid should show a loading state before the fetch resolves',
@@ -72,14 +113,22 @@ export function testHomeGridShowsLoadingStateFirst() {
     }
 }
 
-export async function testHomeGridShowsEmptyState() {
-    const { view, restore } = await createLoadedView(() => ({ status: 200, body: { images: [] } }));
+export async function testHomeGridShowsEmptyStateAndNoTags() {
+    const { view, restore } = await createLoadedView(
+        () => ({ status: 200, body: { images: [], page: 1, perPage: 25, total: 0, tags: [] } }),
+        'tags=missing',
+    );
     try {
         const status = view.querySelector('.grid .grid-status');
         assertTrue(status !== null, 'an empty grid should show a status message');
         assertTrue(status.classList.contains('grid-status--empty'), 'empty state should be marked as such');
         assertTrue(status.textContent.includes('No images uploaded yet'), 'empty state should explain the empty grid');
         assertEqual(view.querySelectorAll('.grid .tile').length, 0, 'an empty grid has no tiles');
+        assertEqual(view.querySelectorAll('.sidebar .tags-item').length, 0, 'an empty page has no tags');
+        assertTrue(view.querySelector('.tags-clear') !== null, 'the active filter remains clearable');
+        assertEqual(view.querySelector('.pagination-label')?.textContent, 'Page 1 of 1');
+        assertTrue(view.querySelector('.pagination-button:first-child').disabled);
+        assertTrue(view.querySelector('.pagination-button:last-child').disabled);
     } finally {
         restore();
     }
@@ -92,6 +141,7 @@ export async function testHomeGridShowsErrorMessageOnFailure() {
         assertTrue(status !== null, 'a fetch failure should show a message');
         assertTrue(status.classList.contains('grid-status--error'), 'failure message should be marked as an error');
         assertTrue(view.querySelector('.sidebar .tags') !== null, 'sidebar should stay usable on grid failure');
+        assertTrue(view.querySelector('.sidebar .search-view') !== null, 'search should stay usable on grid failure');
     } finally {
         restore();
     }
@@ -99,7 +149,13 @@ export async function testHomeGridShowsErrorMessageOnFailure() {
 
 export async function testHomeTileWithoutThumbShowsPlaceholder() {
     const { view, restore } = await createLoadedView(
-        () => ({ status: 200, body: { images: [{ id: 9, thumbSrc: null }] } }),
+        () => ({ status: 200, body: {
+            images: [{ id: 9, thumbSrc: null }],
+            page: 1,
+            perPage: 25,
+            total: 1,
+            tags: [],
+        } }),
     );
     try {
         const tile = view.querySelector('.grid a.tile');
@@ -107,6 +163,28 @@ export async function testHomeTileWithoutThumbShowsPlaceholder() {
         assertEqual(tile.getAttribute('href'), '/image?id=9');
         assertTrue(tile.querySelector('img') === null, 'a tile without a thumb renders no image');
         assertTrue(tile.querySelector('.tile-placeholder') !== null, 'a tile without a thumb shows placeholder text');
+    } finally {
+        restore();
+    }
+}
+
+export async function testHomeSearchSubmitsEncodedFiltersAndClears() {
+    const navigation = [];
+    const { view, restore } = await createLoadedView(
+        () => ({ status: 200, body: IMAGES }),
+        '',
+        (path) => navigation.push(path),
+    );
+    try {
+        const form = view.querySelector('.search-view');
+        const input = view.querySelector('.search-input');
+        input.value = 'nature, sky';
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        assertEqual(navigation[0], '/?tags=nature%2Csky');
+
+        input.value = '  ';
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        assertEqual(navigation[1], '/', 'submitting an empty search should clear the filter');
     } finally {
         restore();
     }
