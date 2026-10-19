@@ -159,6 +159,14 @@ class ImageProcessingServiceTest extends FunctionalTestCase
         return "$baseDir/" . substr($checksum, 0, 2) . "/$filename";
     }
 
+    private function originalPath(ImageEntity $entity): string
+    {
+        return self::variantPath(
+            $this->originalStorage->getStoragePath(),
+            ImagePathLayout::fileName($entity->getChecksum(), $entity->getOriginalExtension())
+        );
+    }
+
     private static function assertChecksumFilename(string $baseDir, string $filename): string
     {
         $path = self::variantPath($baseDir, $filename);
@@ -176,6 +184,7 @@ class ImageProcessingServiceTest extends FunctionalTestCase
         $processed = $this->testee->processBatch(10);
 
         self::assertSame(1, $processed);
+        self::assertFileDoesNotExist($this->originalPath($entity));
 
         $reloaded = $this->imageEntityService->findOneById($entity->getId());
         self::assertNotNull($reloaded);
@@ -267,6 +276,70 @@ class ImageProcessingServiceTest extends FunctionalTestCase
 
         // NOVICE uploader does not skip the moderation queue
         self::assertSame(ImageStatus::PENDING_REVIEW, $reloaded->getStatus());
+        self::assertFileDoesNotExist($this->originalPath($entity));
+    }
+
+    public function testProcessBatch_duplicatePendingImages_deletesOriginalAfterBothAreProcessed(): void
+    {
+        $wizard = $this->createUser(AccessLevel::WIZARD);
+        $image = self::createTestImage(24, 16);
+        $first = $this->createPendingImage($image, ImageType::PNG, $wizard->getId());
+        $second = $this->createPendingImage($image, ImageType::PNG, $wizard->getId());
+
+        self::assertSame($first->getChecksum(), $second->getChecksum());
+        self::assertFileExists($this->originalPath($first));
+
+        self::assertSame(2, $this->testee->processBatch(10));
+
+        self::assertFileDoesNotExist($this->originalPath($first));
+        self::assertSame(ImageStatus::ACCEPTED, $this->imageEntityService->findOneById($first->getId())->getStatus());
+        self::assertSame(ImageStatus::ACCEPTED, $this->imageEntityService->findOneById($second->getId())->getStatus());
+    }
+
+    public function testProcessBatch_reprocessingIsIdempotentAndRetriesCompletedOriginalCleanup(): void
+    {
+        $wizard = $this->createUser(AccessLevel::WIZARD);
+        $entity = $this->createPendingImage(self::createTestImage(48, 32), ImageType::PNG, $wizard->getId());
+        $originalPath = $this->originalPath($entity);
+        $originalContent = file_get_contents($originalPath);
+        self::assertIsString($originalContent);
+
+        self::assertSame(1, $this->testee->processBatch(10));
+        $firstResult = $this->imageEntityService->findOneById($entity->getId());
+        self::assertNotNull($firstResult);
+        $firstFilenames = [
+            $firstResult->getThumbFilename(),
+            $firstResult->getSampleFilename(),
+            $firstResult->getDownloadFilename(),
+        ];
+
+        // Simulate a retry after variant files were written but before the entity update.
+        $this->originalStorage->storeBytes(
+            $originalContent,
+            ImagePathLayout::relativePath($entity->getChecksum(), $entity->getOriginalExtension())
+        );
+        $entity->setStatus(ImageStatus::PENDING);
+        $this->imageEntityService->saveOrUpdate($entity);
+
+        self::assertSame(1, $this->testee->processBatch(10));
+        $secondResult = $this->imageEntityService->findOneById($entity->getId());
+        self::assertNotNull($secondResult);
+        self::assertSame($firstFilenames, [
+            $secondResult->getThumbFilename(),
+            $secondResult->getSampleFilename(),
+            $secondResult->getDownloadFilename(),
+        ]);
+        self::assertFileDoesNotExist($originalPath);
+
+        // Simulate an interruption after the entity update but before original deletion.
+        $this->originalStorage->storeBytes(
+            $originalContent,
+            ImagePathLayout::relativePath($entity->getChecksum(), $entity->getOriginalExtension())
+        );
+        self::assertFileExists($originalPath);
+
+        self::assertSame(0, $this->testee->processBatch(10));
+        self::assertFileDoesNotExist($originalPath);
     }
 
     public function testProcessBatch_corruptOriginal_staysPendingAndBatchContinues(): void
@@ -291,8 +364,8 @@ class ImageProcessingServiceTest extends FunctionalTestCase
             new DateTime('2026-01-02 00:00:00')
         );
 
-        // The failed decode raises a PHP warning deep inside GD; it is expected here.
-        $processed = @$this->testee->processBatch(10);
+        // The failed decode raises a PHP warning deep inside GD; processBatch catches it.
+        $processed = $this->testee->processBatch(10);
 
         self::assertSame(1, $processed);
         $corruptReloaded = $this->imageEntityService->findOneById($corruptEntity->getId());
@@ -301,6 +374,7 @@ class ImageProcessingServiceTest extends FunctionalTestCase
         self::assertNull($corruptReloaded->getThumbFilename());
         self::assertNull($corruptReloaded->getSampleFilename());
         self::assertNull($corruptReloaded->getDownloadFilename());
+        self::assertFileExists($this->originalPath($corruptEntity));
         $goodReloaded = $this->imageEntityService->findOneById($goodEntity->getId());
         self::assertNotNull($goodReloaded);
         self::assertSame(ImageStatus::ACCEPTED, $goodReloaded->getStatus());

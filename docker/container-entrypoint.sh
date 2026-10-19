@@ -8,6 +8,7 @@ DATABASE_FILE=$APP_ROOT/private/db/smolcms.sq3
 
 mkdir -p \
     "$APP_ROOT/private/db" \
+    "$APP_ROOT/private/img" \
     "$APP_ROOT/private/logs" \
     "$APP_ROOT/private/upload/img" \
     "$APP_ROOT/private/upload/tmp" \
@@ -16,6 +17,9 @@ mkdir -p \
     /tmp/nginx/proxy \
     /tmp/nginx/scgi \
     /tmp/nginx/uwsgi
+
+# A previous container may have stopped while leaving the processor lock file behind.
+rm -f "$APP_ROOT/private/img/processing.lock"
 
 php "$APP_ROOT/src/app.php" --init-db
 php "$APP_ROOT/src/app.php" --migrations --noconfirm

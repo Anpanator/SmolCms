@@ -235,6 +235,7 @@ class CoreServiceConfiguration
                 parameters: [
                     ImageProcessingService::class,
                     IMAGE_PROCESSING_LOCK_FILE,
+                    LoggingService::class,
                 ]
             ),
         ];

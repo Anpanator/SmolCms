@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace SmolCms\Service\Core\CliCommand;
 
 use SmolCms\Data\Constant\CliCommandFlag;
+use SmolCms\Data\Constant\LogLevel;
+use SmolCms\Service\Core\LoggingService;
 use SmolCms\Service\Image\ImageProcessingService;
+use Throwable;
 
 final readonly class ProcessImagesExecutor implements CliCommandExecutor
 {
@@ -14,6 +17,7 @@ final readonly class ProcessImagesExecutor implements CliCommandExecutor
     public function __construct(
         private ImageProcessingService $imageProcessingService,
         private string $lockFilePath,
+        private LoggingService $loggingService,
     ) {
     }
 
@@ -52,9 +56,21 @@ final readonly class ProcessImagesExecutor implements CliCommandExecutor
         try {
             $processed = $this->imageProcessingService->processBatch($batchSize);
             echo "Processed $processed image(s).\n";
+        } catch (Throwable $exception) {
+            $this->loggingService->log(
+                LogLevel::ERROR,
+                sprintf('Image processing worker failed with %s: %s', $exception::class, $exception->getMessage())
+            );
+            throw $exception;
         } finally {
-            flock($lock, LOCK_UN);
-            fclose($lock);
+            try {
+                if (is_file($this->lockFilePath)) {
+                    unlink($this->lockFilePath);
+                }
+            } finally {
+                flock($lock, LOCK_UN);
+                fclose($lock);
+            }
         }
     }
 

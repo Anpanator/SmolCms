@@ -3,8 +3,8 @@
  * On 401 the user is sent to the login view; on 403/500 mapped messages
  * are shown. Importing this module has no side effects.
  */
-import { postForm } from '../api.js';
-import { el } from '../dom.js';
+import {postForm} from '../api.js';
+import {el} from '../dom.js';
 import {
     clearMessage,
     createField,
@@ -46,8 +46,8 @@ export function createUploadView({ navigate }) {
         const formData = new FormData();
         formData.append('image', file);
         try {
-            const data = await postForm('/upload-image', formData);
-            showMessage(message, `Image uploaded as "${data?.filename ?? 'unknown'}".`, 'success');
+            await postForm('/upload-image', formData);
+            showMessage(message, 'Image uploaded successfully.', 'success');
             form.reset();
         } catch (error) {
             if (isAuthError(error)) {

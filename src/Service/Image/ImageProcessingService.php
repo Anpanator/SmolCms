@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SmolCms\Service\Image;
 
+use ErrorException;
 use GdImage;
 use InvalidArgumentException;
 use RuntimeException;
@@ -23,7 +24,10 @@ use Throwable;
  * sanitized original and generates three variants — thumbnail (AVIF), sample/viewing
  * image (WebP) and download image (original format, or lossless WebP for PNG sources) —
  * then updates the entity with the variant filenames, the download image's metadata and
- * the next lifecycle status.
+ * the next lifecycle status. Variant files are content-addressed and the entity update
+ * is repeatable, so an interrupted image can safely be processed again while its original
+ * is present. Original-file deletion is deferred until after processing and retried for
+ * completed rows on subsequent worker runs.
  *
  * A failure on a single image is logged and that row is left PENDING (retried on the
  * next run); the rest of the batch is still processed.
@@ -73,16 +77,16 @@ class ImageProcessingService
                 );
             }
         }
+        // Deleting originals is the final phase. If the worker stops before it, the
+        // completed rows still identify which originals need cleanup on the next run.
+        $this->deleteOriginalsAfterProcessing();
         return $processed;
     }
 
     private function processImage(ImageEntity $entity): void
     {
         $originalContent = $this->readOriginal($entity);
-        $image = imagecreatefromstring($originalContent);
-        if ($image === false) {
-            throw new RuntimeException("Stored original of image {$entity->getId()} is not decodable image data.");
-        }
+        $image = $this->decodeOriginal($originalContent, $entity);
         $originalType = ImageType::from($entity->getOriginalExtension());
 
         $thumbImage = ImageResizer::resizeToFit($image, self::THUMB_MAX_SIZE, self::THUMB_MAX_SIZE);
@@ -109,6 +113,61 @@ class ImageProcessingService
         $entity->setFileSize(strlen($downloadContent));
         $entity->setStatus($this->resolvePostProcessingStatus($entity));
         $this->imageEntityService->saveOrUpdate($entity);
+    }
+
+    private function decodeOriginal(string $content, ImageEntity $entity): GdImage
+    {
+        set_error_handler(
+            static function (int $severity, string $message, string $file, int $line): never {
+                throw new ErrorException($message, 0, $severity, $file, $line);
+            }
+        );
+        try {
+            $image = imagecreatefromstring($content);
+        } finally {
+            restore_error_handler();
+        }
+
+        if ($image === false) {
+            throw new RuntimeException("Stored original of image {$entity->getId()} is not decodable image data.");
+        }
+        return $image;
+    }
+
+    private function deleteOriginalsAfterProcessing(): void
+    {
+        $seenOriginals = [];
+        foreach ($this->imageEntityService->findProcessedImages() as $entity) {
+            $originalKey = $entity->getChecksum() . "\0" . $entity->getOriginalExtension();
+            if (isset($seenOriginals[$originalKey])) {
+                continue;
+            }
+            $seenOriginals[$originalKey] = true;
+            $this->deleteOriginalAfterProcessing($entity);
+        }
+    }
+
+    private function deleteOriginalAfterProcessing(ImageEntity $entity): void
+    {
+        try {
+            if ($this->imageEntityService->hasPendingOriginal($entity->getChecksum(), $entity->getOriginalExtension())) {
+                return;
+            }
+
+            $originalPath = $this->originalStoragePath . '/' . ImagePathLayout::relativePath(
+                    $entity->getChecksum(),
+                    $entity->getOriginalExtension()
+                );
+            if (!$this->fileSystemAccessService->fileExists($originalPath)) {
+                return;
+            }
+            $this->fileSystemAccessService->deleteFile($originalPath);
+        } catch (Throwable $e) {
+            $this->loggingService->log(
+                LogLevel::WARNING,
+                "Could not delete processed original for image {$entity->getId()}: {$e->getMessage()}"
+            );
+        }
     }
 
     /**

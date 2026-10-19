@@ -9,7 +9,6 @@ use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Attribute\Authenticated;
-use SmolCms\Service\Image\ImagePathLayout;
 use SmolCms\Service\Image\ImageTypeDetectionFacade;
 use SmolCms\Service\Image\ImageUploadService;
 use SmolCms\Service\Validation\ImageUploadValidator;
@@ -45,10 +44,10 @@ readonly class ImageUploadController
             return new Response(HttpStatus::BAD_REQUEST);
         }
 
-        $entity = $this->imageUploadService->upload($fileContent, $imageType);
+        $this->imageUploadService->upload($fileContent, $imageType);
 
         return new JsonResponse(
-            ['filename' => ImagePathLayout::fileName($entity->getChecksum(), $entity->getOriginalExtension())],
+            ['message' => 'Image uploaded successfully.'],
             HttpStatus::CREATED
         );
     }

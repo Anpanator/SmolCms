@@ -42,6 +42,8 @@ All variants are written through `ImageStorageService::storeBytes()` under the S
 . The entity is updated with the three variant filenames and — because the frontend metadata sidebar shows the download image's data — `width`, `height`, `format`, and `file_size` of the download variant.
 . The next status comes from the uploader's access level: `accepted` for `WIZARD` or higher (skips the moderation queue), otherwise `pending_review`.
 If the uploader no longer exists, an error is logged and the image is treated as `pending_review`.
+. After successful processing, the sanitized original is deleted once no other `pending` image record references it.
+Failed images keep their original so the next batch can retry them; duplicate uploads share the original until all pending records using it have processed.
 
 Status flow: `pending` → (`accepted` | `pending_review`) → (`rejected` via the moderation queue; see the image-serving documentation).
 
@@ -52,11 +54,13 @@ Resizing happens through `ImageResizer`, which computes the largest dimensions t
 
 Only one worker may process images at a time: `ProcessImagesExecutor` takes a non-blocking exclusive `flock()` on `IMAGE_PROCESSING_LOCK_FILE` (`private/img/processing.lock`).
 If the lock is held, the command prints a short notice and exits cleanly without processing.
-The lock is always released when the run finishes, including on exceptions.
+The lock is always released when the run finishes, including on exceptions, and the lock file is removed after an owned run.
+Batch-level exceptions are logged and rethrown.
+The Docker entrypoint also removes a stale lock file before starting the worker.
 
 === Response and database record
 
-Success returns `201` with `{"filename": "<checksum>.<extension>"}` — the basename of the stored original (its path below `IMAGE_STORAGE_DIR` is `<first 2 checksum chars>/<filename>`); the SPA shows this filename in a success message.
+Success returns `201` with `{"message":"Image uploaded successfully."}`; the response does not expose the stored image filename.
 Each accepted upload has exactly one row in the `image` table (see `private/init/init_sqlite.sql`; kept in sync by the `create image table` migration).
 `ImageEntityService` exposes `findOneById(int)` and `findByStatus(ImageStatus, ?int $limit = null)` (ordered by `upload_date` ascending, via `QueryCriteria::orderBy()`); the lifecycle status is the `ImageStatus` enum (`pending`, `pending_review`, `accepted`, `rejected`).
 

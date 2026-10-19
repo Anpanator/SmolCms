@@ -7,8 +7,11 @@ namespace SmolCms\Test\Service\Core\CliCommand;
 use PHPUnit\Framework\MockObject\MockObject;
 use RuntimeException;
 use SmolCms\Data\Constant\CliCommandFlag;
+use SmolCms\Data\Constant\LogLevel;
 use SmolCms\Service\Core\CliCommand\ProcessImagesExecutor;
+use SmolCms\Service\Core\LoggingService;
 use SmolCms\Service\Image\ImageProcessingService;
+use SmolCms\TestUtils\Attributes\Stub;
 use SmolCms\TestUtils\SimpleTestCase;
 
 class ProcessImagesExecutorTest extends SimpleTestCase
@@ -16,6 +19,12 @@ class ProcessImagesExecutorTest extends SimpleTestCase
     private const string LOCK_DIR = '/private/upload/test-process-images';
 
     private string $lockFilePath;
+
+    #[Stub(ImageProcessingService::class)]
+    private ImageProcessingService|MockObject $imageProcessingService;
+
+    #[Stub(LoggingService::class)]
+    private LoggingService|MockObject $loggingService;
 
     protected function setUp(): void
     {
@@ -57,7 +66,7 @@ class ProcessImagesExecutorTest extends SimpleTestCase
 
     private function createTestee(ImageProcessingService|MockObject $imageProcessingService): ProcessImagesExecutor
     {
-        return new ProcessImagesExecutor($imageProcessingService, $this->lockFilePath);
+        return new ProcessImagesExecutor($imageProcessingService, $this->lockFilePath, $this->loggingService);
     }
 
     public function testHandles_returnsProcessImages(): void
@@ -109,6 +118,34 @@ class ProcessImagesExecutorTest extends SimpleTestCase
         self::assertIsString($output);
         self::assertStringContainsString('Processed 0 image(s).', $output);
         self::assertStringNotContainsString('Another worker is already processing images.', $output);
+        self::assertFileDoesNotExist($this->lockFilePath);
+    }
+
+    public function testExecute_processingFailureIsLoggedAndLockFileIsRemoved(): void
+    {
+        $exception = new RuntimeException('processing failed');
+        $this->imageProcessingService
+            ->method('processBatch')
+            ->willThrowException($exception);
+        $loggedErrors = [];
+        $this->loggingService
+            ->method('log')
+            ->willReturnCallback(static function (LogLevel $level, string $message) use (&$loggedErrors): void {
+                $loggedErrors[] = [$level, $message];
+            });
+
+        try {
+            $this->createTestee($this->imageProcessingService)->execute([], true);
+            self::fail('Expected the processing exception to be rethrown.');
+        } catch (RuntimeException $thrown) {
+            self::assertSame($exception, $thrown);
+        }
+
+        self::assertFileDoesNotExist($this->lockFilePath);
+        self::assertSame(
+            [[LogLevel::ERROR, 'Image processing worker failed with RuntimeException: processing failed']],
+            $loggedErrors
+        );
     }
 
     public function testExecute_heldLock_isCleanNoOp(): void
@@ -193,7 +230,7 @@ class ProcessImagesExecutorTest extends SimpleTestCase
 
     public function testHelptext_mentionsFlagAndUsage(): void
     {
-        $executor = new ProcessImagesExecutor($this->createStub(ImageProcessingService::class), $this->lockFilePath);
+        $executor = $this->createTestee($this->createStub(ImageProcessingService::class));
         self::assertStringContainsString('--process-images', $executor->helptext());
     }
 }

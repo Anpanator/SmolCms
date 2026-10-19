@@ -125,9 +125,13 @@ class ImageUploadControllerTest extends FunctionalTestCase
         $this->assertEquals(HttpStatus::BAD_REQUEST, $response->getStatus());
     }
 
-    public function testPostAction_SuccessfulImageUpload_storesChecksumNamedOriginalAndCreatesPendingRecord(): void
+    public function testPostAction_SuccessfulImageUpload_returnsGenericMessageAndStoresChecksumNamedOriginal(): void
     {
         $this->loginUser('testuser', 'Test User');
+        $existingImageIds = array_map(
+            static fn($entity) => $entity->getId(),
+            $this->imageEntityService->findByStatus(ImageStatus::PENDING)
+        );
         $tmpPath = ROOT_DIR . '/tests/TestUtils/TestFiles/image.jpg';
 
         $request = new Request(
@@ -149,24 +153,26 @@ class ImageUploadControllerTest extends FunctionalTestCase
         $this->assertEquals(HttpStatus::CREATED, $response->getStatus());
         $this->assertSame(HttpContentType::JSON->value, $response->getHeaders()[HttpHeader::CONTENT_TYPE->value]);
 
-        // The stored original is named <sha-256 checksum>.jpeg and lives in a two-char subdirectory
         $body = json_decode((string)$response->getContent(), true);
-        $this->assertMatchesRegularExpression('/^[0-9a-f]{64}\.jpeg$/', $body['filename']);
-        $checksum = substr($body['filename'], 0, 64);
-        $filePath = IMAGE_STORAGE_DIR . '/' . substr($checksum, 0, 2) . '/' . $body['filename'];
+        $this->assertSame(['message' => 'Image uploaded successfully.'], $body);
+
+        // The stored original is named <sha-256 checksum>.jpeg and lives in a two-char subdirectory.
+        $pendingEntities = $this->imageEntityService->findByStatus(ImageStatus::PENDING);
+        $uploadedEntities = array_values(array_filter(
+            $pendingEntities,
+            static fn($entity) => !in_array($entity->getId(), $existingImageIds, true)
+        ));
+        $this->assertCount(1, $uploadedEntities);
+        $entity = $uploadedEntities[0];
+        $checksum = $entity->getChecksum();
+        $filename = $checksum . '.' . $entity->getOriginalExtension();
+        $filePath = IMAGE_STORAGE_DIR . '/' . substr($checksum, 0, 2) . '/' . $filename;
         $this->assertFileExists($filePath);
         $this->assertSame($checksum, hash('sha256', (string)file_get_contents($filePath)));
         // The client-supplied name is no longer used
         $this->assertFileDoesNotExist(IMAGE_STORAGE_DIR . '/test.jpg');
 
         // A pending image record was created for the stored original
-        $pendingEntities = $this->imageEntityService->findByStatus(ImageStatus::PENDING);
-        $matchingEntities = array_filter(
-            $pendingEntities,
-            static fn($entity) => $entity->getChecksum() === $checksum
-        );
-        $this->assertCount(1, $matchingEntities);
-        $entity = array_values($matchingEntities)[0];
         $this->assertSame('jpeg', $entity->getOriginalExtension());
         $this->assertNull($entity->getThumbFilename());
         $this->assertNull($entity->getSampleFilename());

@@ -55,7 +55,7 @@ export async function testValidSubmitPostsFormData() {
     try {
         const fetchMock = mockFetch((url) => {
             assertEqual(url, '/upload-image', 'should post to /upload-image');
-            return { status: 201, body: { filename: 'cat.png' } };
+            return {status: 201, body: {message: 'Image uploaded successfully.'}};
         });
         const restoreUpload = useFetch(fetchMock);
         try {
@@ -73,7 +73,8 @@ export async function testValidSubmitPostsFormData() {
 
             const message = view.querySelector('.form-message');
             assertTrue(!message.hidden, 'success message should be visible');
-            assertTrue(message.textContent.includes('cat.png'), 'success message should contain the filename');
+            assertEqual(message.textContent, 'Image uploaded successfully.');
+            assertTrue(!message.textContent.includes('cat.png'), 'success message must not contain the uploaded filename');
             assertEqual(input.files.length, 0, 'form should be reset after upload');
         } finally {
             restoreUpload();
