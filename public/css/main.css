@@ -504,6 +504,88 @@ h3 {
 }
 
 /* ------------------------------------------------------------------ */
+/* Tag management                                                      */
+/* ------------------------------------------------------------------ */
+
+.tags-page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-6);
+    min-width: 0;
+    padding: var(--space-4);
+}
+
+.tags-title {
+    margin: 0;
+}
+
+.tags-page > .search-view {
+    width: min(100%, 36rem);
+    margin: 0;
+}
+
+.tags-browser {
+    min-width: 0;
+}
+
+.tags-section-title {
+    margin-bottom: var(--space-3);
+    font-size: 1.2rem;
+}
+
+.tags-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+}
+
+.tags-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.tags-table th,
+.tags-table td {
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+    text-align: left;
+}
+
+.tags-table th {
+    background: var(--color-surface-alt);
+    font-weight: 600;
+}
+
+.tags-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.tags-table .tags-count-cell {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.tags-table-status td {
+    padding: var(--space-4);
+    color: var(--color-muted);
+    text-align: center;
+}
+
+.tags-management {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+    align-items: start;
+}
+
+.tags-form-panel {
+    min-width: 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* Image display view                                                  */
 /* ------------------------------------------------------------------ */
 
@@ -1059,6 +1141,10 @@ h3 {
 @media (max-width: 48rem) {
     .layout {
         grid-template-columns: 1fr;
+    }
+
+    .tags-management {
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .sidebar {

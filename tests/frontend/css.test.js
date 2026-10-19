@@ -215,6 +215,15 @@ export function testSearchInputAndPaginationStylesAreAvailable() {
     assertTrue(findRule(rules, '.tags-link--active', 'font-weight:600') !== undefined, 'active tags should be visually distinct');
 }
 
+export function testTagManagementTableAndFormsHaveStyles() {
+    const rules = collectRules(findMainStylesheet());
+    assertTrue(findRule(rules, '.tags-page', 'grid-template-columns') !== undefined, 'the tag page should use a single-column layout');
+    assertTrue(findRule(rules, '.tags-table', 'border-collapse:collapse') !== undefined, 'the tag list should render as a table');
+    assertTrue(findRule(rules, '.tags-table th', 'border-bottom') !== undefined, 'table headings and rows should be separated');
+    assertTrue(findRule(rules, '.tags-management', 'grid-template-columns') !== undefined, 'tag creation forms should have a responsive layout');
+    assertTrue(findRule(rules, '.tags-form-panel', 'min-width:0') !== undefined, 'form panels should be allowed to shrink');
+}
+
 function assertNotEqualString(actual, expected, message) {
     if (actual === expected) {
         throw new Error(`${message} (got ${expected})`);

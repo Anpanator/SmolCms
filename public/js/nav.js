@@ -34,6 +34,7 @@ function sessionItems(user, activePath) {
         ];
         if ((user.accessLevel ?? 0) >= MIN_REVIEW_ACCESS_LEVEL) {
             items.push(navItem(navLink('/review', 'Mod Queue', activePath)));
+            items.push(navItem(navLink('/tags', 'Tags', activePath)));
         }
         return items;
     }

@@ -9,7 +9,7 @@ import {el} from './dom.js';
  * Maps an API error status code to a user-facing message
  * (error responses have empty bodies, the frontend owns the wording).
  */
-export function messageForStatus(status) {
+export function messageForStatus(status, conflictMessage = 'This login name is already taken.') {
     switch (status) {
         case 400:
             return 'Please check your input.';
@@ -18,7 +18,7 @@ export function messageForStatus(status) {
         case 403:
             return 'You do not have permission to do that.';
         case 409:
-            return 'This login name is already taken.';
+            return conflictMessage;
         case 413:
             return 'The upload is too large. Each request is limited to 100 MB total, and each image is limited to 100 MB.';
         case 500:

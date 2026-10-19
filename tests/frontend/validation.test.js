@@ -5,6 +5,9 @@ import {
     validateLoginName,
     validatePassword,
     validatePasswordMatch,
+    normalizeTagName,
+    validateTagCategoryName,
+    validateTagName,
 } from '../../public/js/validation.js';
 import { assertEqual } from './assert.js';
 
@@ -40,6 +43,25 @@ export function testDisplayNameValidation() {
     assertEqual(validateDisplayName('a'.repeat(LIMITS.displayNameMax + 1)), `Display name must be at most ${LIMITS.displayNameMax} characters.`);
     assertEqual(validateDisplayName('Amy'), null);
     assertEqual(validateDisplayName('a'.repeat(LIMITS.displayNameMax)), null);
+}
+
+export function testTagNameValidationMatchesBackendNormalization() {
+    assertEqual(validateTagName(''), 'Tag name is required.');
+    assertEqual(validateTagName(' \t\n '), 'Tag name is required.');
+    assertEqual(validateTagName('a'.repeat(LIMITS.tagNameMax + 1)), `Tag name must be at most ${LIMITS.tagNameMax} characters.`);
+    assertEqual(validateTagName('a'.repeat(LIMITS.tagNameMax)), null);
+    assertEqual(validateTagName(' black   thighhighs '), null);
+    assertEqual(normalizeTagName(' black\t\n thighhighs '), 'black thighhighs');
+    assertEqual(validateTagName('black, thighhighs'), 'Tag name must not contain a comma.');
+    assertEqual(validateTagName('😀'.repeat(LIMITS.tagNameMax)), null, 'Unicode code points should count as characters');
+    assertEqual(validateTagName('😀'.repeat(LIMITS.tagNameMax + 1)), `Tag name must be at most ${LIMITS.tagNameMax} characters.`);
+}
+
+export function testTagCategoryNameUsesTheSameRules() {
+    assertEqual(validateTagCategoryName(''), 'Category name is required.');
+    assertEqual(validateTagCategoryName('Characters'), null);
+    assertEqual(validateTagCategoryName('a,b'), 'Category name must not contain a comma.');
+    assertEqual(validateTagCategoryName('x'.repeat(LIMITS.tagNameMax + 1)), `Category name must be at most ${LIMITS.tagNameMax} characters.`);
 }
 
 export function testPasswordMatchValidation() {

@@ -145,9 +145,35 @@ export async function testModQueueLinkVisibleForModerators() {
             const links = [...nav.element.querySelectorAll('a.nav-link')].map((link) => link.getAttribute('href'));
             assertEqual(
                 JSON.stringify(links),
-                JSON.stringify(['/', '/upload-image', '/review', '/settings']),
-                'Mod Queue should sit between Upload Image and the account dropdown',
+                JSON.stringify(['/', '/upload-image', '/review', '/tags', '/settings']),
+                'moderation links should sit between Upload Image and the account dropdown',
             );
+        } finally {
+            restore();
+        }
+    }
+}
+
+export async function testTagsLinkVisibleForModerators() {
+    for (const accessLevel of [500, 600]) {
+        const {session, restore} = await createLoadedSession(() => sessionResponse(testUser({accessLevel})));
+        try {
+            const nav = createHeaderNav({session, navigate: () => {}});
+            const tagsLink = nav.element.querySelector('a.nav-link[href="/tags"]');
+            assertTrue(tagsLink !== null, `access level ${accessLevel} should see the Tags link`);
+            assertEqual(tagsLink.textContent, 'Tags');
+        } finally {
+            restore();
+        }
+    }
+}
+
+export async function testTagsLinkHiddenBelowModerators() {
+    for (const accessLevel of [100, 400]) {
+        const {session, restore} = await createLoadedSession(() => sessionResponse(testUser({accessLevel})));
+        try {
+            const nav = createHeaderNav({session, navigate: () => {}});
+            assertEqual(nav.element.querySelector('a.nav-link[href="/tags"]'), null);
         } finally {
             restore();
         }
