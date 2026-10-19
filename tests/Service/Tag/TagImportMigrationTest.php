@@ -24,8 +24,8 @@ class TagImportMigrationTest extends FunctionalTestCase
 
         $pattern = "/^INSERT OR IGNORE INTO tag \\(name, category_id\\) VALUES \\('((?:''|[^'\\r\\n])*)', \\(SELECT id FROM tag_category WHERE name = '(Artist|General)'\\)\\);$/m";
         $matchCount = preg_match_all($pattern, $sql, $matches, PREG_SET_ORDER);
-        self::assertSame(6087, $matchCount);
-        self::assertSame(6087, substr_count($sql, 'INSERT OR IGNORE INTO tag'));
+        self::assertSame(6086, $matchCount);
+        self::assertSame(6086, substr_count($sql, 'INSERT OR IGNORE INTO tag'));
 
         $seen = [];
         $categoryCounts = ['Artist' => 0, 'General' => 0];
@@ -34,6 +34,7 @@ class TagImportMigrationTest extends FunctionalTestCase
             $categoryCounts[$match[2]]++;
             self::assertNotSame('', $name);
             self::assertSame(trim($name), $name);
+            self::assertSame($name, mb_strtolower($name, 'UTF-8'), 'Imported tag names must be lowercase.');
             self::assertStringNotContainsString('[', $name);
             self::assertStringNotContainsString(']', $name);
             self::assertStringNotContainsString('_', $name);
@@ -42,7 +43,7 @@ class TagImportMigrationTest extends FunctionalTestCase
             self::assertArrayNotHasKey($key, $seen, "Duplicate imported tag: $name");
             $seen[$key] = true;
         }
-        self::assertSame(['Artist' => 1537, 'General' => 4550], $categoryCounts);
+        self::assertSame(['Artist' => 1536, 'General' => 4550], $categoryCounts);
         self::assertContains('#compass', array_map(
             static fn(array $match): string => str_replace("''", "'", $match[1]),
             $matches
@@ -76,7 +77,7 @@ class TagImportMigrationTest extends FunctionalTestCase
         $this->pdo->exec($importSql);
         $secondCount = (int)$this->pdo->query('SELECT COUNT(*) FROM tag')->fetchColumn();
 
-        self::assertSame(6088, $firstCount);
+        self::assertSame(6087, $firstCount);
         self::assertSame($firstCount, $secondCount);
     }
 }

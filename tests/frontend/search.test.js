@@ -26,17 +26,39 @@ function mountSearch(fixture, handler, onSearch = () => {}) {
 export async function testSuggestionsUseCurrentCommaSegmentAndWaitForTwoCharacters(fixture) {
     const { input, fetchMock, restore } = mountSearch(fixture, () => ({ status: 200, body: { tags: ['bear'] } }));
     try {
-        input.value = 'cats, b';
+        input.value = 'cats,b';
         dispatchInput(input);
         await wait(280);
         assertEqual(fetchMock.calls.length, 0, 'a one-character tag segment should not make a request');
 
-        input.value = 'cats, be';
+        input.value = 'cats,be';
         dispatchInput(input);
         await wait(280);
         await settle();
         assertEqual(fetchMock.calls.length, 1, 'a two-character segment should request suggestions');
         assertEqual(fetchMock.calls[0].url, '/api/tags/suggest?q=be');
+    } finally {
+        restore();
+    }
+}
+
+export async function testSuggestionTriggerCountsWhitespaceInCurrentSegment() {
+    const {input, fetchMock, restore} = mountSearch(
+        document.getElementById('test-fixture'),
+        () => ({status: 200, body: {tags: []}}),
+    );
+    try {
+        input.value = 'a';
+        dispatchInput(input);
+        await wait(280);
+        assertEqual(fetchMock.calls.length, 0, 'one character should not request suggestions');
+
+        input.value = 'a ';
+        dispatchInput(input);
+        await wait(280);
+        await settle();
+        assertEqual(fetchMock.calls.length, 1, 'the trailing space should count as the second character');
+        assertEqual(fetchMock.calls[0].url, '/api/tags/suggest?q=a%20');
     } finally {
         restore();
     }

@@ -1436,7 +1436,6 @@ INSERT OR IGNORE INTO tag (name, category_id) VALUES ('wo you yibei jia wanli', 
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('wrddd', (SELECT id FROM tag_category WHERE name = 'Artist'));
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('wsman', (SELECT id FROM tag_category WHERE name = 'Artist'));
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('wstmlisa', (SELECT id FROM tag_category WHERE name = 'Artist'));
-INSERT OR IGNORE INTO tag (name, category_id) VALUES ('wu yue vulpes', (SELECT id FROM tag_category WHERE name = 'Artist'));
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('wucanming', (SELECT id FROM tag_category WHERE name = 'Artist'));
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('wuren', (SELECT id FROM tag_category WHERE name = 'Artist'));
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('wweed', (SELECT id FROM tag_category WHERE name = 'Artist'));
@@ -1550,7 +1549,6 @@ INSERT OR IGNORE INTO tag (name, category_id) VALUES ('7th dragon 2020', (SELECT
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('7th dragon 2020-ii', (SELECT id FROM tag_category WHERE name = 'General'));
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('86 -eighty six-', (SELECT id FROM tag_category WHERE name = 'General'));
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('9a-91 (girls frontline)', (SELECT id FROM tag_category WHERE name = 'General'));
-INSERT OR IGNORE INTO tag (name, category_id) VALUES ('oshi no ko', (SELECT id FROM tag_category WHERE name = 'General'));
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('a-soul', (SELECT id FROM tag_category WHERE name = 'General'));
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('a hat in time', (SELECT id FROM tag_category WHERE name = 'General'));
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('a simple life with my unobtrusive sister', (SELECT id FROM tag_category WHERE name = 'General'));
@@ -4470,6 +4468,7 @@ INSERT OR IGNORE INTO tag (name, category_id) VALUES ('os-tan', (SELECT id FROM 
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('osakabe-hime (fate/grand order)', (SELECT id FROM tag_category WHERE name = 'General'));
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('osakabehime (fate)', (SELECT id FROM tag_category WHERE name = 'General'));
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('osawari tantei', (SELECT id FROM tag_category WHERE name = 'General'));
+INSERT OR IGNORE INTO tag (name, category_id) VALUES ('oshi no ko', (SELECT id FROM tag_category WHERE name = 'General'));
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('oshino ougi', (SELECT id FROM tag_category WHERE name = 'General'));
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('oshino shinobu', (SELECT id FROM tag_category WHERE name = 'General'));
 INSERT OR IGNORE INTO tag (name, category_id) VALUES ('oshiro project re', (SELECT id FROM tag_category WHERE name = 'General'));

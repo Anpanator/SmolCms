@@ -186,7 +186,7 @@ export function createSearchView({onSearch = () => {}, initialTags = ''} = {}) {
         detachOutsideListener();
 
         const commaIndex = input.value.lastIndexOf(',');
-        const prefix = input.value.slice(commaIndex + 1).trim();
+        const prefix = input.value.slice(commaIndex + 1);
         if (prefix.length < 2) {
             return;
         }

@@ -149,11 +149,11 @@ readonly class ImageQueryService
             if (!is_string($tagName)) {
                 continue;
             }
-            $tagName = trim($tagName);
+            $tagName = TagService::normalizeTagName($tagName);
             if ($tagName === '') {
                 continue;
             }
-            $unique[mb_strtolower($tagName, 'UTF-8')] ??= $tagName;
+            $unique[$tagName] ??= $tagName;
         }
         return array_values($unique);
     }

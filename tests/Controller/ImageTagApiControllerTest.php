@@ -81,6 +81,22 @@ class ImageTagApiControllerTest extends FunctionalTestCase
         self::assertSame([$alphaAndGamma->getId()], array_column($alphaAndGammaBody['images'], 'id'));
     }
 
+    public function testInclusiveImageSearchCaseFoldsUnicodeTagNames(): void
+    {
+        $tagName = 'Äimage-search-' . bin2hex(random_bytes(4));
+        $normalizedName = mb_strtolower($tagName, 'UTF-8');
+        $image = $this->createAcceptedImage('2026-10-04 13:00:00');
+        $this->tagService->attachTagToImage($image->getId(), $tagName);
+
+        $response = $this->simulateImageList(['tags' => mb_strtoupper($tagName, 'UTF-8')]);
+        $body = json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR);
+
+        self::assertSame(HttpStatus::OK, $response->getStatus());
+        self::assertSame(1, $body['total']);
+        self::assertSame([$image->getId()], array_column($body['images'], 'id'));
+        self::assertSame([['name' => $normalizedName, 'imageCount' => 1]], $body['tags']);
+    }
+
     public function testImageListPaginatesAndCalculatesTagCloudFromOnlyTheReturnedPage(): void
     {
         $marker = 'page-marker-' . bin2hex(random_bytes(4));

@@ -23,23 +23,18 @@ readonly class TagService
     {
     }
 
-    /**
-     * Trims a name, collapses whitespace runs, and validates the shared tag/category rules.
-     */
+    /** Normalizes and validates a tag name using Unicode lowercase folding. */
     public static function normalizeName(string $name): string
     {
-        $collapsed = preg_replace('/[\s\p{Z}]+/u', ' ', $name);
-        if ($collapsed === null) {
-            throw new InvalidArgumentException('Name must be valid UTF-8.');
-        }
-
-        $normalized = trim($collapsed);
-        $length = mb_strlen($normalized, 'UTF-8');
-        if ($length < 1 || $length > 100 || str_contains($normalized, ',')) {
-            throw new InvalidArgumentException('Name must be 1–100 characters and must not contain a comma.');
-        }
-
+        $normalized = self::normalizeTagName($name);
+        self::validateName($normalized);
         return $normalized;
+    }
+
+    /** Lowercase-folds a tag name and normalizes whitespace, without validation. */
+    public static function normalizeTagName(string $name): string
+    {
+        return mb_strtolower(self::collapseWhitespace($name), 'UTF-8');
     }
 
     /**
@@ -48,7 +43,7 @@ readonly class TagService
     public function createTag(string $name, ?string $categoryName = null): ?array
     {
         $normalizedName = self::normalizeName($name);
-        $normalizedCategory = self::normalizeName($categoryName ?? self::DEFAULT_CATEGORY);
+        $normalizedCategory = self::normalizeCategoryName($categoryName ?? self::DEFAULT_CATEGORY);
 
         return $this->withinTransaction(function () use ($normalizedName, $normalizedCategory): ?array {
             $category = $this->findCategory($normalizedCategory);
@@ -87,7 +82,7 @@ readonly class TagService
      */
     public function createCategory(string $name): ?string
     {
-        $normalizedName = self::normalizeName($name);
+        $normalizedName = self::normalizeCategoryName($name);
 
         return $this->withinTransaction(function () use ($normalizedName): ?string {
             if ($this->findCategory($normalizedName) !== null) {
@@ -115,7 +110,7 @@ readonly class TagService
     public function findOrCreateTagId(string $name, ?string $categoryName = null): int
     {
         $normalizedName = self::normalizeName($name);
-        $normalizedCategory = self::normalizeName($categoryName ?? self::DEFAULT_CATEGORY);
+        $normalizedCategory = self::normalizeCategoryName($categoryName ?? self::DEFAULT_CATEGORY);
 
         return $this->withinTransaction(function () use ($normalizedName, $normalizedCategory): int {
             $tagId = $this->findTagId($normalizedName);
@@ -293,11 +288,12 @@ readonly class TagService
      */
     public function suggestTags(string $prefix): array
     {
-        if (trim($prefix) === '') {
+        $normalizedPrefix = self::normalizeTagName($prefix);
+        if ($normalizedPrefix === '') {
             return [];
         }
 
-        $escapedPrefix = self::escapeLikePattern($prefix) . '%';
+        $escapedPrefix = self::escapeLikePattern($normalizedPrefix) . '%';
         $statement = $this->pdo->prepare(
             "SELECT name FROM tag WHERE name COLLATE NOCASE LIKE :prefix ESCAPE '\\' "
             . 'ORDER BY usage_count DESC, name COLLATE NOCASE ASC LIMIT 15'
@@ -317,7 +313,7 @@ readonly class TagService
             throw new InvalidArgumentException('Page must be a positive integer.');
         }
 
-        $query = trim($query);
+        $query = self::normalizeTagName($query);
         $where = '';
         $parameters = [];
         if ($query !== '') {
@@ -443,6 +439,30 @@ readonly class TagService
         $statement->execute(['name' => $name]);
         $tagId = $statement->fetchColumn();
         return $tagId === false ? null : (int)$tagId;
+    }
+
+    private static function normalizeCategoryName(string $name): string
+    {
+        $normalized = self::collapseWhitespace($name);
+        self::validateName($normalized);
+        return $normalized;
+    }
+
+    private static function collapseWhitespace(string $name): string
+    {
+        $collapsed = preg_replace('/[\s\p{Z}]+/u', ' ', $name);
+        if ($collapsed === null) {
+            throw new InvalidArgumentException('Name must be valid UTF-8.');
+        }
+        return trim($collapsed);
+    }
+
+    private static function validateName(string $name): void
+    {
+        $length = mb_strlen($name, 'UTF-8');
+        if ($length < 1 || $length > 100 || str_contains($name, ',')) {
+            throw new InvalidArgumentException('Name must be 1–100 characters and must not contain a comma.');
+        }
     }
 
     private function deleteTagByIdWithinTransaction(int $tagId): bool

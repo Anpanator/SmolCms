@@ -6,6 +6,7 @@ namespace SmolCms\Test\Service\Tag;
 
 use DateTime;
 use InvalidArgumentException;
+use PDO;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Service\DB\ImageEntityService;
 use SmolCms\Service\Tag\TagService;
@@ -21,9 +22,13 @@ class TagServiceTest extends FunctionalTestCase
     #[Autowire]
     private ImageEntityService $imageEntityService;
 
+    #[Autowire]
+    private PDO $pdo;
+
     public function testNormalizeName_collapsesWhitespaceAndRejectsInvalidNames(): void
     {
         self::assertSame('multi word tag', TagService::normalizeName("  multi\tword\n tag  "));
+        self::assertSame('ätag', TagService::normalizeName(' ÄTAG '));
 
         foreach (['', '  ', 'not,a,tag', str_repeat('x', 101)] as $invalidName) {
             try {
@@ -204,6 +209,46 @@ class TagServiceTest extends FunctionalTestCase
         );
         self::assertSame(3, $this->tagService->browseTags(1, substr($prefix, 1, -1))['total']);
         self::assertSame([], $this->tagService->suggestTags(''));
+    }
+
+    public function testUnicodeTagNamesAreNormalizedForWritesSuggestionsBrowseAndImageAttachments(): void
+    {
+        $suffix = bin2hex(random_bytes(4));
+        $tagName = 'Ätag-' . $suffix;
+        $normalizedTagName = mb_strtolower($tagName, 'UTF-8');
+
+        $created = $this->tagService->createTag($tagName);
+        self::assertNotNull($created);
+        self::assertSame($normalizedTagName, $created['name']);
+        self::assertNull($this->tagService->createTag('ätag-' . $suffix));
+        self::assertNull($this->tagService->createTag('ÄTAG-' . $suffix));
+
+        $countStatement = $this->pdo->prepare('SELECT COUNT(*) FROM tag WHERE name = :name');
+        $countStatement->execute(['name' => $normalizedTagName]);
+        self::assertSame(1, (int)$countStatement->fetchColumn(), 'Unicode case variants should persist only one tag');
+
+        self::assertSame(
+            $this->tagService->suggestTags('Ä'),
+            $this->tagService->suggestTags('ä'),
+            'Unicode case variants of a suggestion prefix should return the same results',
+        );
+        self::assertContains($normalizedTagName, $this->tagService->suggestTags('Ä'));
+        self::assertSame(
+            [['name' => $normalizedTagName, 'category' => 'General', 'usageCount' => 0]],
+            $this->tagService->browseTags(1, 'ÄTAG-' . $suffix)['tags'],
+            'Unicode mixed-case browse terms should match lowercased stored names',
+        );
+
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+            uploadDate: new DateTime('2026-10-02 12:00:00'),
+        );
+        $attachedTag = 'Äupload-' . $suffix;
+        self::assertTrue($this->tagService->attachTagToImage($image->getId(), $attachedTag));
+        self::assertFalse($this->tagService->attachTagToImage($image->getId(), 'ÄUPLOAD-' . $suffix));
+        self::assertSame([mb_strtolower($attachedTag, 'UTF-8')], $this->tagService->getTagsForImage($image->getId()));
     }
 
     public function testBrowseTagsPaginatesAtOneHundredResults(): void

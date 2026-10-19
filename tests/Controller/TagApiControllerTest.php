@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SmolCms\Test\Controller;
 
 use DateTime;
+use PDO;
 use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpContentType;
@@ -30,6 +31,9 @@ class TagApiControllerTest extends FunctionalTestCase
 
     #[Autowire]
     private ImageEntityService $imageEntityService;
+
+    #[Autowire]
+    private PDO $pdo;
 
     public function testModerationEndpointsRequireModAccess(): void
     {
@@ -115,7 +119,7 @@ class TagApiControllerTest extends FunctionalTestCase
         self::assertSame(HttpStatus::CREATED, $response->getStatus());
         self::assertSame(HttpContentType::JSON->value, $response->getHeaders()[HttpHeader::CONTENT_TYPE->value]);
         self::assertSame(
-            ['tag' => ['name' => 'Tag with Spaces', 'category' => 'Artist', 'usageCount' => 0]],
+            ['tag' => ['name' => 'tag with spaces', 'category' => 'Artist', 'usageCount' => 0]],
             json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR)
         );
 
@@ -134,6 +138,30 @@ class TagApiControllerTest extends FunctionalTestCase
             ['tag' => ['name' => 'tag-api-default-category', 'category' => 'General', 'usageCount' => 0]],
             json_decode((string)$defaultCategoryResponse->getContent(), true, JSON_THROW_ON_ERROR)
         );
+    }
+
+    public function testCreateTagRejectsUnicodeCaseVariantsAsDuplicates(): void
+    {
+        $this->loginUserWithAccessLevel('tag-api-mod-unicode', 'Tag API Mod', AccessLevel::MOD);
+        $suffix = bin2hex(random_bytes(4));
+        $tagName = 'Ätag-' . $suffix;
+
+        $createdResponse = $this->simulateApiRequest(HttpMethod::POST, '/api/tags', ['name' => $tagName]);
+        self::assertSame(HttpStatus::CREATED, $createdResponse->getStatus());
+        self::assertSame(
+            ['tag' => ['name' => mb_strtolower($tagName, 'UTF-8'), 'category' => 'General', 'usageCount' => 0]],
+            json_decode((string)$createdResponse->getContent(), true, JSON_THROW_ON_ERROR),
+        );
+
+        foreach (['ätag-' . $suffix, 'ÄTAG-' . $suffix] as $duplicateName) {
+            $duplicateResponse = $this->simulateApiRequest(HttpMethod::POST, '/api/tags', ['name' => $duplicateName]);
+            self::assertSame(HttpStatus::CONFLICT, $duplicateResponse->getStatus());
+            self::assertNull($duplicateResponse->getContent());
+        }
+
+        $countStatement = $this->pdo->prepare('SELECT COUNT(*) FROM tag WHERE name = :name');
+        $countStatement->execute(['name' => mb_strtolower($tagName, 'UTF-8')]);
+        self::assertSame(1, (int)$countStatement->fetchColumn());
     }
 
     public function testCreateTagInvalidNamesAndCategoriesReturnBadRequest(): void
