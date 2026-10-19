@@ -952,6 +952,61 @@ h3 {
 }
 
 /* ------------------------------------------------------------------ */
+/* Tag suggestion queue                                                 */
+/* ------------------------------------------------------------------ */
+
+.tag-queue-list {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.tag-queue-select {
+    align-items: stretch;
+    gap: var(--space-1);
+}
+
+.tag-queue-name {
+    display: block;
+    overflow-wrap: anywhere;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.tag-queue-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    width: 100%;
+    min-width: 0;
+}
+
+.tag-queue-suggested-by {
+    overflow-wrap: anywhere;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.tag-queue-created,
+.tag-queue-image-id {
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    overflow-wrap: anywhere;
+}
+
+.tag-queue-current-name {
+    margin-bottom: var(--space-1);
+    overflow-wrap: anywhere;
+    font-family: var(--font-serif);
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.tag-queue-current-byline {
+    color: var(--color-muted);
+    font-size: 0.9rem;
+    overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------ */
 /* Pages and forms                                                     */
 /* ------------------------------------------------------------------ */
 

@@ -14,6 +14,7 @@ export function testMessageForStatusMapping() {
     assertEqual(messageForStatus(400), 'Please check your input.');
     assertEqual(messageForStatus(401), 'Please log in to continue.');
     assertEqual(messageForStatus(403), 'You do not have permission to do that.');
+    assertEqual(messageForStatus(404), 'This item no longer exists.');
     assertEqual(messageForStatus(409), 'This login name is already taken.');
     assertEqual(messageForStatus(409, 'This tag already exists.'), 'This tag already exists.');
     assertEqual(messageForStatus(413), 'The upload is too large. Each request is limited to 100 MB total, and each image is limited to 100 MB.');

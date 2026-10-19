@@ -13,6 +13,7 @@ import {createNotFoundView} from './views/notFound.js';
 import {createRegisterView} from './views/register.js';
 import {createProfileView} from './views/profile.js';
 import {createReviewView} from './views/review.js';
+import {createTagQueueView} from './views/tagQueue.js';
 import {createUploadView} from './views/upload.js';
 import {createTagsView} from './views/tags.js';
 
@@ -42,6 +43,7 @@ async function bootstrap() {
         '/upload-image': (context) => createUploadView(context),
         '/image': (context) => createImageView(context),
         '/review': (context) => createReviewView({session, ...context}),
+        '/tag-queue': (context) => createTagQueueView({session, ...context}),
         '/tags': (context) => createTagsView({session, ...context}),
     };
 
@@ -50,8 +52,9 @@ async function bootstrap() {
         routes,
         notFound: () => createNotFoundView(),
         onNavigate: (path) => {
-            viewContainer.classList.toggle('view-container--review', path === '/review');
-            if (path === '/review') {
+            const isModerationQueue = path === '/review' || path === '/tag-queue';
+            viewContainer.classList.toggle('view-container--review', isModerationQueue);
+            if (isModerationQueue) {
                 viewContainer.querySelector('.review-page')?.focus({preventScroll: true});
             }
             headerNav.setActive(path);

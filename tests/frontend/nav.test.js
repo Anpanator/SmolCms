@@ -145,7 +145,7 @@ export async function testModQueueLinkVisibleForModerators() {
             const links = [...nav.element.querySelectorAll('a.nav-link')].map((link) => link.getAttribute('href'));
             assertEqual(
                 JSON.stringify(links),
-                JSON.stringify(['/', '/upload-image', '/review', '/tags', '/settings']),
+                JSON.stringify(['/', '/upload-image', '/review', '/tag-queue', '/tags', '/settings']),
                 'moderation links should sit between Upload Image and the account dropdown',
             );
         } finally {
@@ -174,6 +174,37 @@ export async function testTagsLinkHiddenBelowModerators() {
         try {
             const nav = createHeaderNav({session, navigate: () => {}});
             assertEqual(nav.element.querySelector('a.nav-link[href="/tags"]'), null);
+        } finally {
+            restore();
+        }
+    }
+}
+
+export async function testTagQueueLinkVisibleForModerators() {
+    for (const accessLevel of [500, 600]) {
+        const {session, restore} = await createLoadedSession(() => sessionResponse(testUser({accessLevel})));
+        try {
+            const nav = createHeaderNav({session, navigate: () => {}});
+            const tagQueueLink = nav.element.querySelector('a.nav-link[href="/tag-queue"]');
+            assertTrue(tagQueueLink !== null, `access level ${accessLevel} should see the Tag Queue link`);
+            assertEqual(tagQueueLink.textContent, 'Tag Queue');
+            assertEqual(
+                tagQueueLink.parentElement?.previousElementSibling?.querySelector('a')?.getAttribute('href'),
+                '/review',
+                'Tag Queue should sit next to Mod Queue',
+            );
+        } finally {
+            restore();
+        }
+    }
+}
+
+export async function testTagQueueLinkHiddenBelowModerators() {
+    for (const accessLevel of [100, 400]) {
+        const {session, restore} = await createLoadedSession(() => sessionResponse(testUser({accessLevel})));
+        try {
+            const nav = createHeaderNav({session, navigate: () => {}});
+            assertEqual(nav.element.querySelector('a.nav-link[href="/tag-queue"]'), null);
         } finally {
             restore();
         }
