@@ -2,7 +2,7 @@
 == Directory Access Restrictions
 
 During `ApplicationCore::init()` (via `ApplicationStartupHandler::runActions()`), the first default startup action `RestrictDirectoryAccessStartupAction::runAction()` calls `ini_set('open_basedir', ...)` with `FS_DIRECTORY_WHITELIST` spread into it by `CoreServiceConfiguration`.
-With the default `config.php` on Unix-like systems, file accesses subject to `open_basedir` after that point are limited to the trees `ROOT_DIR/private`, `ROOT_DIR/src`, and `ROOT_DIR/public/js` (symlinks resolved; the parent `ROOT_DIR` itself need not be listed).
+With the default `config.php` on Unix-like systems, file accesses subject to `open_basedir` after that point are limited to the trees `ROOT_DIR/private`, `ROOT_DIR/src`, `ROOT_DIR/public/js`, and `ROOT_DIR/public/img` (symlinks resolved; the parent `ROOT_DIR` itself need not be listed).
 
 `src/app.php` requires `constants.php`, `config.php`, and `vendor/autoload.php`, then constructs the service graph (`ApplicationCore`, `PDO`, `FileSystemAccessService`, startup actions, CLI handlers) via `ServiceBuilder::getService()` before `init()`, so this is not process-start protection.
 Keep `ROOT_DIR/src` whitelisted because route controllers and other services are autowired and lazy-loaded with Composer PSR-4 `SmolCms\` → `src` after startup (`ApplicationCore::handleRequest()` plus `ServiceBuilder`).
@@ -15,7 +15,7 @@ The current action ignores that return value.
 The host `php.ini` or pool configuration must therefore be unset or a superset of all required paths, including the upload temporary directory.
 
 `open_basedir` neither creates directories nor grants OS permissions.
-`private/init`, `private/sql`, `private/upload`, `private/assets`, and `public/js` must resolve at `FileSystemAccessService` construction; `private/db` and `private/upload/img` are required by database and image operations.
+`private/init`, `private/sql`, `private/upload`, `private/img`, `private/assets`, `public/js`, and `public/img` must resolve at `FileSystemAccessService` construction; `private/db`, `private/upload/img`, and the image directories below `private/img` and `public/img` are required by database and image operations.
 The default `FS_DIRECTORY_WHITELIST` does not cover PHP's `upload_tmp_dir` (default system tmp); image uploads fail unless the temporary directory is relocated inside the whitelist or the whitelist is extended.
 
 The action joins the whitelist with `implode(':')`, not `PATH_SEPARATOR`; the code assumes a Unix-like runtime.

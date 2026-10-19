@@ -19,8 +19,13 @@ class QueryCriteria
     /** @var array<array<string, string>> */
     private array $whereConditions = [];
     private array $parameters = [];
+    /** @var array<array{string, string}> */
+    private array $orderBy = [];
     private ?int $offset = null;
     private ?int $limit = null;
+
+    public const ORDER_ASC = 'ASC';
+    public const ORDER_DESC = 'DESC';
 
     public function select(string $entityClass): static
     {
@@ -79,6 +84,15 @@ class QueryCriteria
         return $this;
     }
 
+    public function orderBy(string $field, string $direction = self::ORDER_ASC): static
+    {
+        if (!in_array($direction, [self::ORDER_ASC, self::ORDER_DESC], true)) {
+            throw new InvalidStateException("Invalid order direction: $direction");
+        }
+        $this->orderBy[] = [$field, $direction];
+        return $this;
+    }
+
     public function getType(): string
     {
         return $this->type;
@@ -92,6 +106,12 @@ class QueryCriteria
     public function getWhereConditions(): array
     {
         return $this->whereConditions;
+    }
+
+    /** @return array<array{string, string}> */
+    public function getOrderBy(): array
+    {
+        return $this->orderBy;
     }
 
     public function getParameters(): array

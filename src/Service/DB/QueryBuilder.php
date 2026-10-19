@@ -49,6 +49,12 @@ class QueryBuilder
             array_push($queryParts, ...$whereParts);
         }
 
+        $orderParts = $this->buildOrderParts($qc);
+        if (!empty($orderParts)) {
+            $queryParts[] = 'ORDER BY';
+            $queryParts[] = implode(', ', $orderParts);
+        }
+
         if ($qc->getLimit() !== null || $qc->getOffset() !== null) {
             $queryParts[] = 'LIMIT';
             if ($qc->getOffset() !== null) {
@@ -82,6 +88,18 @@ class QueryBuilder
                 $parts[] = 'OR';
                 $parts[] = $condition[QueryCriteria::KEY_OR];
             }
+        }
+        return $parts;
+    }
+
+    private function buildOrderParts(QueryCriteria $qc): array
+    {
+        if ($qc->getType() !== QueryCriteria::TYPE_SELECT) {
+            return [];
+        }
+        $parts = [];
+        foreach ($qc->getOrderBy() as [$field, $direction]) {
+            $parts[] = "$field $direction";
         }
         return $parts;
     }

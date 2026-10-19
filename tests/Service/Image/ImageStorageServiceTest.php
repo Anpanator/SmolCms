@@ -4,28 +4,34 @@ declare(strict_types=1);
 namespace SmolCms\Test\Service\Image;
 
 use PHPUnit\Framework\MockObject\MockObject;
+use RuntimeException;
 use SmolCms\Data\Image\ImageType;
 use SmolCms\Service\File\FileSystemAccessService;
 use SmolCms\Service\Image\ImageStorageService;
+use SmolCms\Service\Image\StoredImage;
 use SmolCms\TestUtils\Attributes\Stub;
 use SmolCms\TestUtils\SimpleTestCase;
 
 class ImageStorageServiceTest extends SimpleTestCase
 {
     private const string TEST_STORAGE_DIR = '/private/test-img-storage';
-    private const string TEST_FILENAME = 'test-image.png';
 
     private ImageStorageService $testee;
     #[Stub(FileSystemAccessService::class)]
     private FileSystemAccessService|MockObject $fileSystemAccessService;
+    private bool $storageAllowed = true;
 
     protected function setUp(): void
     {
         parent::setUp();
         @mkdir(ROOT_DIR . self::TEST_STORAGE_DIR, 0777, true);
+        $this->storageAllowed = true;
         $this->fileSystemAccessService
             ->method('isPathAllowed')
-            ->willReturnCallback(fn(string $path) => str_starts_with($path, ROOT_DIR . self::TEST_STORAGE_DIR));
+            ->willReturnCallback(
+                fn(string $path) => $this->storageAllowed
+                    && str_starts_with($path, ROOT_DIR . self::TEST_STORAGE_DIR)
+            );
         $this->testee = new ImageStorageService(ROOT_DIR . self::TEST_STORAGE_DIR, $this->fileSystemAccessService);
     }
 
@@ -58,47 +64,85 @@ class ImageStorageServiceTest extends SimpleTestCase
         rmdir($path);
     }
 
-    public function testStoreImage_createsDirectoryIfNotExists(): void
+    public function testStoreImage_createsTwoCharSubdirectoryIfNotExists(): void
     {
         $image = imagecreatetruecolor(100, 100);
 
-        $this->testee->storeImage($image, ImageType::PNG, self::TEST_FILENAME);
+        $stored = $this->testee->storeImage($image, ImageType::PNG);
 
-        self::assertDirectoryExists(ROOT_DIR . self::TEST_STORAGE_DIR);
+        self::assertDirectoryExists(
+            ROOT_DIR . self::TEST_STORAGE_DIR . '/' . substr($stored->getChecksum(), 0, 2)
+        );
     }
 
-    public function testStoreImage_writesPngImage(): void
+    public function testStoreImage_writesChecksumNamedPngIntoTwoCharSubdirectory(): void
     {
         $image = imagecreatetruecolor(100, 100);
         imagefill($image, 0, 0, 0xFF0000); // Red background
 
-        $this->testee->storeImage($image, ImageType::PNG, self::TEST_FILENAME);
+        $stored = $this->testee->storeImage($image, ImageType::PNG);
 
-        $filePath = ROOT_DIR . self::TEST_STORAGE_DIR . '/' . self::TEST_FILENAME;
+        self::assertMatchesRegularExpression('/^[0-9a-f]{64}\.png$/', $stored->getFilename());
+        self::assertSame(substr($stored->getChecksum(), 0, 2) . '/' . $stored->getFilename(), $stored->getRelativePath());
+
+        $filePath = ROOT_DIR . self::TEST_STORAGE_DIR . '/' . $stored->getRelativePath();
+        $content = file_get_contents($filePath);
         self::assertFileExists($filePath);
-        self::assertStringContainsString('PNG', file_get_contents($filePath));
+        self::assertStringContainsString('PNG', $content);
+        self::assertSame($stored->getChecksum(), hash('sha256', $content));
+        self::assertSame(strlen($content), $stored->getFileSize());
+        self::assertSame(100, $stored->getWidth());
+        self::assertSame(100, $stored->getHeight());
+        self::assertSame(ImageType::PNG, $stored->getType());
     }
 
-    public function testStoreImage_writesJpegImage(): void
+    public function testStoreImage_writesJpegContent(): void
     {
         $image = imagecreatetruecolor(100, 100);
         imagefill($image, 0, 0, 0x00FF00); // Green background
 
-        $this->testee->storeImage($image, ImageType::JPEG, 'test.jpg');
+        $stored = $this->testee->storeImage($image, ImageType::JPEG);
 
-        $filePath = ROOT_DIR . self::TEST_STORAGE_DIR . '/test.jpg';
+        self::assertMatchesRegularExpression('/^[0-9a-f]{64}\.jpeg$/', $stored->getFilename());
+        $filePath = ROOT_DIR . self::TEST_STORAGE_DIR . '/' . $stored->getRelativePath();
         self::assertFileExists($filePath);
+        self::assertStringStartsWith("\xFF\xD8\xFF", file_get_contents($filePath));
     }
 
-    public function testStoreImage_writesAvifImage(): void
+    public function testStoreImage_writesAvifContent(): void
     {
         $image = imagecreatetruecolor(100, 100);
         imagefill($image, 0, 0, 0x0000FF); // Blue background
 
-        $this->testee->storeImage($image, ImageType::AVIF, 'test.avif');
+        $stored = $this->testee->storeImage($image, ImageType::AVIF);
 
-        $filePath = ROOT_DIR . self::TEST_STORAGE_DIR . '/test.avif';
+        self::assertMatchesRegularExpression('/^[0-9a-f]{64}\.avif$/', $stored->getFilename());
+        $filePath = ROOT_DIR . self::TEST_STORAGE_DIR . '/' . $stored->getRelativePath();
         self::assertFileExists($filePath);
+        self::assertSame('ftyp', substr(file_get_contents($filePath), 4, 4));
+    }
+
+    public function testStoreImage_sameContent_storesSameFileName(): void
+    {
+        $image = imagecreatetruecolor(50, 50);
+
+        $first = $this->testee->storeImage($image, ImageType::PNG);
+        $second = $this->testee->storeImage($image, ImageType::PNG);
+
+        self::assertSame($first->getChecksum(), $second->getChecksum());
+        self::assertSame($first->getFilename(), $second->getFilename());
+        self::assertFileExists(ROOT_DIR . self::TEST_STORAGE_DIR . '/' . $second->getRelativePath());
+    }
+
+    public function testStoreImage_disallowedDirectory_throwsException(): void
+    {
+        $this->storageAllowed = false;
+        $image = imagecreatetruecolor(10, 10);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageIsOrContains('Image storage is not allowed in path. Check config!');
+
+        $this->testee->storeImage($image, ImageType::PNG);
     }
 
     public function testGetStoragePath_returnsCorrectPath(): void
@@ -107,4 +151,3 @@ class ImageStorageServiceTest extends SimpleTestCase
         self::assertSame(ROOT_DIR . self::TEST_STORAGE_DIR, $path);
     }
 }
-
