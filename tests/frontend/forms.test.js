@@ -15,6 +15,7 @@ export function testMessageForStatusMapping() {
     assertEqual(messageForStatus(401), 'Please log in to continue.');
     assertEqual(messageForStatus(403), 'You do not have permission to do that.');
     assertEqual(messageForStatus(409), 'This login name is already taken.');
+    assertEqual(messageForStatus(413), 'The file is too large. The maximum upload size is 100 MB.');
     assertEqual(messageForStatus(500), 'Something went wrong on the server. Please try again later.');
     assertEqual(messageForStatus(503), 'Something went wrong. Please try again.');
     assertEqual(messageForStatus(0), 'Something went wrong. Please try again.');

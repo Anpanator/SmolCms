@@ -7,6 +7,9 @@ const FS_DIRECTORY_WHITELIST = [
     ROOT_DIR . '/src',
     ROOT_DIR . '/public/js',
     ROOT_DIR . '/public/img',
+    // PHP's upload temp directory when upload_tmp_dir is not overridden (local development
+    // without docker). In docker, php.ini pins upload_tmp_dir to private/upload/tmp instead.
+    PHP_TEMP_DIR,
 ];
 
 // In case app-level access checks should be more restrictive, you can be more specific here.

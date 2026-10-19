@@ -19,6 +19,8 @@ export function messageForStatus(status) {
             return 'You do not have permission to do that.';
         case 409:
             return 'This login name is already taken.';
+        case 413:
+            return 'The file is too large. The maximum upload size is 100 MB.';
         case 500:
             return 'Something went wrong on the server. Please try again later.';
         default:

@@ -19,9 +19,9 @@ use SmolCms\TestUtils\FunctionalTestCase;
 
 readonly class TestImageUploadValidator extends ImageUploadValidator
 {
-    public function validate(Request $request): bool
+    public function getStatus(Request $request): HttpStatus
     {
-        return true;
+        return HttpStatus::OK;
     }
 }
 

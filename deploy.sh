@@ -42,6 +42,8 @@ docker run --detach \
     --security-opt no-new-privileges:true \
     --mount type=volume,source=smolcms-dev-db,target=/var/www/html/private/db \
     --mount type=volume,source=smolcms-dev-upload,target=/var/www/html/private/upload \
+    --mount type=volume,source=smolcms-dev-img,target=/var/www/html/private/img \
+    --mount type=volume,source=smolcms-dev-img-public,target=/var/www/html/public/img \
     --mount "type=bind,source=$LOG_DIR,target=/var/www/html/private/logs" \
     smolcms:dev
 
