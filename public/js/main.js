@@ -34,7 +34,7 @@ async function bootstrap() {
 
     const viewContainer = el('main', { className: 'view-container' });
     const routes = {
-        '/': () => createHomeView(),
+        '/': (context) => createHomeView(context),
         '/login': (context) => createLoginView({ session, ...context }),
         '/register': (context) => createRegisterView(context),
         '/settings': (context) => createProfileView({session, ...context}),

@@ -12,6 +12,7 @@ const DETAIL = {
     fileSize: 1234,
     sampleSrc: '/api/image/sample?name=ab89c0d0ef.webp',
     downloadSrc: '/api/image/download?name=ab89c0d0ef.jpeg',
+    tags: ['nature', 'sky'],
 };
 
 function detailResponse(overrides = {}) {
@@ -41,6 +42,10 @@ export async function testImageViewRendersSampleImageInLayout() {
     try {
         assertTrue(view.matches('.layout'), 'image view should use the .layout grid');
         assertTrue(view.querySelector('.sidebar .tags') !== null, 'sidebar tag list should exist');
+        assertTrue(view.querySelector('.sidebar .search-view') !== null, 'image sidebar should have tag search');
+        assertEqual(view.querySelectorAll('.sidebar .tags-item').length, 2, 'detail tags should replace static tags');
+        assertEqual(view.querySelector('.tags-item:first-child .tags-link')?.textContent, 'nature');
+        assertEqual(view.querySelector('.tags-item:last-child .tags-link')?.textContent, 'sky');
         assertTrue(view.querySelector('.sidebar .image-meta') !== null, 'metadata section should live in the sidebar');
         assertTrue(view.querySelector('.content-title') === null, 'the image view should not have a title header');
         assertTrue(view.querySelector('.image-meta-section .sidebar-title') === null, 'image details should not have a title header');
@@ -72,6 +77,18 @@ export async function testImageViewShowsMetadataAndDownloadLink() {
         assertEqual(download.getAttribute('href'), '/api/image/download?name=ab89c0d0ef.jpeg');
         assertTrue(download.hasAttribute('download'), 'download link should carry the download attribute');
         assertEqual(download.textContent, 'Download');
+    } finally {
+        restore();
+    }
+}
+
+export async function testImageTagSearchNavigatesToHomeFilter() {
+    const { view, navigateCalls, restore } = await createView(() => detailResponse());
+    try {
+        const input = view.querySelector('.search-input');
+        input.value = 'cats, dogs';
+        view.querySelector('.search-view').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        assertEqual(navigateCalls[0], '/?tags=cats%2Cdogs');
     } finally {
         restore();
     }

@@ -7,12 +7,17 @@
 import {get} from '../api.js';
 import {el} from '../dom.js';
 import {createMessageBox, isAuthError, messageForStatus, showMessage} from '../forms.js';
-import {createTagList} from './home.js';
+import {createSearchView, normalizeTags} from '../search.js';
+import {createTagView} from './home.js';
 
 const DETAIL_URL = '/api/image/detail';
 const NOT_FOUND_MESSAGE = 'Image not found.';
 
 export function createImageView({ navigate, query = new URLSearchParams(window.location.search) } = {}) {
+    const search = createSearchView({
+        onSearch: (tags) => navigate?.(buildHomePath(tags)),
+    });
+    const tagView = createTagView();
     const metaList = el('dl', { className: 'image-meta' });
     const metaSection = el('div', {
         className: 'image-meta-section',
@@ -21,8 +26,9 @@ export function createImageView({ navigate, query = new URLSearchParams(window.l
     const sidebar = el('aside', {
         className: 'sidebar',
         children: [
+            search.element,
             el('h2', { className: 'sidebar-title', children: 'Tags' }),
-            createTagList(),
+            tagView,
             metaSection,
         ],
     });
@@ -34,7 +40,7 @@ export function createImageView({ navigate, query = new URLSearchParams(window.l
         children: [status, imageHolder],
     });
 
-    loadImage(parseImageId(query.get('id')), { navigate, imageHolder, metaList, metaSection, status });
+    loadImage(parseImageId(query.get('id')), { navigate, imageHolder, metaList, metaSection, status, tagView });
 
     return el('div', { className: 'layout image-layout', children: [sidebar, content] });
 }
@@ -44,14 +50,14 @@ function parseImageId(raw) {
     return /^[1-9][0-9]*$/.test(raw ?? '') ? Number(raw) : null;
 }
 
-async function loadImage(id, { navigate, imageHolder, metaList, metaSection, status }) {
+async function loadImage(id, { navigate, imageHolder, metaList, metaSection, status, tagView }) {
     if (id === null) {
         showMessage(status, NOT_FOUND_MESSAGE);
         return;
     }
     try {
         const data = await get(`${DETAIL_URL}?id=${id}`);
-        renderImage(data?.image ?? null, { imageHolder, metaList, metaSection, status });
+        renderImage(data?.image ?? null, { imageHolder, metaList, metaSection, status, tagView });
     } catch (error) {
         if (isAuthError(error)) {
             navigate('/login');
@@ -61,11 +67,13 @@ async function loadImage(id, { navigate, imageHolder, metaList, metaSection, sta
     }
 }
 
-function renderImage(image, { imageHolder, metaList, metaSection, status }) {
+function renderImage(image, { imageHolder, metaList, metaSection, status, tagView }) {
     if (!image) {
         showMessage(status, NOT_FOUND_MESSAGE);
         return;
     }
+
+    tagView.replaceWith(createTagView(Array.isArray(image.tags) ? image.tags : []));
 
     if (image.sampleSrc) {
         imageHolder.append(el('img', {
@@ -107,6 +115,13 @@ function formatDimensions(width, height) {
     return width === null || width === undefined || height === null || height === undefined
         ? '—'
         : `${width} × ${height}`;
+}
+
+function buildHomePath(tags) {
+    const normalizedTags = normalizeTags(tags);
+    return normalizedTags === ''
+        ? '/'
+        : `/?${new URLSearchParams({ tags: normalizedTags })}`;
 }
 
 /** Human-readable file size in B/KB/MB; "—" when unknown. */

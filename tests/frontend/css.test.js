@@ -205,6 +205,16 @@ export function testFormElementsAreStyled() {
     }
 }
 
+export function testSearchInputAndPaginationStylesAreAvailable() {
+    const rules = collectRules(findMainStylesheet());
+    const searchInputRule = findRule(rules, '.search-input', 'overflow:hidden');
+    assertTrue(searchInputRule?.text.includes('white-space:nowrap'), 'the search field should stay single-line without overflow');
+    assertTrue(findRule(rules, '.search-submit', 'position:absolute') !== undefined, 'the search icon should sit inside the field');
+    assertTrue(findRule(rules, '.search-suggestions', 'position:absolute') !== undefined, 'suggestions should overlay below the field');
+    assertTrue(findRule(rules, '.pagination', 'display:flex') !== undefined, 'pagination controls should have a styled row');
+    assertTrue(findRule(rules, '.tags-link--active', 'font-weight:600') !== undefined, 'active tags should be visually distinct');
+}
+
 function assertNotEqualString(actual, expected, message) {
     if (actual === expected) {
         throw new Error(`${message} (got ${expected})`);
