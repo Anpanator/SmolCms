@@ -34,7 +34,7 @@ export async function testLoggedInNavRendersUserAndLogout() {
     try {
         const nav = createHeaderNav({ session, navigate: () => {} });
         const links = [...nav.element.querySelectorAll('a.nav-link')].map((link) => link.getAttribute('href'));
-        assertEqual(JSON.stringify(links), JSON.stringify(['/', '/upload-image', '/settings']));
+        assertEqual(JSON.stringify(links), JSON.stringify(['/', '/upload-image', '/tagme', '/settings']));
         assertEqual(nav.element.querySelector('.nav-submenu-trigger')?.textContent, 'Amy', 'display name should title the account dropdown');
         assertEqual(nav.element.querySelector('.has-submenu .submenu a[href="/settings"]')?.textContent, 'Profile');
         assertEqual(nav.element.querySelector('.nav-list > .nav-item > a[href="/settings"]'), null, 'profile link should be in the account dropdown');
@@ -124,7 +124,7 @@ export async function testFooterNavMirrorsSession() {
     try {
         const footer = createFooterNav({ session });
         const links = [...footer.element.querySelectorAll('a.nav-link')].map((link) => link.getAttribute('href'));
-        assertEqual(JSON.stringify(links), JSON.stringify(['/', '/upload-image']));
+        assertEqual(JSON.stringify(links), JSON.stringify(['/', '/upload-image', '/tagme']));
 
         footer.setActive('/upload-image');
         assertEqual(footer.element.querySelector('a.nav-link.active')?.getAttribute('href'), '/upload-image');
@@ -145,7 +145,7 @@ export async function testModQueueLinkVisibleForModerators() {
             const links = [...nav.element.querySelectorAll('a.nav-link')].map((link) => link.getAttribute('href'));
             assertEqual(
                 JSON.stringify(links),
-                JSON.stringify(['/', '/upload-image', '/review', '/tags', '/settings']),
+                JSON.stringify(['/', '/upload-image', '/tagme', '/review', '/tags', '/settings']),
                 'moderation links should sit between Upload Image and the account dropdown',
             );
         } finally {
@@ -197,10 +197,24 @@ export async function testFooterNavHasNoModQueueLinkForModerators() {
         const links = [...footer.element.querySelectorAll('a.nav-link')].map((link) => link.getAttribute('href'));
         assertEqual(
             JSON.stringify(links),
-            JSON.stringify(['/', '/upload-image']),
+            JSON.stringify(['/', '/upload-image', '/tagme']),
             'the footer navigation must not gain a Mod Queue link',
         );
     } finally {
         restore();
+    }
+}
+
+export async function testTagmeLinkIsVisibleForEveryLoggedInAccessLevel() {
+    for (const accessLevel of [100, 200, 300, 400, 500, 600]) {
+        const {session, restore} = await createLoadedSession(() => sessionResponse(testUser({accessLevel})));
+        try {
+            const nav = createHeaderNav({session, navigate: () => {}});
+            const tagmeLink = nav.element.querySelector('a.nav-link[href="/tagme"]');
+            assertTrue(tagmeLink !== null, `access level ${accessLevel} should see Tagme`);
+            assertEqual(tagmeLink.textContent, 'Tagme');
+        } finally {
+            restore();
+        }
     }
 }

@@ -669,6 +669,112 @@ h3 {
 }
 
 /* ------------------------------------------------------------------ */
+/* Tag editing controls                                                 */
+/* ------------------------------------------------------------------ */
+
+.tag-editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.tag-add-row {
+    display: flex;
+    align-items: stretch;
+    gap: var(--space-1);
+}
+
+.tag-add-field {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.tag-add-input {
+    padding: var(--space-2);
+    font-size: 0.9rem;
+}
+
+.tag-add-input:focus {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+    border-color: var(--color-accent);
+}
+
+.tag-add-submit {
+    flex: 0 0 auto;
+    align-self: stretch;
+    padding: var(--space-2) var(--space-3);
+}
+
+.tags-item {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.tags-item .tags-link {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.tag-remove-button {
+    flex: 0 0 1.5rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-danger);
+    font: inherit;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.tag-remove-button:hover,
+.tag-remove-button:focus-visible {
+    background: color-mix(in srgb, var(--color-danger) 12%, white);
+    outline: 2px solid var(--color-danger);
+    outline-offset: 1px;
+}
+
+.tag-remove-button:disabled {
+    cursor: wait;
+    opacity: 0.55;
+}
+
+.tagme-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.tagme-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+}
+
+.tagme-toolbar .content-title {
+    margin: 0;
+}
+
+.tagme-next-button {
+    align-self: center;
+}
+
+.form-message--info {
+    background: color-mix(in srgb, var(--color-accent) 10%, white);
+    border: 1px solid var(--color-accent);
+    color: var(--color-accent-strong);
+}
+
+/* ------------------------------------------------------------------ */
 /* Moderation queue                                                    */
 /* ------------------------------------------------------------------ */
 

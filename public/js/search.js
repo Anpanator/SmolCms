@@ -10,6 +10,7 @@ const DEBOUNCE_MS = 250;
 const MAX_SUGGESTIONS = 15;
 
 let nextSearchViewId = 1;
+let nextSuggestionsId = 1;
 
 /** Normalize comma-separated tag input for API and URL use. */
 export function normalizeTags(value) {
@@ -70,6 +71,27 @@ export function createSearchView({onSearch = () => {}, initialTags = ''} = {}) {
         ],
     });
 
+    const autocomplete = attachTagSuggestions({input, suggestions, container: form});
+    form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        autocomplete.close();
+        onSearch(normalizeTags(input.value));
+    });
+
+    return { element: form, input, suggestions };
+}
+
+/**
+ * Attach the shared comma-segment completion behavior to a text input.
+ *
+ * @param {{input: HTMLInputElement, suggestions: HTMLUListElement, container?: HTMLElement}} options
+ * @returns {{close: () => void}}
+ */
+export function attachTagSuggestions({input, suggestions, container = input.parentElement} = {}) {
+    const suggestionsId = suggestions.id || input.getAttribute('aria-controls') || `tag-suggestions-${nextSuggestionsId++}`;
+    suggestions.id = suggestionsId;
+    input.setAttribute('aria-controls', suggestionsId);
+
     let debounceTimer = null;
     let requestVersion = 0;
     let resultTags = [];
@@ -118,7 +140,7 @@ export function createSearchView({onSearch = () => {}, initialTags = ''} = {}) {
     }
 
     function handleOutsidePointerDown(event) {
-        if (!form.contains(event.target)) {
+        if (!container?.contains(event.target)) {
             closeSuggestions();
         }
     }
@@ -187,7 +209,7 @@ export function createSearchView({onSearch = () => {}, initialTags = ''} = {}) {
         detachOutsideListener();
 
         const commaIndex = input.value.lastIndexOf(',');
-        const prefix = input.value.slice(commaIndex + 1);
+        const prefix = input.value.slice(commaIndex + 1).replace(/^\s+/, '');
         if (prefix.length < 2) {
             return;
         }
@@ -237,11 +259,6 @@ export function createSearchView({onSearch = () => {}, initialTags = ''} = {}) {
             closeSuggestions();
         }
     });
-    form.addEventListener('submit', (event) => {
-        event.preventDefault();
-        closeSuggestions();
-        onSearch(normalizeTags(input.value));
-    });
 
-    return { element: form, input, suggestions };
+    return {close: closeSuggestions};
 }

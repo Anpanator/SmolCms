@@ -224,6 +224,14 @@ export function testTagManagementTableAndFormsHaveStyles() {
     assertTrue(findRule(rules, '.tags-form-panel', 'min-width:0') !== undefined, 'form panels should be allowed to shrink');
 }
 
+export function testImageTagEditingAndTagmeControlsHaveStyles() {
+    const rules = collectRules(findMainStylesheet());
+    assertTrue(findRule(rules, '.tag-add-row', 'display:flex') !== undefined, 'tag input and Add button should share a row');
+    assertTrue(findRule(rules, '.tag-remove-button', 'color:var(--color-danger)') !== undefined, 'remove controls should use the danger color');
+    assertTrue(findRule(rules, '.tagme-toolbar', 'display:flex') !== undefined, 'the Tagme title and refresh action should share a toolbar');
+    assertTrue(findRule(rules, '.form-message--info', 'color:var(--color-accent-strong)') !== undefined, 'informational tag messages should be styled');
+}
+
 function assertNotEqualString(actual, expected, message) {
     if (actual === expected) {
         throw new Error(`${message} (got ${expected})`);

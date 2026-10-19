@@ -2,7 +2,7 @@
  * Header and footer navigation, rendered from session state.
  *
  * Anonymous: Home / Login / Register.
- * Logged in: Home / Upload Image / user display name (hover dropdown with
+ * Logged in: Home / Upload Image / Tagme / user display name (hover dropdown with
  * profile and logout). Dropdown submenus are plain nested lists whose
  * visibility is toggled purely by CSS (:hover / :focus-within).
  * Importing this module has no side effects.
@@ -28,6 +28,7 @@ function sessionItems(user, activePath) {
         const items = [
             navItem(navLink('/', 'Home', activePath)),
             navItem(navLink('/upload-image', 'Upload Image', activePath)),
+            navItem(navLink('/tagme', 'Tagme', activePath)),
         ];
         if ((user.accessLevel ?? 0) >= AccessLevel.MOD) {
             items.push(navItem(navLink('/review', 'Mod Queue', activePath)));
@@ -140,7 +141,7 @@ export function createFooterNav({ session }) {
 
     function render(user) {
         const links = user
-            ? [['/', 'Home'], ['/upload-image', 'Upload Image']]
+            ? [['/', 'Home'], ['/upload-image', 'Upload Image'], ['/tagme', 'Tagme']]
             : [['/', 'Home'], ['/login', 'Login'], ['/register', 'Register']];
         list.replaceChildren(...links.map(([path, label]) => el('li', {
             className: 'nav-item',
