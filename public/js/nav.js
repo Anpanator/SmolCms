@@ -23,6 +23,33 @@ function navItem(children) {
     return el('li', { className: 'nav-item', children });
 }
 
+function internalNavItem(activePath) {
+    const isActive = activePath === '/users' || activePath === '/audit-log';
+    return el('li', {
+        className: 'nav-item has-submenu internal-nav-item',
+        children: [
+            el('button', {
+                className: `nav-link nav-submenu-trigger internal-nav-trigger${isActive ? ' active' : ''}`,
+                attributes: {type: 'button', 'aria-haspopup': 'true'},
+                children: 'Internal',
+            }),
+            el('ul', {
+                className: 'submenu',
+                children: [
+                    el('li', {
+                        className: 'submenu-item',
+                        children: navLink('/users', 'User Management', activePath),
+                    }),
+                    el('li', {
+                        className: 'submenu-item',
+                        children: navLink('/audit-log', 'Audit Log', activePath),
+                    }),
+                ],
+            }),
+        ],
+    });
+}
+
 function sessionItems(user, activePath) {
     if (user) {
         const items = [
@@ -32,6 +59,7 @@ function sessionItems(user, activePath) {
         if ((user.accessLevel ?? 0) >= AccessLevel.MOD) {
             items.push(navItem(navLink('/review', 'Mod Queue', activePath)));
             items.push(navItem(navLink('/tags', 'Tags', activePath)));
+            items.push(internalNavItem(activePath));
         }
         return items;
     }

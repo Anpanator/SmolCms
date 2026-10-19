@@ -619,6 +619,136 @@ h3 {
 }
 
 /* ------------------------------------------------------------------ */
+/* Internal admin area: user management and audit log                  */
+/* ------------------------------------------------------------------ */
+
+.internal-admin-page {
+    min-width: 0;
+    padding: var(--space-4);
+}
+
+.internal-admin-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(14rem, 1fr);
+    gap: var(--space-4);
+    align-items: start;
+    min-width: 0;
+}
+
+.internal-admin-list-panel,
+.internal-admin-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-width: 0;
+}
+
+.internal-admin-sidebar {
+    padding: var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.internal-admin-sidebar .search-box {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.internal-admin-sidebar .search-box-input {
+    flex-basis: auto;
+    width: 100%;
+}
+
+.internal-admin-table-wrap {
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+}
+
+.internal-admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.internal-admin-table th,
+.internal-admin-table td {
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+    text-align: left;
+    vertical-align: top;
+}
+
+.internal-admin-table th {
+    background: var(--color-surface-alt);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.internal-admin-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.internal-admin-table-status td {
+    padding: var(--space-4);
+    color: var(--color-muted);
+    text-align: center;
+}
+
+.internal-admin-table .users-actions-cell {
+    width: 1%;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.users-edit-button {
+    min-width: 2.5rem;
+    padding: var(--space-1) var(--space-2);
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    color: var(--color-accent-strong);
+    font-size: 1.15rem;
+    line-height: 1.25;
+}
+
+.users-edit-button:hover,
+.users-edit-button:focus-visible {
+    background: var(--color-surface-alt);
+    border-color: var(--color-accent);
+}
+
+.users-login-cell,
+.users-register-date-cell,
+.audit-log-time-cell {
+    white-space: nowrap;
+}
+
+.audit-log-user-cell,
+.audit-log-context-cell {
+    overflow-wrap: anywhere;
+}
+
+.internal-admin-denied-page {
+    max-width: 30rem;
+    margin: 0 auto;
+    padding: var(--space-8) var(--space-4);
+}
+
+.internal-admin-denied {
+    margin-bottom: 0;
+}
+
+.user-edit-readonly-field .field-input {
+    background: var(--color-surface-alt);
+    color: var(--color-muted);
+}
+
+/* ------------------------------------------------------------------ */
 /* Image display view                                                  */
 /* ------------------------------------------------------------------ */
 
@@ -1228,6 +1358,10 @@ h3 {
 @media (max-width: 48rem) {
     .layout {
         grid-template-columns: 1fr;
+    }
+
+    .internal-admin-workspace {
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .tags-management {

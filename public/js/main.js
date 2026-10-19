@@ -15,6 +15,8 @@ import {createProfileView} from './views/profile.js';
 import {createReviewView} from './views/review.js';
 import {createUploadView} from './views/upload.js';
 import {createTagsView} from './views/tags.js';
+import {createUsersView} from './views/users.js';
+import {createAuditLogView} from './views/auditLog.js';
 
 async function bootstrap() {
     const appRoot = document.getElementById('app');
@@ -43,6 +45,8 @@ async function bootstrap() {
         '/image': (context) => createImageView(context),
         '/review': (context) => createReviewView({session, ...context}),
         '/tags': (context) => createTagsView({session, ...context}),
+        '/users': (context) => createUsersView({session, ...context}),
+        '/audit-log': (context) => createAuditLogView({session, ...context}),
     };
 
     const router = createRouter({
