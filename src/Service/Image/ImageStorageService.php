@@ -81,6 +81,7 @@ readonly class ImageStorageService
                 ImageType::PNG => imagepng($image, null, 9),
                 ImageType::JPEG => imagejpeg($image, null, 100),
                 ImageType::AVIF => imageavif($image, null, 100),
+                ImageType::WEBP => imagewebp($image, null, 100),
             };
             $content = ob_get_clean();
         } finally {

@@ -18,6 +18,7 @@ use SmolCms\Service\Core\CliCommand\GenerateJsIntegrityExecutor;
 use SmolCms\Service\Core\CliCommand\GenerateMigrationExecutor;
 use SmolCms\Service\Core\CliCommand\InitializeDatabaseExecutor;
 use SmolCms\Service\Core\CliCommand\MigrationsExecutor;
+use SmolCms\Service\Core\CliCommand\ProcessImagesExecutor;
 use SmolCms\Service\Core\CliCommandHandler;
 use SmolCms\Service\Core\ContextService;
 use SmolCms\Service\Core\LoggingService;
@@ -29,6 +30,7 @@ use SmolCms\Service\DB\UserService;
 use SmolCms\Service\File\FileSystemAccessService;
 use SmolCms\Service\Image\AvifImageProcessor;
 use SmolCms\Service\Image\AvifImageTypeDetector;
+use SmolCms\Service\Image\ImageProcessingService;
 use SmolCms\Service\Image\ImageProcessorFacade;
 use SmolCms\Service\Image\ImageQueryService;
 use SmolCms\Service\Image\ImageReviewService;
@@ -38,6 +40,8 @@ use SmolCms\Service\Image\JpegImageProcessor;
 use SmolCms\Service\Image\JpegImageTypeDetector;
 use SmolCms\Service\Image\PngImageProcessor;
 use SmolCms\Service\Image\PngImageTypeDetector;
+use SmolCms\Service\Image\WebpImageProcessor;
+use SmolCms\Service\Image\WebpImageTypeDetector;
 use SmolCms\Service\Validation\ImageUploadValidator;
 
 class CoreServiceConfiguration
@@ -113,6 +117,7 @@ class CoreServiceConfiguration
                     GenerateJsIntegrityExecutor::class,
                     MigrationsExecutor::class,
                     InitializeDatabaseExecutor::class,
+                    ProcessImagesExecutor::class,
                 ]
             ),
             new Service(
@@ -137,6 +142,7 @@ class CoreServiceConfiguration
                     PngImageTypeDetector::class,
                     JpegImageTypeDetector::class,
                     AvifImageTypeDetector::class,
+                    WebpImageTypeDetector::class,
                 ]
             ),
             new Service(
@@ -154,6 +160,7 @@ class CoreServiceConfiguration
                     PngImageProcessor::class,
                     JpegImageProcessor::class,
                     AvifImageProcessor::class,
+                    WebpImageProcessor::class,
                 ]
             ),
             new Service(
@@ -177,6 +184,57 @@ class CoreServiceConfiguration
                     UserService::class,
                     LoggingService::class,
                     FileSystemAccessService::class,
+                ]
+            ),
+            // --- Image processing pipeline (added at the end to ease parallel merges) ---
+            new Service(
+                identifier: WebpImageTypeDetector::class,
+            ),
+            new Service(
+                identifier: WebpImageProcessor::class,
+            ),
+            new Service(
+                identifier: ImageStorageService::class . '.thumb',
+                class: ImageStorageService::class,
+                parameters: [
+                    IMAGE_THUMB_DIR,
+                    FileSystemAccessService::class,
+                ]
+            ),
+            new Service(
+                identifier: ImageStorageService::class . '.sample',
+                class: ImageStorageService::class,
+                parameters: [
+                    IMAGE_SAMPLE_DIR,
+                    FileSystemAccessService::class,
+                ]
+            ),
+            new Service(
+                identifier: ImageStorageService::class . '.download',
+                class: ImageStorageService::class,
+                parameters: [
+                    IMAGE_DOWNLOAD_DIR,
+                    FileSystemAccessService::class,
+                ]
+            ),
+            new Service(
+                identifier: ImageProcessingService::class,
+                parameters: [
+                    ImageEntityService::class,
+                    UserService::class,
+                    ImageStorageService::class . '.thumb',
+                    ImageStorageService::class . '.sample',
+                    ImageStorageService::class . '.download',
+                    IMAGE_STORAGE_DIR,
+                    LoggingService::class,
+                    FileSystemAccessService::class,
+                ]
+            ),
+            new Service(
+                identifier: ProcessImagesExecutor::class,
+                parameters: [
+                    ImageProcessingService::class,
+                    IMAGE_PROCESSING_LOCK_FILE,
                 ]
             ),
         ];

@@ -15,6 +15,7 @@ Run from the project root:
 The script builds the `smolcms:dev` target and runs it at <http://localhost:8080>. The port is bound to localhost only.
 SQLite and uploaded images persist in rootless Docker volumes; logs are written to `~/SmolCms/logs` on the host.
 `display_errors` is enabled in this image.
+On startup the container initializes the database, runs pending migrations, and starts a background loop that processes pending image uploads every minute (up to 100 per run).
 
 The script uses a working Docker context named `rootless` when available. Set `DOCKER_CONTEXT` or `DOCKER_HOST` to
 select another daemon explicitly.
@@ -40,7 +41,9 @@ The production script sets the bind-mount directories to the current user's prim
 permissions. This allows the non-root container user to write through a rootless Docker user namespace while keeping the
 data accessible to the host user. Use the rootless Docker context owned by the same host user. The application runs
 `php src/app.php --init-db` on startup, initializing the SQLite schema only when the mounted database has no tables; it
-does not reset an existing database.
+does not reset an existing database. Pending SQL migrations are then executed with `--migrations --noconfirm`, and a
+background worker loop runs `--process-images 100` every minute to generate image variants (see
+`docs/image-uploads.adoc`); concurrent worker runs are prevented by an advisory lock.
 
 Both variants use host port `8080` by default and cannot run simultaneously on that port. Set `SMOLCMS_DEV_PORT` or
 `SMOLCMS_PROD_PORT` to use another localhost port. The Compose profiles can also be invoked directly with

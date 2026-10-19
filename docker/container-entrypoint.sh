@@ -18,6 +18,7 @@ mkdir -p \
     /tmp/nginx/uwsgi
 
 php "$APP_ROOT/src/app.php" --init-db
+php "$APP_ROOT/src/app.php" --migrations --noconfirm
 
 for file_path in "$DATABASE_FILE" "$APP_ROOT"/private/logs/*.log
 do
@@ -26,13 +27,22 @@ do
     fi
 done
 
+# Background worker: process pending image uploads every minute (up to 100 per run).
+(
+    while true; do
+        php "$APP_ROOT/src/app.php" --process-images 100 >/dev/null 2>&1 || true
+        sleep 60
+    done
+) &
+image_worker_pid=$!
+
 php-fpm -F --fpm-config /usr/local/etc/php-fpm.conf &
 php_fpm_pid=$!
 nginx -g 'daemon off;' -c /etc/nginx/nginx.conf &
 nginx_pid=$!
 
 shutdown() {
-    kill -TERM "$php_fpm_pid" "$nginx_pid" 2>/dev/null || true
+    kill -TERM "$php_fpm_pid" "$nginx_pid" "$image_worker_pid" 2>/dev/null || true
 }
 
 trap shutdown INT TERM
@@ -46,4 +56,5 @@ fi
 shutdown
 wait "$php_fpm_pid" 2>/dev/null || true
 wait "$nginx_pid" 2>/dev/null || true
+wait "$image_worker_pid" 2>/dev/null || true
 exit "$status"

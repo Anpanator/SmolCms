@@ -10,6 +10,7 @@ string
     case PNG = 'png';
     case JPEG = 'jpeg';
     case AVIF = 'avif';
+    case WEBP = 'webp';
 
     public function getValue(): string
     {

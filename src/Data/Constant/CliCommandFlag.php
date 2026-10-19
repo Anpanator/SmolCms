@@ -12,4 +12,5 @@ enum CliCommandFlag: string
     case NOCONFIRM = 'noconfirm';
     case INIT_DB = 'init-db';
     case RESET = 'reset';
+    case PROCESS_IMAGES = 'process-images';
 }
