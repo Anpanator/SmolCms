@@ -23,6 +23,7 @@ class IndexControllerTest extends FunctionalTestCase
             'register' => [RouteEnum::REGISTER],
             'settings' => [RouteEnum::SETTINGS],
             'upload image' => [RouteEnum::UPLOAD_IMAGE],
+            'tags' => [RouteEnum::TAGS_PAGE],
         ];
     }
 

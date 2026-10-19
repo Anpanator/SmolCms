@@ -40,3 +40,32 @@ CREATE TABLE migration
     filename    VARCHAR(255) NOT NULL PRIMARY KEY,
     executed_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE = InnoDb;
+
+CREATE TABLE tag_category
+(
+    id   INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(64) NOT NULL UNIQUE KEY
+) ENGINE = InnoDb;
+
+INSERT IGNORE INTO tag_category (name) VALUES ('General'), ('Artist'), ('Copyright');
+
+CREATE TABLE tag
+(
+    id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name        VARCHAR(100) NOT NULL UNIQUE KEY,
+    category_id INT UNSIGNED NOT NULL,
+    usage_count INT UNSIGNED NOT NULL DEFAULT 0,
+    KEY idx_tag_name (name),
+    KEY idx_tag_usage (usage_count DESC, name)
+) ENGINE = InnoDb;
+
+CREATE TABLE image_tag
+(
+    image_id INT UNSIGNED NOT NULL,
+    tag_id   INT UNSIGNED NOT NULL,
+    PRIMARY KEY (image_id, tag_id),
+    KEY idx_image_tag_tag (tag_id)
+) ENGINE = InnoDb;
+
+INSERT IGNORE INTO tag (name, category_id)
+SELECT 'tagme', id FROM tag_category WHERE name = 'General';

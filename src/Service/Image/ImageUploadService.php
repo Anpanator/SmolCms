@@ -10,6 +10,7 @@ use SmolCms\Data\Persistence\ImageEntity;
 use SmolCms\Exception\InvalidStateException;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\ImageEntityService;
+use SmolCms\Service\Tag\TagService;
 
 /**
  * Orchestrates a single synchronous image upload: validate the image, store the
@@ -22,6 +23,7 @@ readonly class ImageUploadService
         private ImageStorageService  $imageStorageService,
         private ImageEntityService   $imageEntityService,
         private SessionService       $sessionService,
+        private TagService           $tagService,
     )
     {
     }
@@ -52,6 +54,10 @@ readonly class ImageUploadService
             fileSize: $stored->getFileSize(),
         );
         $this->imageEntityService->saveAsNew($entity);
+        if ($entity->getId() === null) {
+            throw new InvalidStateException('The uploaded image was saved without an ID.');
+        }
+        $this->tagService->attachTagToImage($entity->getId(), 'tagme');
 
         return $entity;
     }

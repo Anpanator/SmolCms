@@ -42,6 +42,7 @@ use SmolCms\Service\Image\PngImageProcessor;
 use SmolCms\Service\Image\PngImageTypeDetector;
 use SmolCms\Service\Image\WebpImageProcessor;
 use SmolCms\Service\Image\WebpImageTypeDetector;
+use SmolCms\Service\Tag\TagService;
 use SmolCms\Service\Validation\ImageUploadValidator;
 
 class CoreServiceConfiguration
@@ -174,6 +175,8 @@ class CoreServiceConfiguration
                 parameters: [
                     ImageEntityService::class,
                     UserService::class,
+                    PDO::class,
+                    TagService::class,
                 ]
             ),
             new Service(

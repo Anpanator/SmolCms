@@ -13,9 +13,13 @@ enum RouteEnum: string
     case UPLOAD_IMAGE = '/upload-image';
     case IMAGE_DISPLAY = '/image';
     case IMAGE_REVIEW = '/review';
+    case TAGS_PAGE = '/tags';
     case API_SESSION = '/api/session';
     case API_IMAGES = '/api/images';
     case API_IMAGE_DETAIL = '/api/image/detail';
+    case API_TAGS = '/api/tags';
+    case API_TAG_SUGGEST = '/api/tags/suggest';
+    case API_TAG_CATEGORIES = '/api/tag-categories';
     case API_IMAGE_SAMPLE = '/api/image/sample';
     case API_IMAGE_DOWNLOAD = '/api/image/download';
     case API_REVIEW_QUEUE = '/api/review/queue';

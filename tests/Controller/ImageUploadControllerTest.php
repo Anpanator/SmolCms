@@ -13,6 +13,7 @@ use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Service\DB\ImageEntityService;
 use SmolCms\Service\Image\ImageTypeDetectionFacade;
+use SmolCms\Service\Tag\TagService;
 use SmolCms\Service\Validation\ImageUploadValidator;
 use SmolCms\TestUtils\Attributes\Autowire;
 use SmolCms\TestUtils\FunctionalTestCase;
@@ -31,6 +32,9 @@ class ImageUploadControllerTest extends FunctionalTestCase
 
     #[Autowire]
     private ImageEntityService $imageEntityService;
+
+    #[Autowire]
+    private TagService $tagService;
 
     public static function setUpBeforeClass(): void
     {
@@ -177,6 +181,7 @@ class ImageUploadControllerTest extends FunctionalTestCase
         $this->assertNull($entity->getThumbFilename());
         $this->assertNull($entity->getSampleFilename());
         $this->assertNull($entity->getDownloadFilename());
+        $this->assertContains('tagme', $this->tagService->getTagsForImage($entity->getId()));
     }
 
     public function testPostAction_multipleImages_uploadsEachImage(): void

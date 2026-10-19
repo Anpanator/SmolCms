@@ -21,9 +21,14 @@ readonly class ImageApiController
 
     public function getImageListAction(Request $request): Response
     {
-        return new JsonResponse(
-            ['images' => $this->imageQueryService->getAcceptedImageSummaries()]
-        );
+        $params = $request->getParams ?? [];
+        $page = self::parsePage($params['page'] ?? null);
+        $tags = self::parseTags($params['tags'] ?? null);
+        if ($page === null || $tags === null) {
+            return new Response(HttpStatus::BAD_REQUEST);
+        }
+
+        return new JsonResponse($this->imageQueryService->getAcceptedImagePage($page, $tags));
     }
 
     #[Authenticated(AccessLevel::NOVICE)]
@@ -49,5 +54,50 @@ readonly class ImageApiController
         }
         $intId = (int)$id;
         return $intId > 0 ? $intId : null;
+    }
+
+    private static function parsePage(mixed $page): ?int
+    {
+        if ($page === null) {
+            return 1;
+        }
+        if (!is_string($page) || !ctype_digit($page)) {
+            return null;
+        }
+
+        $digits = ltrim($page, '0');
+        if ($digits === '') {
+            return null;
+        }
+        $maximum = (string)(intdiv(PHP_INT_MAX, 25) + 1);
+        if (strlen($digits) > strlen($maximum)
+            || (strlen($digits) === strlen($maximum) && strcmp($digits, $maximum) > 0)) {
+            return null;
+        }
+
+        $parsedPage = (int)$digits;
+        return $parsedPage > 0 ? $parsedPage : null;
+    }
+
+    /** @return list<string>|null */
+    private static function parseTags(mixed $tags): ?array
+    {
+        if ($tags === null) {
+            return [];
+        }
+        if (!is_string($tags)) {
+            return null;
+        }
+
+        $uniqueTags = [];
+        foreach (explode(',', $tags) as $tagName) {
+            $tagName = trim($tagName);
+            if ($tagName === '') {
+                continue;
+            }
+            $key = mb_strtolower($tagName, 'UTF-8');
+            $uniqueTags[$key] ??= $tagName;
+        }
+        return array_values($uniqueTags);
     }
 }

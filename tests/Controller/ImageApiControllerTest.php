@@ -92,6 +92,10 @@ class ImageApiControllerTest extends FunctionalTestCase
                     ['id' => $newerAccepted->getId(), 'thumbSrc' => '/public/img/thumb/' . substr($newerAccepted->getThumbFilename(), 0, 2) . '/' . $newerAccepted->getThumbFilename()],
                     ['id' => $olderAccepted->getId(), 'thumbSrc' => '/public/img/thumb/' . substr($olderAccepted->getThumbFilename(), 0, 2) . '/' . $olderAccepted->getThumbFilename()],
                 ],
+                'page' => 1,
+                'perPage' => 25,
+                'total' => 2,
+                'tags' => [],
             ],
             $body
         );
@@ -144,6 +148,7 @@ class ImageApiControllerTest extends FunctionalTestCase
                     'fileSize' => 1234,
                     'sampleSrc' => '/api/image/sample?name=' . $sampleFilename,
                     'downloadSrc' => '/api/image/download?name=' . $downloadFilename,
+                    'tags' => [],
                 ],
             ],
             json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR)

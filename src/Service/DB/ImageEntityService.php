@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace SmolCms\Service\DB;
 
+use Throwable;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Persistence\ImageEntity;
 
@@ -86,11 +87,36 @@ readonly class ImageEntityService extends EntityService
 
     public function deleteById(int $id): void
     {
-        $qc = new QueryCriteria();
-        $qc->delete(ImageEntity::class)
-            ->andWhere('id = :id')
-            ->withParameters(['id' => $id]);
-        $this->execute($qc);
+        $ownsTransaction = !$this->pdo->inTransaction();
+        if ($ownsTransaction) {
+            $this->pdo->beginTransaction();
+        }
+
+        try {
+            $usageStatement = $this->pdo->prepare(
+                'UPDATE tag SET usage_count = CASE WHEN usage_count > 0 THEN usage_count - 1 ELSE 0 END '
+                . 'WHERE id IN (SELECT tag_id FROM image_tag WHERE image_id = :image_id)'
+            );
+            $usageStatement->execute(['image_id' => $id]);
+
+            $tagStatement = $this->pdo->prepare('DELETE FROM image_tag WHERE image_id = :image_id');
+            $tagStatement->execute(['image_id' => $id]);
+
+            $qc = new QueryCriteria();
+            $qc->delete(ImageEntity::class)
+                ->andWhere('id = :id')
+                ->withParameters(['id' => $id]);
+            $this->execute($qc);
+
+            if ($ownsTransaction) {
+                $this->pdo->commit();
+            }
+        } catch (Throwable $throwable) {
+            if ($ownsTransaction && $this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $throwable;
+        }
     }
 
     private function findOneByColumn(string $column, string $value): ?ImageEntity

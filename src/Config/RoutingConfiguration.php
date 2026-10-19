@@ -12,6 +12,7 @@ use SmolCms\Controller\ImageReviewController;
 use SmolCms\Controller\ImageUploadController;
 use SmolCms\Controller\IndexController;
 use SmolCms\Controller\RegisterController;
+use SmolCms\Controller\TagApiController;
 use SmolCms\Controller\UserProfileController;
 use SmolCms\Data\Business\Route;
 use SmolCms\Data\Constant\HttpMethod;
@@ -95,6 +96,11 @@ class RoutingConfiguration
                 method: HttpMethod::GET,
                 controller: IndexController::class,
             ),
+            RouteEnum::TAGS_PAGE->name => new Route(
+                path: RouteEnum::TAGS_PAGE->value,
+                method: HttpMethod::GET,
+                controller: IndexController::class,
+            ),
             RouteEnum::API_IMAGES->name => new Route(
                 path: RouteEnum::API_IMAGES->value,
                 method: HttpMethod::GET,
@@ -106,6 +112,36 @@ class RoutingConfiguration
                 method: HttpMethod::GET,
                 controller: ImageApiController::class,
                 handler: 'getImageDetailAction',
+            ),
+            RouteEnum::API_TAG_SUGGEST->name => new Route(
+                path: RouteEnum::API_TAG_SUGGEST->value,
+                method: HttpMethod::GET,
+                controller: TagApiController::class,
+                handler: 'getSuggestionsAction',
+            ),
+            RouteEnum::API_TAGS->name => new Route(
+                path: RouteEnum::API_TAGS->value,
+                method: HttpMethod::GET,
+                controller: TagApiController::class,
+                handler: 'getListAction',
+            ),
+            'ApiTagsPostRoute' => new Route(
+                path: RouteEnum::API_TAGS->value,
+                method: HttpMethod::POST,
+                controller: TagApiController::class,
+                handler: 'createTagAction',
+            ),
+            RouteEnum::API_TAG_CATEGORIES->name => new Route(
+                path: RouteEnum::API_TAG_CATEGORIES->value,
+                method: HttpMethod::GET,
+                controller: TagApiController::class,
+                handler: 'getCategoriesAction',
+            ),
+            'ApiTagCategoriesPostRoute' => new Route(
+                path: RouteEnum::API_TAG_CATEGORIES->value,
+                method: HttpMethod::POST,
+                controller: TagApiController::class,
+                handler: 'createCategoryAction',
             ),
             RouteEnum::API_IMAGE_SAMPLE->name => new Route(
                 path: RouteEnum::API_IMAGE_SAMPLE->value,

@@ -23,7 +23,7 @@ abstract readonly class EntityService
      * EntityService constructor.
      */
     public function __construct(
-        private PDO                        $pdo,
+        protected PDO                      $pdo,
         protected CaseConverter            $caseConverter,
         private QueryBuilder               $queryBuilder,
         protected EntityAttributeProcessor $entityAttributeProcessor
