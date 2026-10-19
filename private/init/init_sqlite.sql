@@ -83,3 +83,38 @@ CREATE INDEX IF NOT EXISTS idx_image_tag_tag ON image_tag (tag_id);
 
 INSERT OR IGNORE INTO tag (name, category_id)
 SELECT 'tagme', id FROM tag_category WHERE name = 'General';
+
+CREATE TABLE tag_suggestion
+(
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    image_id INTEGER      NOT NULL,
+    tag_name VARCHAR(100) NOT NULL COLLATE NOCASE,
+    user_id  INTEGER      NOT NULL,
+    created  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (image_id, tag_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tag_suggestion_image ON tag_suggestion (image_id);
+CREATE INDEX IF NOT EXISTS idx_tag_suggestion_user ON tag_suggestion (user_id);
+
+CREATE TABLE tag_approval
+(
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    tag_id   INTEGER  NOT NULL,
+    user_id  INTEGER  NOT NULL,
+    created  DATETIME NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_tag_approval_tag ON tag_approval (tag_id);
+CREATE INDEX IF NOT EXISTS idx_tag_approval_user ON tag_approval (user_id);
+
+CREATE TABLE audit_log
+(
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER      NOT NULL,
+    action_type INTEGER      NOT NULL,
+    context     VARCHAR(255) NOT NULL DEFAULT '',
+    created     DATETIME     NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log (user_id);

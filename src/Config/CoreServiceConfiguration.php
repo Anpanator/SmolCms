@@ -25,7 +25,13 @@ use SmolCms\Service\Core\LoggingService;
 use SmolCms\Service\Core\Startup\RegisterSessionHandlerStartupAction;
 use SmolCms\Service\Core\Startup\RestrictDirectoryAccessStartupAction;
 use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
+use SmolCms\Service\Core\CaseConverter;
+use SmolCms\Service\DB\AuditLogService;
+use SmolCms\Service\DB\EntityAttributeProcessor;
 use SmolCms\Service\DB\ImageEntityService;
+use SmolCms\Service\DB\QueryBuilder;
+use SmolCms\Service\DB\TagApprovalService;
+use SmolCms\Service\Tag\TagSuggestionService;
 use SmolCms\Service\DB\UserService;
 use SmolCms\Service\File\FileSystemAccessService;
 use SmolCms\Service\Image\AvifImageProcessor;
@@ -238,6 +244,35 @@ class CoreServiceConfiguration
                     ImageProcessingService::class,
                     IMAGE_PROCESSING_LOCK_FILE,
                     LoggingService::class,
+                ]
+            ),
+            new Service(
+                identifier: AuditLogService::class,
+                parameters: [
+                    PDO::class,
+                    CaseConverter::class,
+                    QueryBuilder::class,
+                    EntityAttributeProcessor::class,
+                ]
+            ),
+            new Service(
+                identifier: TagApprovalService::class,
+                parameters: [
+                    PDO::class,
+                    CaseConverter::class,
+                    QueryBuilder::class,
+                    EntityAttributeProcessor::class,
+                ]
+            ),
+            new Service(
+                identifier: TagSuggestionService::class,
+                parameters: [
+                    PDO::class,
+                    CaseConverter::class,
+                    QueryBuilder::class,
+                    EntityAttributeProcessor::class,
+                    TagService::class,
+                    TagApprovalService::class,
                 ]
             ),
         ];
