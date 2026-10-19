@@ -133,20 +133,20 @@ export async function testFooterNavMirrorsSession() {
     }
 }
 
-export async function testReviewLinkVisibleForModerators() {
+export async function testModQueueLinkVisibleForModerators() {
     for (const accessLevel of [500, 600]) {
         const { session, restore } = await createLoadedSession(() => sessionResponse(testUser({ accessLevel })));
         try {
             const nav = createHeaderNav({ session, navigate: () => {} });
             const reviewLink = nav.element.querySelector('a.nav-link[href="/review"]');
-            assertTrue(reviewLink !== null, `access level ${accessLevel} should see the Review link`);
-            assertEqual(reviewLink.textContent, 'Review');
+            assertTrue(reviewLink !== null, `access level ${accessLevel} should see the Mod Queue link`);
+            assertEqual(reviewLink.textContent, 'Mod Queue');
 
             const links = [...nav.element.querySelectorAll('a.nav-link')].map((link) => link.getAttribute('href'));
             assertEqual(
                 JSON.stringify(links),
                 JSON.stringify(['/', '/upload-image', '/review', '/settings']),
-                'Review should sit between Upload Image and the account dropdown',
+                'Mod Queue should sit between Upload Image and the account dropdown',
             );
         } finally {
             restore();
@@ -154,17 +154,17 @@ export async function testReviewLinkVisibleForModerators() {
     }
 }
 
-export async function testReviewLinkHiddenBelowModerators() {
+export async function testModQueueLinkHiddenBelowModerators() {
     const { session, restore } = await createLoadedSession(() => sessionResponse(testUser({ accessLevel: 100 })));
     try {
         const nav = createHeaderNav({ session, navigate: () => {} });
-        assertEqual(nav.element.querySelector('a.nav-link[href="/review"]'), null, 'novices must not see the Review link');
+        assertEqual(nav.element.querySelector('a.nav-link[href="/review"]'), null, 'novices must not see the Mod Queue link');
     } finally {
         restore();
     }
 }
 
-export async function testFooterNavHasNoReviewLinkForModerators() {
+export async function testFooterNavHasNoModQueueLinkForModerators() {
     const { session, restore } = await createLoadedSession(() => sessionResponse(testUser({ accessLevel: 500 })));
     try {
         const footer = createFooterNav({ session });
@@ -172,7 +172,7 @@ export async function testFooterNavHasNoReviewLinkForModerators() {
         assertEqual(
             JSON.stringify(links),
             JSON.stringify(['/', '/upload-image']),
-            'the footer navigation must not gain a Review link',
+            'the footer navigation must not gain a Mod Queue link',
         );
     } finally {
         restore();

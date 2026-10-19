@@ -71,8 +71,19 @@ export function testImageTileAndReviewStylesExist() {
     const reviewThumbRule = findRule(rules, '.review-thumb', 'object-fit:cover');
     assertTrue(reviewThumbRule !== undefined, 'review thumbnails should be cropped with object-fit: cover');
 
-    const reviewItemRule = findRule(rules, '.review-item', 'display:flex');
-    assertTrue(reviewItemRule !== undefined, 'review items should be laid out with flexbox');
+    const reviewSelectRule = findRule(rules, '.review-select', 'display:flex');
+    assertTrue(reviewSelectRule !== undefined, 'queue thumbnails should have a selectable layout');
+
+    const reviewColumnsRule = findRule(rules, '.review-workspace', 'grid-template-columns');
+    assertTrue(
+        reviewColumnsRule?.text.includes('3fr') && reviewColumnsRule.text.includes('1fr'),
+        'the moderation workspace should split into 75/25 columns',
+    );
+
+    const reviewImageRule = findRule(rules, '.review-image', 'object-fit:contain');
+    assertTrue(reviewImageRule !== undefined, 'the full-size image should fit without cropping');
+
+    assertTrue(findRule(rules, '.review-metadata-panel') !== undefined, 'active image metadata should have a panel');
 
     assertTrue(findRule(rules, '.button--danger') !== undefined, 'a danger button style should exist for Reject');
     assertTrue(findRule(rules, '.image-meta') !== undefined, 'the image metadata list should be styled');

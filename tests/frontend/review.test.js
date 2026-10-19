@@ -1,8 +1,9 @@
-import { assertEqual, assertTrue, settle } from './assert.js';
-import { mockFetch, sessionResponse, testUser, useFetch } from './mocks.js';
-import { createSession } from '../../public/js/session.js';
-import { createReviewView } from '../../public/js/views/review.js';
+import {assertEqual, assertTrue, settle} from './assert.js';
+import {mockFetch, sessionResponse, testUser, useFetch} from './mocks.js';
+import {createSession} from '../../public/js/session.js';
+import {createReviewView} from '../../public/js/views/review.js';
 
+const QUEUE_URL = '/api/review/queue';
 const QUEUE = {
     images: [
         {
@@ -21,17 +22,40 @@ const QUEUE = {
         },
     ],
 };
+const DETAILS = {
+    7: {
+        id: 7,
+        uploadDate: '2026-10-19 10:30:00',
+        uploader: 'Upload User',
+        width: 1920,
+        height: 1080,
+        format: 'WEBP',
+        fileSize: 1234567,
+        downloadSrc: '/api/image/download?name=ab89c0d0ef.webp',
+    },
+    3: {
+        id: 3,
+        uploadDate: '2026-10-18 09:00:00',
+        uploader: 'Other User',
+        width: 800,
+        height: 600,
+        format: 'PNG',
+        fileSize: 2048,
+        downloadSrc: '/api/image/download?name=cd89c0d0ef.png',
+    },
+};
 
 /**
- * Creates a session (mocked /api/session) and a review view for the given
- * access level (null = anonymous). `handler` serves every non-session URL.
+ * Creates a session (mocked /api/session) and a mod queue view for the given
+ * access level (null = anonymous). The optional handler overrides API calls.
  */
-async function createViewWith(accessLevel, handler) {
-    const fetchMock = mockFetch((url, options) => {
+async function createViewWith(accessLevel, handler = () => undefined) {
+    const fetchMock = mockFetch(async (url, options) => {
         if (url === '/api/session') {
             return sessionResponse(accessLevel === null ? null : testUser({ accessLevel }));
         }
-        return handler(url, options);
+        const response = await handler(url, options);
+        return response === undefined ? defaultResponse(url) : response;
     });
     const restore = useFetch(fetchMock);
     const session = createSession();
@@ -42,8 +66,31 @@ async function createViewWith(accessLevel, handler) {
     return { view, fetchMock, navigateCalls, restore };
 }
 
+function defaultResponse(url) {
+    if (url === QUEUE_URL) {
+        return {status: 200, body: QUEUE};
+    }
+    const detailMatch = url.match(/^\/api\/image\/detail\?id=(\d+)$/);
+    if (detailMatch) {
+        const image = DETAILS[detailMatch[1]];
+        return image ? {status: 200, body: {image}} : {status: 404, body: null};
+    }
+    return {status: 200, body: null};
+}
+
 function queueCalls(fetchMock) {
-    return fetchMock.calls.filter((call) => call.url === '/api/review/queue');
+    return fetchMock.calls.filter((call) => call.url === QUEUE_URL);
+}
+
+function pressKey(view, key, options = {}) {
+    const event = new KeyboardEvent('keydown', {
+        key,
+        bubbles: true,
+        cancelable: true,
+        ...options,
+    });
+    view.dispatchEvent(event);
+    return event;
 }
 
 export async function testReviewIsDeniedBelowMod() {
@@ -55,6 +102,7 @@ export async function testReviewIsDeniedBelowMod() {
             const denied = view.querySelector('.review-denied');
             assertTrue(denied !== null, 'denied access should show a message');
             assertTrue(denied.textContent.includes('permission'), 'denied message should mention permissions');
+            assertEqual(view.querySelector('.page-title')?.textContent, 'Mod Queue');
             assertTrue(view.querySelector('.review-item') === null, 'no queue items for non-moderators');
             assertEqual(queueCalls(fetchMock).length, 0, 'the queue must not be fetched');
             assertEqual(JSON.stringify(navigateCalls), JSON.stringify([]), 'denied view should not navigate');
@@ -64,64 +112,91 @@ export async function testReviewIsDeniedBelowMod() {
     }
 }
 
-export async function testReviewQueueRendersItemsForModerators() {
-    const { view, fetchMock, restore } = await createViewWith(500, () => ({ status: 200, body: QUEUE }));
+export async function testModQueueShowsDownloadImageAndActiveMetadata() {
+    const {view, fetchMock, restore} = await createViewWith(500);
     try {
         assertEqual(fetchMock.calls[0].url, '/api/session');
         assertEqual(queueCalls(fetchMock).length, 1, 'the queue should be fetched once for MOD');
         assertEqual(queueCalls(fetchMock)[0].options.method, 'GET');
 
         const items = view.querySelectorAll('.review-item');
-        assertEqual(items.length, 2, 'each queued image should become a list item');
+        assertEqual(items.length, 2, 'each queued image should become a thumbnail');
+        assertEqual(view.querySelector('.review-title')?.textContent, 'Mod Queue');
 
         const thumb = items[0].querySelector('img.review-thumb');
         assertTrue(thumb !== null, 'a queued image with a thumb should render an image');
         assertEqual(thumb.getAttribute('src'), '/public/img/thumb/ab/ab89c0.avif');
-        assertTrue(items[0].textContent.includes('Upload User'), 'uploader should be shown');
+        assertTrue(items[0].textContent.includes('Upload User'), 'uploader should be shown in compact metadata');
         assertTrue(items[0].textContent.includes('2026-10-19 10:30:00'), 'upload date should be shown');
+        assertEqual(items[0].querySelectorAll('button[data-action]').length, 0, 'thumbnails must not have action buttons');
 
         assertTrue(items[1].querySelector('img') === null, 'a queued image without a thumb renders no image');
         assertTrue(items[1].querySelector('.review-thumb--empty') !== null, 'a missing thumb should show fallback text');
 
-        for (const item of items) {
-            assertEqual(item.querySelector('button[data-action="approve"]')?.textContent, 'Approve');
-            assertEqual(item.querySelector('button[data-action="reject"]')?.textContent, 'Reject');
-        }
+        const displayedImage = view.querySelector('.review-image');
+        assertTrue(displayedImage !== null, 'the active image should be displayed');
+        assertEqual(displayedImage.getAttribute('src'), DETAILS[7].downloadSrc, 'the full-size download image should be used');
+        assertTrue(view.querySelector('.review-metadata').textContent.includes('1920 × 1080'));
+        assertTrue(view.querySelector('.review-metadata').textContent.includes('1.2 MB'));
+        assertEqual(items[0].querySelector('.review-select')?.getAttribute('aria-pressed'), 'true');
+
+        assertEqual(view.querySelector('.review-actions [data-action="approve"]')?.textContent, 'Approve');
+        assertEqual(view.querySelector('.review-actions [data-action="reject"]')?.textContent, 'Reject');
+        assertTrue(view.querySelector('.review-hotkeys').textContent.includes('Delete / Backspace'));
+    } finally {
+        restore();
+    }
+}
+
+export async function testSelectingThumbnailUpdatesImageAndMetadata() {
+    const {view, fetchMock, restore} = await createViewWith(500);
+    try {
+        view.querySelectorAll('.review-select')[1].dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        await settle();
+
+        assertEqual(view.querySelector('.review-image')?.getAttribute('src'), DETAILS[3].downloadSrc);
+        assertTrue(view.querySelector('.review-metadata').textContent.includes('Other User'));
+        assertTrue(view.querySelector('.review-metadata').textContent.includes('800 × 600'));
+        assertEqual(view.querySelectorAll('.review-select[aria-pressed="true"]').length, 1);
+        assertEqual(view.querySelector('.review-select[aria-pressed="true"]')?.getAttribute('data-image-id'), '3');
+        assertTrue(fetchMock.calls.some((call) => call.url === '/api/image/detail?id=3'));
     } finally {
         restore();
     }
 }
 
 export async function testReviewQueueEmptyState() {
-    const { view, restore } = await createViewWith(600, () => ({ status: 200, body: { images: [] } }));
+    const {view, restore} = await createViewWith(600, (url) => (
+        url === QUEUE_URL ? {status: 200, body: {images: []}} : undefined
+    ));
     try {
         const empty = view.querySelector('.review-empty');
         assertTrue(empty !== null, 'an empty queue should show a message');
-        assertTrue(empty.textContent.includes('No images are waiting for review'));
+        assertTrue(empty.textContent.includes('No images are waiting for moderation'));
+        assertTrue(view.querySelector('.review-image') === null);
+        assertTrue(view.querySelector('.review-actions [data-action="approve"]').disabled);
     } finally {
         restore();
     }
 }
 
-export async function testApprovePostsAndRemovesItem() {
-    const { view, fetchMock, restore } = await createViewWith(500, (url) => {
-        if (url === '/api/review/approve?id=7') {
-            return { status: 204, body: null };
-        }
-        return { status: 200, body: QUEUE };
-    });
+export async function testApprovePostsForActiveImageAndSelectsNext() {
+    const {view, fetchMock, restore} = await createViewWith(500, (url) => (
+        url === '/api/review/approve?id=7' ? {status: 204, body: null} : undefined
+    ));
     try {
-        const approve = view.querySelector('.review-item button[data-action="approve"]');
-        approve.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        view.querySelector('.review-actions button[data-action="approve"]')
+            .dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
         await settle();
 
         const actionCall = fetchMock.calls.find((call) => call.url.startsWith('/api/review/approve'));
-        assertEqual(actionCall.url, '/api/review/approve?id=7', 'approve should post the image id');
+        assertEqual(actionCall.url, '/api/review/approve?id=7', 'approve should post the active image id');
         assertEqual(actionCall.options.method, 'POST');
 
         const items = view.querySelectorAll('.review-item');
         assertEqual(items.length, 1, 'the approved item should be removed from the queue');
-        assertEqual(items[0].querySelector('.review-uploader')?.textContent, 'Other User');
+        assertEqual(items[0].textContent.includes('Other User'), true, 'the next queue image should remain');
+        assertEqual(view.querySelector('.review-image')?.getAttribute('src'), DETAILS[3].downloadSrc);
 
         const message = view.querySelector('.form-message');
         assertTrue(message !== null && !message.hidden, 'approval should show a message');
@@ -132,25 +207,22 @@ export async function testApprovePostsAndRemovesItem() {
     }
 }
 
-export async function testRejectPostsAndRemovesItem() {
-    const { view, fetchMock, restore } = await createViewWith(500, (url) => {
-        if (url === '/api/review/reject?id=3') {
-            return { status: 204, body: null };
-        }
-        return { status: 200, body: QUEUE };
-    });
+export async function testRejectPostsForSelectedThumbnailAndRemovesIt() {
+    const {view, fetchMock, restore} = await createViewWith(500, (url) => (
+        url === '/api/review/reject?id=3' ? {status: 204, body: null} : undefined
+    ));
     try {
-        const reject = view.querySelectorAll('.review-item')[1].querySelector('button[data-action="reject"]');
-        reject.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        view.querySelectorAll('.review-select')[1].dispatchEvent(new MouseEvent('click', {bubbles: true}));
+        await settle();
+        view.querySelector('.review-actions button[data-action="reject"]')
+            .dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
         await settle();
 
         const actionCall = fetchMock.calls.find((call) => call.url.startsWith('/api/review/reject'));
-        assertEqual(actionCall.url, '/api/review/reject?id=3', 'reject should post the image id');
+        assertEqual(actionCall.url, '/api/review/reject?id=3', 'reject should post the selected image id');
         assertEqual(actionCall.options.method, 'POST');
-
-        const items = view.querySelectorAll('.review-item');
-        assertEqual(items.length, 1, 'the rejected item should be removed from the queue');
-        assertEqual(items[0].querySelector('.review-uploader')?.textContent, 'Upload User');
+        assertEqual(view.querySelectorAll('.review-item').length, 1);
+        assertEqual(view.querySelector('.review-select')?.getAttribute('data-image-id'), '7');
         assertTrue(view.querySelector('.form-message').textContent.includes('rejected'));
     } finally {
         restore();
@@ -158,10 +230,14 @@ export async function testRejectPostsAndRemovesItem() {
 }
 
 export async function testRejectLastItemShowsEmptyState() {
-    const { view, restore } = await createViewWith(500, () => ({ status: 200, body: { images: [QUEUE.images[1]] } }));
+    const {view, restore} = await createViewWith(500, (url) => (
+        url === QUEUE_URL ? {status: 200, body: {images: [QUEUE.images[1]]}}
+            : url === '/api/review/reject?id=3' ? {status: 204, body: null}
+                : undefined
+    ));
     try {
-        const reject = view.querySelector('.review-item button[data-action="reject"]');
-        reject.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        view.querySelector('.review-actions button[data-action="reject"]')
+            .dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
         await settle();
 
         assertEqual(view.querySelectorAll('.review-item').length, 0);
@@ -171,15 +247,74 @@ export async function testRejectLastItemShowsEmptyState() {
     }
 }
 
-export async function testApproveUnauthorizedNavigatesToLogin() {
-    const { view, fetchMock, navigateCalls, restore } = await createViewWith(500, (url) => {
-        if (url === '/api/review/approve?id=7') {
-            return { status: 401, body: null };
-        }
-        return { status: 200, body: QUEUE };
-    });
+export async function testArrowKeysNavigateAndUpdateActiveImage() {
+    const {view, restore} = await createViewWith(500);
     try {
-        view.querySelector('.review-item button[data-action="approve"]')
+        assertTrue(pressKey(view, 'ArrowDown').defaultPrevented, 'down should be handled as next');
+        await settle();
+        assertEqual(view.querySelector('.review-image')?.getAttribute('src'), DETAILS[3].downloadSrc);
+
+        pressKey(view, 'ArrowLeft');
+        await settle();
+        assertEqual(view.querySelector('.review-select[aria-pressed="true"]')?.getAttribute('data-image-id'), '7');
+
+        pressKey(view, 'ArrowRight');
+        await settle();
+        assertEqual(view.querySelector('.review-select[aria-pressed="true"]')?.getAttribute('data-image-id'), '3');
+        pressKey(view, 'ArrowUp');
+        await settle();
+        assertEqual(view.querySelector('.review-select[aria-pressed="true"]')?.getAttribute('data-image-id'), '7');
+    } finally {
+        restore();
+    }
+}
+
+export async function testEnterApprovesSelectedImage() {
+    const {view, fetchMock, restore} = await createViewWith(500, (url) => (
+        url === '/api/review/approve?id=3' ? {status: 204, body: null} : undefined
+    ));
+    try {
+        pressKey(view, 'ArrowRight');
+        await settle();
+        const enter = pressKey(view, 'Enter');
+        assertTrue(enter.defaultPrevented, 'Enter should be handled as approve');
+        await settle();
+        assertTrue(fetchMock.calls.some((call) => call.url === '/api/review/approve?id=3'));
+    } finally {
+        restore();
+    }
+}
+
+export async function testDeleteAndBackspaceRejectSelectedImages() {
+    const {view, fetchMock, restore} = await createViewWith(500, (url) => (
+        url.startsWith('/api/review/reject?id=') ? {status: 204, body: null} : undefined
+    ));
+    try {
+        assertTrue(pressKey(view, 'Delete').defaultPrevented, 'Delete should be handled as reject');
+        await settle();
+        assertEqual(view.querySelector('.review-select')?.getAttribute('data-image-id'), '3');
+
+        assertTrue(pressKey(view, 'Backspace').defaultPrevented, 'Backspace should be handled as reject');
+        await settle();
+        const rejectedIds = fetchMock.calls
+            .filter((call) => call.url.startsWith('/api/review/reject?id='))
+            .map((call) => call.url);
+        assertEqual(JSON.stringify(rejectedIds), JSON.stringify([
+            '/api/review/reject?id=7',
+            '/api/review/reject?id=3',
+        ]));
+        assertTrue(view.querySelector('.review-empty') !== null);
+    } finally {
+        restore();
+    }
+}
+
+export async function testApproveUnauthorizedNavigatesToLogin() {
+    const {view, navigateCalls, restore} = await createViewWith(500, (url) => (
+        url === '/api/review/approve?id=7' ? {status: 401, body: null} : undefined
+    ));
+    try {
+        view.querySelector('.review-actions button[data-action="approve"]')
             .dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
         await settle();
 
@@ -191,14 +326,11 @@ export async function testApproveUnauthorizedNavigatesToLogin() {
 }
 
 export async function testApproveForbiddenShowsMessageWithoutRefresh() {
-    const { view, fetchMock, navigateCalls, restore } = await createViewWith(500, (url) => {
-        if (url === '/api/review/approve?id=7') {
-            return { status: 403, body: null };
-        }
-        return { status: 200, body: QUEUE };
-    });
+    const {view, fetchMock, navigateCalls, restore} = await createViewWith(500, (url) => (
+        url === '/api/review/approve?id=7' ? {status: 403, body: null} : undefined
+    ));
     try {
-        view.querySelector('.review-item button[data-action="approve"]')
+        view.querySelector('.review-actions button[data-action="approve"]')
             .dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
         await settle();
 
@@ -214,14 +346,11 @@ export async function testApproveForbiddenShowsMessageWithoutRefresh() {
 }
 
 export async function testApproveNotFoundRefreshesQueue() {
-    const { view, fetchMock, restore } = await createViewWith(500, (url) => {
-        if (url === '/api/review/approve?id=7') {
-            return { status: 404, body: null };
-        }
-        return { status: 200, body: QUEUE };
-    });
+    const {view, fetchMock, restore} = await createViewWith(500, (url) => (
+        url === '/api/review/approve?id=7' ? {status: 404, body: null} : undefined
+    ));
     try {
-        view.querySelector('.review-item button[data-action="approve"]')
+        view.querySelector('.review-actions button[data-action="approve"]')
             .dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
         await settle();
 
@@ -235,7 +364,9 @@ export async function testApproveNotFoundRefreshesQueue() {
 }
 
 export async function testQueueFetchUnauthorizedNavigatesToLogin() {
-    const { view, navigateCalls, restore } = await createViewWith(500, () => ({ status: 401, body: null }));
+    const {view, navigateCalls, restore} = await createViewWith(500, (url) => (
+        url === QUEUE_URL ? {status: 401, body: null} : undefined
+    ));
     try {
         assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/login']), 'queue 401 should navigate to login');
         assertTrue(view.querySelector('.review-item') === null);
@@ -245,7 +376,9 @@ export async function testQueueFetchUnauthorizedNavigatesToLogin() {
 }
 
 export async function testQueueFetchFailureShowsMessage() {
-    const { view, restore } = await createViewWith(500, () => ({ status: 500, body: null }));
+    const {view, restore} = await createViewWith(500, (url) => (
+        url === QUEUE_URL ? {status: 500, body: null} : undefined
+    ));
     try {
         const message = view.querySelector('.form-message');
         assertTrue(message !== null && !message.hidden, 'a queue fetch failure should show a message');
@@ -255,7 +388,7 @@ export async function testQueueFetchFailureShowsMessage() {
     }
 }
 
-export async function testQueueButtonsAreDisabledWhileRequestIsRunning() {
+export async function testActionButtonsAreDisabledWhileRequestIsRunning() {
     let release;
     const gate = new Promise((resolve) => {
         release = resolve;
@@ -265,17 +398,17 @@ export async function testQueueButtonsAreDisabledWhileRequestIsRunning() {
             await gate;
             return { status: 204, body: null };
         }
-        return { status: 200, body: QUEUE };
+        return undefined;
     });
     try {
-        const approve = view.querySelector('.review-item button[data-action="approve"]');
-        const reject = view.querySelector('.review-item button[data-action="reject"]');
+        const approve = view.querySelector('.review-actions button[data-action="approve"]');
+        const reject = view.querySelector('.review-actions button[data-action="reject"]');
         approve.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
         await settle();
 
-        assertEqual(view.querySelectorAll('.review-item').length, 2, 'the item should still be rendered while the request runs');
+        assertEqual(view.querySelectorAll('.review-item').length, 2, 'the item should remain while the request runs');
         assertTrue(approve.disabled, 'the approve button should be disabled while the request runs');
-        assertTrue(reject.disabled, 'the sibling reject button should be disabled while the request runs');
+        assertTrue(reject.disabled, 'the reject button should be disabled while the request runs');
         release();
         await settle();
         assertEqual(view.querySelectorAll('.review-item').length, 1, 'the item should be removed after 204');

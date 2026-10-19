@@ -2,7 +2,7 @@
  * SmolCms SPA stylesheet.
  * Organized in sections: custom properties, base reset, layout shell,
  * top navigation with hover dropdowns, sidebar, content grid, image
- * display view, review queue, footer, pages/forms, buttons and messages.
+ * display view, moderation queue, footer, pages/forms, buttons and messages.
  */
 
 /* ------------------------------------------------------------------ */
@@ -377,29 +377,201 @@ h3 {
 }
 
 /* ------------------------------------------------------------------ */
-/* Review queue                                                        */
+/* Moderation queue                                                    */
 /* ------------------------------------------------------------------ */
 
-.review-page {
-    max-width: 48rem;
+.view-container--review {
+    display: flex;
+    max-width: none;
+    min-width: 0;
+    min-height: 0;
 }
 
-.review-list {
+.review-page {
+    display: flex;
+    flex: 1;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: var(--space-3);
+}
+
+.review-page:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+}
+
+.review-workspace {
+    display: grid;
+    flex: 1;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+    gap: var(--space-3);
+    min-width: 0;
+    min-height: 0;
+}
+
+.review-image-panel {
+    display: grid;
+    min-width: 0;
+    min-height: 0;
+    padding: var(--space-3);
+    place-items: center;
+    overflow: auto;
+    background: #20201d;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+}
+
+.review-image-frame {
+    display: grid;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    place-items: center;
+}
+
+.review-image {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+.review-sidebar {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+    min-width: 0;
+    min-height: 0;
+    padding: var(--space-3);
+    overflow: hidden;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+}
+
+.review-title {
+    margin: 0;
+    text-align: left;
+}
+
+.review-metadata-panel {
+    padding: var(--space-3);
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+}
+
+.review-panel-title {
+    margin-bottom: var(--space-2);
+    font-size: 1rem;
+}
+
+.review-metadata {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin: 0;
+}
+
+.review-meta-item {
+    display: grid;
+    grid-template-columns: minmax(4.5rem, 0.7fr) minmax(0, 1.3fr);
+    gap: var(--space-2);
+    align-items: baseline;
+}
+
+.review-meta-term {
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.review-meta-value {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: 0.9rem;
+}
+
+.review-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+}
+
+.review-actions .button {
+    width: 100%;
+    align-self: stretch;
+    text-align: center;
+}
+
+.review-hotkeys {
+    padding: var(--space-2);
+    color: var(--color-muted);
+    background: var(--color-bg);
+    border-radius: var(--radius);
+    font-size: 0.8rem;
+}
+
+.review-hotkeys kbd {
+    color: var(--color-text);
+    font: inherit;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.review-queue-panel {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.review-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+    gap: var(--space-2);
     list-style: none;
 }
 
 .review-item {
+    min-width: 0;
+}
+
+.review-select {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3);
+    gap: var(--space-2);
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    padding: var(--space-2);
+    color: var(--color-text);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
-    box-shadow: var(--shadow);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.review-select:hover,
+.review-select:focus-visible {
+    border-color: var(--color-accent);
+    outline: 2px solid var(--color-accent);
+    outline-offset: 1px;
+}
+
+.review-select[aria-pressed="true"] {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 35%, transparent);
 }
 
 .review-thumb {
@@ -423,30 +595,39 @@ h3 {
 
 .review-info {
     display: flex;
-    flex: 1;
     flex-direction: column;
     gap: var(--space-1);
+    width: 100%;
     min-width: 0;
 }
 
 .review-uploader {
+    overflow: hidden;
+    font-size: 0.75rem;
     font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .review-date {
     color: var(--color-muted);
-    font-size: 0.85rem;
-}
-
-.review-actions {
-    display: flex;
-    gap: var(--space-2);
+    font-size: 0.65rem;
+    overflow-wrap: anywhere;
 }
 
 .review-empty {
-    padding: var(--space-4);
+    grid-column: 1 / -1;
+    padding: var(--space-3);
     color: var(--color-muted);
     text-align: center;
+}
+
+.review-denied-page {
+    display: block;
+    flex: none;
+    align-self: center;
+    max-width: 30rem;
+    padding: var(--space-8) var(--space-4);
 }
 
 /* ------------------------------------------------------------------ */
@@ -645,7 +826,31 @@ h3 {
         flex-wrap: wrap;
     }
 
-    .review-item {
-        flex-wrap: wrap;
+    .view-container--review {
+        display: block;
+    }
+
+    .review-page {
+        display: block;
+        min-height: auto;
+    }
+
+    .review-workspace {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: minmax(16rem, 50vh) auto;
+    }
+
+    .review-image-panel {
+        min-height: 16rem;
+    }
+
+    .review-sidebar {
+        min-height: 0;
+        overflow: visible;
+    }
+
+    .review-queue-panel {
+        flex: none;
+        overflow: visible;
     }
 }

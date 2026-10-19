@@ -48,6 +48,10 @@ async function bootstrap() {
         routes,
         notFound: () => createNotFoundView(),
         onNavigate: (path) => {
+            viewContainer.classList.toggle('view-container--review', path === '/review');
+            if (path === '/review') {
+                viewContainer.querySelector('.review-page')?.focus({preventScroll: true});
+            }
             headerNav.setActive(path);
             footerNav.setActive(path);
         },
