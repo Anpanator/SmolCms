@@ -8,6 +8,7 @@ It maps each PHP upload `error` code to explicit response statuses instead of fa
 Uploads are limited to **100 MB per file** (`upload_max_filesize = 100M`) and **100 MB total per request** (`post_max_size = 100M`, nginx `client_max_body_size 100m` — keep the aggregate request limits in sync; larger bodies are rejected by nginx with `413` before PHP sees them).
 The request limit includes the full multipart body and its overhead.
 Since the client sends each selected image in its own sequential request, this limit applies separately to each upload rather than to the combined selection.
+Nginx spills request bodies to `private/upload/tmp/nginx/client_body` on the upload bind mount, rather than the container's `/tmp` tmpfs (capped at 64 MiB); PHP's own multipart temp files remain directly under `private/upload/tmp`.
 `memory_limit = 1024M` gives GD headroom for decoding large uploads into uncompressed RGBA buffers.
 
 For every file the controller runs `file_get_contents(tmp_name)` (guarded by `is_readable()`, `false` returns `500`; in docker `php.ini` pins `upload_tmp_dir` to the whitelisted `private/upload/tmp`, and for local runs `config.php` adds `sys_get_temp_dir()` to `FS_DIRECTORY_WHITELIST`), then gates on `ImageTypeDetectionFacade` (`Png`, `Jpeg`, `Avif`, and `Webp` detectors, first match wins; `null` returns `400`).

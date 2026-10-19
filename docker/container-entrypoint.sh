@@ -12,7 +12,7 @@ mkdir -p \
     "$APP_ROOT/private/logs" \
     "$APP_ROOT/private/upload/img" \
     "$APP_ROOT/private/upload/tmp" \
-    /tmp/nginx/client_body \
+    "$APP_ROOT/private/upload/tmp/nginx/client_body" \
     /tmp/nginx/fastcgi \
     /tmp/nginx/proxy \
     /tmp/nginx/scgi \

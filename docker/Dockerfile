@@ -67,9 +67,9 @@ RUN rm -f /usr/local/etc/php-fpm.d/docker.conf \
         private/img/dl \
         private/upload/img \
         private/upload/tmp \
+        private/upload/tmp/nginx/client_body \
         public/img \
         public/img/thumb \
-        /tmp/nginx/client_body \
         /tmp/nginx/fastcgi \
         /tmp/nginx/proxy \
         /tmp/nginx/scgi \
