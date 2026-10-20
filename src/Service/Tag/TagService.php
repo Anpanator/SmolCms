@@ -34,10 +34,10 @@ readonly class TagService extends EntityService
         return $normalized;
     }
 
-    /** Lowercase-folds a tag name and normalizes whitespace, without validation. */
+    /** Applies Unicode full case folding and normalizes whitespace, without validation. */
     public static function normalizeTagName(string $name): string
     {
-        return mb_strtolower(self::collapseWhitespace($name), 'UTF-8');
+        return mb_convert_case(self::collapseWhitespace($name), MB_CASE_FOLD, 'UTF-8');
     }
 
     /**

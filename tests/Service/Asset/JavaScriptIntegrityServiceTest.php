@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SmolCms\Test\Service\Asset;
 
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use SmolCms\Service\Asset\JavaScriptIntegrityService;
 use SmolCms\Service\File\FileSystemAccessService;
@@ -106,5 +107,26 @@ class JavaScriptIntegrityServiceTest extends SimpleTestCase
         $this->javaScriptIntegrityService->addIntegrityAttributes(
             '<script src="/public/js/../Attributes/Mock.php"></script>'
         );
+    }
+
+    public static function encodedTraversalPathProvider(): array
+    {
+        return [
+            'lowercase encoding' => ['/public/js/%2e%2e/TestUtils/TestFiles/integrity-test.js'],
+            'uppercase encoding' => ['/public/js/%2E%2E/TestUtils/TestFiles/integrity-test.js'],
+            'mixed encoded dots' => ['/public/js/.%2e/TestUtils/TestFiles/integrity-test.js'],
+        ];
+    }
+
+    #[DataProvider('encodedTraversalPathProvider')]
+    public function testAddIntegrityAttributes_rejectsEncodedTraversal(string $source): void
+    {
+        $this->fileSystemAccessService
+            ->expects($this->never())
+            ->method('readFile')
+            ->seal();
+
+        $this->expectException(RuntimeException::class);
+        $this->javaScriptIntegrityService->addIntegrityAttributes('<script src="' . $source . '"></script>');
     }
 }

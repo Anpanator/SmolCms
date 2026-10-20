@@ -14,6 +14,7 @@ class PngImageTypeDetectorTest extends SimpleTestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
         $this->detector = new PngImageTypeDetector();
     }
 

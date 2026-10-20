@@ -63,4 +63,41 @@ class LoggingServiceTest extends SimpleTestCase
         self::assertIsString($infoLog);
         self::assertStringContainsString('Configured file mode', $infoLog);
     }
+
+    public function testLog_SystemModeUsesConfiguredPhpErrorLog(): void
+    {
+        $originalErrorLog = ini_get('error_log');
+        self::assertIsString($originalErrorLog);
+        self::assertNotFalse(ini_set('error_log', $this->infoLogFilePath));
+
+        try {
+            $this->loggingService->log(LogLevel::INFO, 'System mode message', LoggingMode::SYSTEM);
+
+            $infoLog = file_get_contents($this->infoLogFilePath);
+            self::assertIsString($infoLog);
+            self::assertStringContainsString('[INFO] System mode message', $infoLog);
+        } finally {
+            self::assertNotFalse(ini_set('error_log', $originalErrorLog));
+        }
+    }
+
+    public function testLog_SapiModeUsesSapiLogger(): void
+    {
+        $emitted = null;
+        $this->loggingService->setErrorLogEmitter(
+            static function (string $message, int $mode, ?string $destination) use (&$emitted): void {
+                $emitted = ['message' => $message, 'mode' => $mode, 'destination' => $destination];
+            },
+        );
+
+        $this->loggingService->log(LogLevel::INFO, 'SAPI mode message', LoggingMode::SAPI);
+
+        self::assertIsArray($emitted);
+        self::assertSame(LoggingMode::SAPI->value, $emitted['mode']);
+        self::assertNull($emitted['destination']);
+        self::assertMatchesRegularExpression(
+            '/^\[\d{2}-[A-Za-z]{3}-\d{4} \d{2}:\d{2}:\d{2} [^\]]+\] \[INFO\] SAPI mode message$/',
+            $emitted['message'],
+        );
+    }
 }

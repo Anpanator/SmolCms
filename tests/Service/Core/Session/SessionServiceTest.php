@@ -20,12 +20,16 @@ class SessionServiceTest extends SimpleTestCase
     /** @var array<string, mixed> */
     private array $originalSession;
 
+    /** @var array<string, int|string|bool> */
+    private array $originalCookieParams;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->originalCookie = $_COOKIE;
         $this->originalSession = $_SESSION ?? [];
+        $this->originalCookieParams = session_get_cookie_params();
         $this->closeActiveSession();
         $_COOKIE = [];
         $_SESSION = [];
@@ -36,6 +40,7 @@ class SessionServiceTest extends SimpleTestCase
     protected function tearDown(): void
     {
         $this->closeActiveSession();
+        session_set_cookie_params($this->originalCookieParams);
         $_COOKIE = $this->originalCookie;
         $_SESSION = $this->originalSession;
 
@@ -65,6 +70,72 @@ class SessionServiceTest extends SimpleTestCase
         self::assertSame(PHP_SESSION_ACTIVE, session_status());
         self::assertSame($sessionId, session_id());
         self::assertSame('value', $_SESSION['marker']);
+    }
+
+    public function testResumeSession_refreshesCookieExpiryAndAttributes(): void
+    {
+        session_set_cookie_params([
+            'lifetime' => 86400,
+            'path' => '/smolcms-test',
+            'domain' => 'example.test',
+            'secure' => false,
+            'httponly' => true,
+            'samesite' => 'Strict',
+        ]);
+
+        $this->sessionService->startSession();
+        $sessionId = session_id();
+        self::assertTrue(session_write_close());
+        $_SESSION = [];
+        $_COOKIE[SessionService::SESSION_NAME] = $sessionId;
+
+        $emittedCookie = null;
+        $this->sessionService->setCookieEmitter(
+            static function (string $name, string $value, array $options) use (&$emittedCookie): void {
+                $emittedCookie = ['name' => $name, 'value' => $value, 'options' => $options];
+            },
+        );
+        $beforeResume = time();
+
+        $this->sessionService->resumeSession();
+
+        $afterResume = time();
+        self::assertIsArray($emittedCookie);
+        self::assertSame(SessionService::SESSION_NAME, $emittedCookie['name']);
+        self::assertSame($sessionId, $emittedCookie['value']);
+        self::assertGreaterThanOrEqual($beforeResume + 86400, $emittedCookie['options']['expires']);
+        self::assertLessThanOrEqual($afterResume + 86400, $emittedCookie['options']['expires']);
+        self::assertSame('/smolcms-test', $emittedCookie['options']['path']);
+        self::assertSame('example.test', $emittedCookie['options']['domain']);
+        self::assertFalse($emittedCookie['options']['secure']);
+        self::assertTrue($emittedCookie['options']['httponly']);
+        self::assertSame('Strict', $emittedCookie['options']['samesite']);
+    }
+
+    public function testResumeSession_doesNotEmitRefreshedCookieWhenHeadersAreSent(): void
+    {
+        $sessionService = new class extends SessionService {
+            protected function headersSent(): bool
+            {
+                return true;
+            }
+        };
+        $sessionService->startSession();
+        $sessionId = session_id();
+        self::assertTrue(session_write_close());
+        $_SESSION = [];
+        $_COOKIE[SessionService::SESSION_NAME] = $sessionId;
+        $cookieWasEmitted = false;
+        $sessionService->setCookieEmitter(
+            static function () use (&$cookieWasEmitted): void {
+                $cookieWasEmitted = true;
+            },
+        );
+
+        $sessionService->resumeSession();
+
+        self::assertFalse($cookieWasEmitted);
+        self::assertSame(PHP_SESSION_ACTIVE, session_status());
     }
 
     public function testDiscardStaleSessionCookie_RemovesCookieFromRequest(): void

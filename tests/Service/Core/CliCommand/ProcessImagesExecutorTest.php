@@ -11,6 +11,7 @@ use SmolCms\Data\Constant\LogLevel;
 use SmolCms\Service\Core\CliCommand\ProcessImagesExecutor;
 use SmolCms\Service\Core\LoggingService;
 use SmolCms\Service\Image\ImageProcessingService;
+use SmolCms\TestUtils\Attributes\Mock;
 use SmolCms\TestUtils\Attributes\Stub;
 use SmolCms\TestUtils\SimpleTestCase;
 
@@ -20,7 +21,7 @@ class ProcessImagesExecutorTest extends SimpleTestCase
 
     private string $lockFilePath;
 
-    #[Stub(ImageProcessingService::class)]
+    #[Mock(ImageProcessingService::class)]
     private ImageProcessingService|MockObject $imageProcessingService;
 
     #[Stub(LoggingService::class)]
@@ -71,47 +72,47 @@ class ProcessImagesExecutorTest extends SimpleTestCase
 
     public function testHandles_returnsProcessImages(): void
     {
-        self::assertSame(CliCommandFlag::PROCESS_IMAGES, $this->createTestee($this->createStub(ImageProcessingService::class))->handles());
+        $this->imageProcessingService->expects($this->never())->method('processBatch')->seal();
+        self::assertSame(CliCommandFlag::PROCESS_IMAGES, $this->createTestee($this->imageProcessingService)->handles());
     }
 
     public function testExecute_withoutBatchSizeArg_usesDefault(): void
     {
-        $imageProcessingService = $this->createMock(ImageProcessingService::class);
-        $imageProcessingService
+        $this->imageProcessingService
             ->expects($this->once())
             ->method('processBatch')
             ->with(100)
             ->willReturn(0);
 
         $this->expectOutputString("Processed 0 image(s).\n");
-        $this->createTestee($imageProcessingService)->execute([], true);
+        $this->createTestee($this->imageProcessingService)->execute([], true);
     }
 
     public function testExecute_withValidBatchSize_passesItToTheService(): void
     {
-        $imageProcessingService = $this->createMock(ImageProcessingService::class);
-        $imageProcessingService
+        $this->imageProcessingService
             ->expects($this->once())
             ->method('processBatch')
             ->with(25)
             ->willReturn(3);
 
         $this->expectOutputString("Processed 3 image(s).\n");
-        $this->createTestee($imageProcessingService)->execute(['25'], true);
+        $this->createTestee($this->imageProcessingService)->execute(['25'], true);
     }
 
     public function testExecute_lockIsReleasedAfterRun(): void
     {
-        $imageProcessingService = $this->createStub(ImageProcessingService::class);
-        $imageProcessingService
+        $this->imageProcessingService
+            ->expects($this->exactly(2))
             ->method('processBatch')
-            ->willReturn(0);
+            ->willReturn(0)
+            ->seal();
 
         ob_start();
-        $this->createTestee($imageProcessingService)->execute([], true);
+        $this->createTestee($this->imageProcessingService)->execute([], true);
         ob_end_clean();
         ob_start();
-        $this->createTestee($imageProcessingService)->execute([], true);
+        $this->createTestee($this->imageProcessingService)->execute([], true);
         $output = ob_get_clean();
 
         // If the lock had leaked, the second run would have been a clean no-op instead.
@@ -125,8 +126,10 @@ class ProcessImagesExecutorTest extends SimpleTestCase
     {
         $exception = new RuntimeException('processing failed');
         $this->imageProcessingService
+            ->expects($this->once())
             ->method('processBatch')
-            ->willThrowException($exception);
+            ->willThrowException($exception)
+            ->seal();
         $loggedErrors = [];
         $this->loggingService
             ->method('log')
@@ -154,14 +157,13 @@ class ProcessImagesExecutorTest extends SimpleTestCase
         self::assertNotFalse($lock);
         self::assertTrue(flock($lock, LOCK_EX | LOCK_NB));
         try {
-            $imageProcessingService = $this->createMock(ImageProcessingService::class);
-            $imageProcessingService
+            $this->imageProcessingService
                 ->expects($this->never())
                 ->method('processBatch')
                 ->seal();
 
             $this->expectOutputString("Another worker is already processing images.\n");
-            $this->createTestee($imageProcessingService)->execute(['100'], true);
+            $this->createTestee($this->imageProcessingService)->execute(['100'], true);
         } finally {
             flock($lock, LOCK_UN);
             fclose($lock);
@@ -170,8 +172,7 @@ class ProcessImagesExecutorTest extends SimpleTestCase
 
     public function testExecute_nonNumericBatchSize_printsUsageWithoutProcessing(): void
     {
-        $imageProcessingService = $this->createMock(ImageProcessingService::class);
-        $imageProcessingService
+        $this->imageProcessingService
             ->expects($this->never())
             ->method('processBatch')
             ->seal();
@@ -180,13 +181,12 @@ class ProcessImagesExecutorTest extends SimpleTestCase
             "Usage: --process-images [batch-size]\n"
             . "Batch size must be a positive integer; default is 100.\n"
         );
-        $this->createTestee($imageProcessingService)->execute(['abc'], true);
+        $this->createTestee($this->imageProcessingService)->execute(['abc'], true);
     }
 
     public function testExecute_zeroBatchSize_printsUsageWithoutProcessing(): void
     {
-        $imageProcessingService = $this->createMock(ImageProcessingService::class);
-        $imageProcessingService
+        $this->imageProcessingService
             ->expects($this->never())
             ->method('processBatch')
             ->seal();
@@ -195,13 +195,12 @@ class ProcessImagesExecutorTest extends SimpleTestCase
             "Usage: --process-images [batch-size]\n"
             . "Batch size must be a positive integer; default is 100.\n"
         );
-        $this->createTestee($imageProcessingService)->execute(['0'], true);
+        $this->createTestee($this->imageProcessingService)->execute(['0'], true);
     }
 
     public function testExecute_negativeBatchSize_printsUsageWithoutProcessing(): void
     {
-        $imageProcessingService = $this->createMock(ImageProcessingService::class);
-        $imageProcessingService
+        $this->imageProcessingService
             ->expects($this->never())
             ->method('processBatch')
             ->seal();
@@ -210,13 +209,12 @@ class ProcessImagesExecutorTest extends SimpleTestCase
             "Usage: --process-images [batch-size]\n"
             . "Batch size must be a positive integer; default is 100.\n"
         );
-        $this->createTestee($imageProcessingService)->execute(['-5'], true);
+        $this->createTestee($this->imageProcessingService)->execute(['-5'], true);
     }
 
     public function testExecute_fractionalBatchSize_printsUsageWithoutProcessing(): void
     {
-        $imageProcessingService = $this->createMock(ImageProcessingService::class);
-        $imageProcessingService
+        $this->imageProcessingService
             ->expects($this->never())
             ->method('processBatch')
             ->seal();
@@ -225,12 +223,13 @@ class ProcessImagesExecutorTest extends SimpleTestCase
             "Usage: --process-images [batch-size]\n"
             . "Batch size must be a positive integer; default is 100.\n"
         );
-        $this->createTestee($imageProcessingService)->execute(['1.5'], true);
+        $this->createTestee($this->imageProcessingService)->execute(['1.5'], true);
     }
 
     public function testHelptext_mentionsFlagAndUsage(): void
     {
-        $executor = $this->createTestee($this->createStub(ImageProcessingService::class));
+        $this->imageProcessingService->expects($this->never())->method('processBatch')->seal();
+        $executor = $this->createTestee($this->imageProcessingService);
         self::assertStringContainsString('--process-images', $executor->helptext());
     }
 }

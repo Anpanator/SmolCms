@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace SmolCms\Test\Service\File;
 
+use RuntimeException;
 use SmolCms\Exception\FileAccessException;
 use SmolCms\Service\File\FileSystemAccessService;
 use SmolCms\TestUtils\SimpleTestCase;
@@ -23,10 +24,10 @@ class FileSystemAccessServiceTest extends SimpleTestCase
     {
         parent::setUp();
         $this->testee = new FileSystemAccessService(ROOT_DIR . '/private');
-        @mkdir(ROOT_DIR . self::EMPTY_DIR, 0777, true);
+        self::ensureDirectory(ROOT_DIR . self::EMPTY_DIR);
         file_put_contents(ROOT_DIR . self::TEST_FILE, 'hello world');
         file_put_contents(self::FORBIDDEN_FILE_THAT_EXISTS, 'I exist');
-        @mkdir(ROOT_DIR . self::SIBLING_DIR, 0777, true);
+        self::ensureDirectory(ROOT_DIR . self::SIBLING_DIR);
         file_put_contents(ROOT_DIR . self::SIBLING_FILE, 'sibling secret');
     }
 
@@ -34,6 +35,14 @@ class FileSystemAccessServiceTest extends SimpleTestCase
     {
         self::rmDirRecursive(ROOT_DIR . self::TEST_DIR);
         self::rmDirRecursive(ROOT_DIR . self::SIBLING_DIR);
+        parent::tearDown();
+    }
+
+    private static function ensureDirectory(string $path): void
+    {
+        if (!is_dir($path) && !mkdir($path, 0777, true) && !is_dir($path)) {
+            throw new RuntimeException("Could not create test directory: $path");
+        }
     }
 
     private static function rmDirRecursive(string $path): void
@@ -225,7 +234,9 @@ class FileSystemAccessServiceTest extends SimpleTestCase
             $this->testee->writeFile($symlinkPath, 'overwritten');
         } finally {
             self::assertStringEqualsFile(self::FORBIDDEN_FILE_THAT_EXISTS, 'I exist');
-            @unlink($symlinkPath);
+            if (is_link($symlinkPath)) {
+                self::assertTrue(unlink($symlinkPath));
+            }
         }
     }
 
@@ -238,7 +249,9 @@ class FileSystemAccessServiceTest extends SimpleTestCase
         try {
             $this->testee->writeFile($symlinkPath, 'content');
         } finally {
-            @unlink($symlinkPath);
+            if (is_link($symlinkPath)) {
+                self::assertTrue(unlink($symlinkPath));
+            }
         }
     }
 
