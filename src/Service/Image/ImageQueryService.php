@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace SmolCms\Service\Image;
 
 use InvalidArgumentException;
+use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Constant\RouteEnum;
 use SmolCms\Data\Persistence\ImageEntity;
 use SmolCms\Service\DB\ImageEntityService;
@@ -72,6 +73,29 @@ readonly class ImageQueryService
             'total' => $total,
             'tags' => $this->tagService->getTopTagsForImages($imageIds, self::IMAGES_PER_PAGE),
         ];
+    }
+
+    /**
+     * Recent thumbnail-ready uploads belonging to a user.
+     *
+     * @return list<array{id: int, thumbSrc: ?string, status: string, uploadDate: string}>
+     */
+    public function getRecentUploadsForUser(int $userId, int $limit): array
+    {
+        $uploads = [];
+        foreach ($this->imageEntityService->findRecentByUser(
+            $userId,
+            $limit,
+            [ImageStatus::PENDING_REVIEW, ImageStatus::ACCEPTED],
+        ) as $entity) {
+            $uploads[] = [
+                'id' => $entity->getId(),
+                'thumbSrc' => $this->getThumbSrc($entity),
+                'status' => $entity->getStatus()->value,
+                'uploadDate' => $entity->getUploadDate()->format(self::UPLOAD_DATE_FORMAT),
+            ];
+        }
+        return $uploads;
     }
 
     /**

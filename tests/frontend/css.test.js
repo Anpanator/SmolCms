@@ -61,6 +61,11 @@ export function testImageTileAndReviewStylesExist() {
 
     assertTrue(findRule(rules, '.tile-unapproved', 'border:2pxsolid') !== undefined, 'unapproved thumbnails should have an orange border');
     assertTrue(findRule(rules, '.image-pending-warning', 'color:var(--color-danger)') !== undefined, 'pending warnings should use the danger color');
+    const profileGridRule = findRule(rules, '.profile-recent-uploads-grid', 'display:grid');
+    assertTrue(
+        /grid-template-columns:repeat\(5,minmax\(0(?:px)?,1fr\)\)/.test(profileGridRule?.text ?? ''),
+        'recent uploads should use a five-column grid',
+    );
 
     const tileImageRule = findRule(rules, '.tile-image', 'object-fit:cover');
     assertTrue(tileImageRule !== undefined, 'tile images should be cropped with object-fit: cover');

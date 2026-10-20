@@ -24,6 +24,7 @@ class ImageEntityServiceTest extends FunctionalTestCase
         ?string $checksum = null,
         ?DateTime $uploadDate = null,
         int $userId = 1,
+        ?string $thumbFilename = null,
     ): ImageEntity
     {
         return new ImageEntity(
@@ -33,7 +34,7 @@ class ImageEntityServiceTest extends FunctionalTestCase
             status: $status,
             checksum: $checksum ?? hash('sha256', uniqid('image-entity-test', true)),
             originalExtension: 'png',
-            thumbFilename: null,
+            thumbFilename: $thumbFilename,
             sampleFilename: null,
             downloadFilename: null,
             width: 100,
@@ -201,5 +202,91 @@ class ImageEntityServiceTest extends FunctionalTestCase
                 $this->imageEntityService->findVisiblePage(2, 2, [$markerTag], $viewerId, true),
             ),
         );
+    }
+
+    public function testFindRecentByUserFiltersStatusThumbnailAndUserOrdersNewestFirstAndAppliesLimit(): void
+    {
+        $userId = 4321;
+        $otherUserId = 9876;
+        $olderAccepted = $this->makeEntity(
+            status: ImageStatus::ACCEPTED,
+            uploadDate: new DateTime('2026-01-01 12:00:00'),
+            userId: $userId,
+            thumbFilename: 'older.avif',
+        );
+        $sameDateAccepted = $this->makeEntity(
+            status: ImageStatus::ACCEPTED,
+            uploadDate: new DateTime('2026-01-02 12:00:00'),
+            userId: $userId,
+            thumbFilename: 'same-date-accepted.avif',
+        );
+        $sameDatePendingReview = $this->makeEntity(
+            status: ImageStatus::PENDING_REVIEW,
+            uploadDate: new DateTime('2026-01-02 12:00:00'),
+            userId: $userId,
+            thumbFilename: 'same-date-pending-review.avif',
+        );
+        $newestAccepted = $this->makeEntity(
+            status: ImageStatus::ACCEPTED,
+            uploadDate: new DateTime('2026-01-03 12:00:00'),
+            userId: $userId,
+            thumbFilename: 'newest.avif',
+        );
+        $otherUserImage = $this->makeEntity(
+            status: ImageStatus::ACCEPTED,
+            uploadDate: new DateTime('2026-01-04 12:00:00'),
+            userId: $otherUserId,
+            thumbFilename: 'other-user.avif',
+        );
+        $pendingWithThumb = $this->makeEntity(
+            status: ImageStatus::PENDING,
+            uploadDate: new DateTime('2026-01-05 12:00:00'),
+            userId: $userId,
+            thumbFilename: 'pending.avif',
+        );
+        $pendingReviewWithoutThumb = $this->makeEntity(
+            status: ImageStatus::PENDING_REVIEW,
+            uploadDate: new DateTime('2026-01-06 12:00:00'),
+            userId: $userId,
+        );
+        $rejected = $this->makeEntity(
+            status: ImageStatus::REJECTED,
+            uploadDate: new DateTime('2026-01-07 12:00:00'),
+            userId: $userId,
+            thumbFilename: 'rejected.avif',
+        );
+        foreach ([
+            $olderAccepted,
+            $sameDateAccepted,
+            $sameDatePendingReview,
+            $newestAccepted,
+            $otherUserImage,
+            $pendingWithThumb,
+            $pendingReviewWithoutThumb,
+            $rejected,
+        ] as $image) {
+            $this->imageEntityService->saveAsNew($image);
+        }
+
+        $result = $this->imageEntityService->findRecentByUser(
+            $userId,
+            3,
+            [ImageStatus::PENDING_REVIEW, ImageStatus::ACCEPTED],
+        );
+
+        self::assertSame(
+            [$newestAccepted->getId(), $sameDatePendingReview->getId(), $sameDateAccepted->getId()],
+            array_map(static fn(ImageEntity $image) => $image->getId(), $result),
+        );
+        self::assertSame([], $this->imageEntityService->findRecentByUser(
+            $userId,
+            10,
+            [],
+        ));
+        self::assertSame([], $this->imageEntityService->findRecentByUser(
+            $userId,
+            0,
+            [ImageStatus::ACCEPTED],
+        ));
     }
 }

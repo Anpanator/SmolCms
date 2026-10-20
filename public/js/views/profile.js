@@ -18,6 +18,8 @@ import {
 } from '../forms.js';
 import {validateDisplayName} from '../validation.js';
 
+const RECENT_UPLOADS_LIMIT = 15;
+
 export function createProfileView({session, navigate}) {
     const user = session.getUser();
     const fields = {
@@ -35,6 +37,7 @@ export function createProfileView({session, navigate}) {
     const approvedTagSuggestionsField = user
         ? createReadOnlyField('Approved tag suggestions', 'approvedTagSuggestions', 'Loading…')
         : null;
+    const recentUploadsSection = user ? createRecentUploadsSection() : null;
 
     const form = el('form', {
         className: 'form',
@@ -54,8 +57,11 @@ export function createProfileView({session, navigate}) {
         }));
     }
     children.push(form);
+    if (recentUploadsSection !== null) {
+        children.push(recentUploadsSection.element);
+    }
 
-    if (approvedTagSuggestionsField !== null) {
+    if (approvedTagSuggestionsField !== null && recentUploadsSection !== null) {
         const approvedTagSuggestionsInput = approvedTagSuggestionsField.querySelector('input');
         get('/api/profile')
             .then((data) => {
@@ -63,9 +69,13 @@ export function createProfileView({session, navigate}) {
                 approvedTagSuggestionsInput.value = Number.isSafeInteger(count) && count >= 0
                     ? String(count)
                     : 'Unavailable';
+                renderRecentUploads(recentUploadsSection.grid, data?.recentUploads);
             })
             .catch(() => {
                 approvedTagSuggestionsInput.value = 'Unavailable';
+                recentUploadsSection.grid.replaceChildren(
+                    createRecentUploadsStatus('Recent uploads are unavailable.'),
+                );
             });
     }
 
@@ -102,4 +112,57 @@ function createReadOnlyField(label, name, value) {
     });
     input.value = value;
     return createControlField({label, name, control: input}).wrapper;
+}
+
+function createRecentUploadsSection() {
+    const grid = el('div', {
+        className: 'profile-recent-uploads-grid',
+        attributes: {'aria-live': 'polite'},
+        children: [createRecentUploadsStatus('Loading recent uploads…')],
+    });
+    return {
+        element: el('section', {
+            className: 'profile-recent-uploads',
+            children: [
+                el('h2', {className: 'profile-recent-uploads-title', children: 'Recent Uploads'}),
+                grid,
+            ],
+        }),
+        grid,
+    };
+}
+
+function renderRecentUploads(grid, recentUploads) {
+    const uploads = Array.isArray(recentUploads)
+        ? recentUploads.filter((image) => Number.isSafeInteger(image?.id)
+            && image.id > 0
+            && typeof image.thumbSrc === 'string'
+            && image.thumbSrc !== '').slice(0, RECENT_UPLOADS_LIMIT)
+        : [];
+
+    if (uploads.length === 0) {
+        grid.replaceChildren(createRecentUploadsStatus('No uploads yet.'));
+        return;
+    }
+
+    grid.replaceChildren(...uploads.map(createRecentUploadTile));
+}
+
+function createRecentUploadTile(image) {
+    return el('a', {
+        className: `tile tile--link${image.status === 'pending_review' ? ' tile-unapproved' : ''}`,
+        attributes: {
+            href: `/image?id=${image.id}`,
+            'data-image-id': image.id,
+            'aria-label': `View image ${image.id}`,
+        },
+        children: el('img', {
+            className: 'tile-image',
+            attributes: {src: image.thumbSrc, alt: '', loading: 'lazy'},
+        }),
+    });
+}
+
+function createRecentUploadsStatus(text) {
+    return el('p', {className: 'profile-recent-uploads-status', children: text});
 }

@@ -108,6 +108,39 @@ readonly class ImageEntityService extends EntityService
     }
 
     /**
+     * Recent processed images belonging to one user, newest first.
+     *
+     * @param list<ImageStatus> $statuses
+     * @return list<ImageEntity>
+     */
+    public function findRecentByUser(int $userId, int $limit, array $statuses): array
+    {
+        if ($limit < 1 || $statuses === []) {
+            return [];
+        }
+
+        $parameters = ['user_id' => $userId];
+        $statusPlaceholders = [];
+        foreach (array_values($statuses) as $index => $status) {
+            $parameterName = 'status_' . $index;
+            $statusPlaceholders[] = ':' . $parameterName;
+            $parameters[$parameterName] = $status->value;
+        }
+
+        $qc = new QueryCriteria();
+        $qc->select(ImageEntity::class)
+            ->andWhere('user_id = :user_id')
+            ->andWhere('thumb_filename IS NOT NULL')
+            ->andWhere('status IN (' . implode(', ', $statusPlaceholders) . ')')
+            ->withParameters($parameters)
+            ->orderBy('upload_date', QueryCriteria::ORDER_DESC)
+            ->orderBy('id', QueryCriteria::ORDER_DESC)
+            ->maxResults($limit);
+
+        return $this->execute($qc) ?? [];
+    }
+
+    /**
      * Total number of accepted images, optionally restricted to images that carry
      * every requested tag.
      *

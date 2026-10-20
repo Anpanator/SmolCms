@@ -1272,6 +1272,33 @@ h3 {
     color: var(--color-muted);
 }
 
+.profile-recent-uploads {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-top: var(--space-6);
+}
+
+.profile-recent-uploads-title {
+    font-size: 1.2rem;
+}
+
+.profile-recent-uploads-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--space-2);
+}
+
+.profile-recent-uploads-grid .tile {
+    min-width: 0;
+}
+
+.profile-recent-uploads-status {
+    grid-column: 1 / -1;
+    color: var(--color-muted);
+    text-align: center;
+}
+
 .notice {
     margin-bottom: var(--space-4);
     padding: var(--space-2) var(--space-3);
