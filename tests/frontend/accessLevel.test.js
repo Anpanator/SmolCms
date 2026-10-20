@@ -1,5 +1,5 @@
 import {assertEqual, assertTrue} from './assert.js';
-import {AccessLevel, accessLevelName} from '../../public/js/accessLevel.js';
+import {AccessLevel, accessLevelName, hasAccessLevel} from '../../public/js/accessLevel.js';
 
 export function testAccessLevelNames() {
     const levels = [
@@ -36,4 +36,13 @@ export function testAccessLevelConstantsMirrorPhpEnum() {
 
 export function testAccessLevelConstantsAreFrozen() {
     assertTrue(Object.isFrozen(AccessLevel));
+}
+
+export function testAccessLevelGuardConsistentlyAcceptsNumericValues() {
+    assertTrue(hasAccessLevel({accessLevel: 500}, AccessLevel.MOD));
+    assertTrue(hasAccessLevel({accessLevel: '500'}, AccessLevel.MOD));
+    assertTrue(!hasAccessLevel({accessLevel: 400}, AccessLevel.MOD));
+    assertTrue(!hasAccessLevel(null, AccessLevel.MOD));
+    assertTrue(!hasAccessLevel({accessLevel: 'not-a-level'}, AccessLevel.MOD));
+    assertTrue(!hasAccessLevel({accessLevel: 600}, Number.NaN));
 }

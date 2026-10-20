@@ -8,6 +8,7 @@ import {el} from '../dom.js';
 import {createPagination} from '../pagination.js';
 import {createSearchView, normalizeTags} from '../search.js';
 import {messageForStatus} from '../forms.js';
+import {createTagLinkList, normalizeActiveTags} from '../tagLinks.js';
 
 const IMAGES_URL = '/api/images';
 const DEFAULT_PER_PAGE = 25;
@@ -15,36 +16,24 @@ const LOADING_TILE_COUNT = 6;
 
 /** Build the shared list of tag links used by the home and image sidebars. */
 export function createTagList(tags = [], activeTags = []) {
-    const active = toActiveTagSet(activeTags);
-    return el('ul', {
-        className: 'tags',
-        children: normalizeTagEntries(tags).map((tag) => {
-            const isActive = active.has(tag.name);
+    return createTagLinkList({
+        tags,
+        activeTags,
+        hrefForTag(tagName, {active: isActive, activeTags: active}) {
             const nextActive = new Set(active);
             if (isActive) {
-                nextActive.delete(tag.name);
+                nextActive.delete(tagName);
             } else {
-                nextActive.add(tag.name);
+                nextActive.add(tagName);
             }
-            return el('li', {
-                className: 'tags-item',
-                children: el('a', {
-                    className: `tags-link${isActive ? ' tags-link--active' : ''}`,
-                    attributes: {
-                        href: buildHomePath(1, [...nextActive].join(',')),
-                        'data-tag-name': tag.name,
-                        ...(isActive ? { 'aria-current': 'page' } : {}),
-                    },
-                    children: tag.name,
-                }),
-            });
-        }),
+            return buildHomePath(1, [...nextActive].join(','));
+        },
     });
 }
 
 /** Render the tag list and an affordance to clear any active filters. */
 export function createTagView(tags = [], activeTags = []) {
-    const active = toActiveTagSet(activeTags);
+    const active = normalizeActiveTags(activeTags);
     return el('div', {
         className: 'tag-view',
         children: [
@@ -168,25 +157,6 @@ function parsePositiveInteger(value, fallback) {
     }
     const parsed = Number(value);
     return Number.isSafeInteger(parsed) ? parsed : fallback;
-}
-
-function normalizeTagEntries(tags) {
-    if (!Array.isArray(tags)) {
-        return [];
-    }
-    return tags
-        .map((tag) => typeof tag === 'string' ? { name: tag } : tag)
-        .filter((tag) => typeof tag?.name === 'string' && tag.name !== '');
-}
-
-function toActiveTagSet(activeTags) {
-    if (activeTags instanceof Set) {
-        return activeTags;
-    }
-    const tags = Array.isArray(activeTags)
-        ? activeTags
-        : typeof activeTags === 'string' ? activeTags.split(',') : [activeTags];
-    return new Set(tags.map((tag) => String(tag ?? '').trim()).filter(Boolean));
 }
 
 function createGridStatus(text, kind) {

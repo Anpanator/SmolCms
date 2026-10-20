@@ -11,6 +11,15 @@ export const AccessLevel = Object.freeze({
     ADMIN: 600,
 });
 
+/** Return whether a user meets a minimum access level. */
+export function hasAccessLevel(user, minimum) {
+    const accessLevel = Number(user?.accessLevel ?? 0);
+    const requiredLevel = Number(minimum);
+    return Number.isFinite(accessLevel)
+        && Number.isFinite(requiredLevel)
+        && accessLevel >= requiredLevel;
+}
+
 const ACCESS_LEVEL_NAMES = new Map([
     [AccessLevel.NOVICE, 'NOVICE'],
     [AccessLevel.FELLOW, 'FELLOW'],

@@ -3,6 +3,9 @@
  * Importing this module has no side effects.
  */
 import {el} from './dom.js';
+import {createImageMetadataItems} from './imageMetadata.js';
+
+export {formatDimensions, formatFileSize} from './imageMetadata.js';
 
 /**
  * @returns {{
@@ -45,13 +48,7 @@ export function createImageDetails() {
             }));
         }
 
-        metadata.append(
-            createMetaItem('Uploaded', image.uploadDate ?? '—'),
-            createMetaItem('Uploader', image.uploader ?? '—'),
-            createMetaItem('Dimensions', formatDimensions(image.width, image.height)),
-            createMetaItem('Format', image.format ?? '—'),
-            createMetaItem('File size', formatFileSize(image.fileSize)),
-        );
+        metadata.append(...createImageMetadataItems(image));
 
         if (image.downloadSrc) {
             downloadLink = el('a', {
@@ -62,31 +59,4 @@ export function createImageDetails() {
             metaSection.append(downloadLink);
         }
     }
-}
-
-function createMetaItem(term, value) {
-    return el('div', {className: 'image-meta-item', children: [
-        el('dt', {className: 'image-meta-term', children: term}),
-        el('dd', {className: 'image-meta-value', children: value}),
-    ]});
-}
-
-function formatDimensions(width, height) {
-    return width === null || width === undefined || height === null || height === undefined
-        ? '—'
-        : `${width} × ${height}`;
-}
-
-/** Human-readable file size in B/KB/MB; "—" when unknown. */
-export function formatFileSize(bytes) {
-    if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0) {
-        return '—';
-    }
-    if (bytes < 1024) {
-        return `${bytes} B`;
-    }
-    if (bytes < 1024 ** 2) {
-        return `${(bytes / 1024).toFixed(1)} KB`;
-    }
-    return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 }

@@ -300,12 +300,6 @@ export async function testNoviceSeesUnknownTagsWereNotAddedWithoutDialog() {
 }
 
 export async function testRemovingTagRequiresConfirmationAndExplainsTagmeConflict() {
-    const originalConfirm = window.confirm;
-    let confirmationMessage = '';
-    window.confirm = (message) => {
-        confirmationMessage = message;
-        return true;
-    };
     const {view, fetchMock, restore} = await createView((url, options) => {
         if (url === '/api/image/detail?id=7') {
             return detailResponse({tags: ['nature', 'tagme']});
@@ -317,24 +311,24 @@ export async function testRemovingTagRequiresConfirmationAndExplainsTagmeConflic
     }, 'id=7', {getUser: () => testUser()});
     try {
         view.querySelector('.tag-remove-button[data-tag-name="tagme"]').click();
+        const dialog = document.querySelector('.modal-backdrop');
+        assertTrue(dialog !== null, 'removing a tag should open the shared confirmation dialog');
+        assertEqual(dialog.querySelector('.modal-message')?.textContent, 'Remove the tag "tagme" from this image?');
+        dialog.querySelector('.button--primary').click();
         await settle();
 
-        assertEqual(confirmationMessage, 'Remove the tag "tagme" from this image?');
         const post = fetchMock.calls.find((call) => call.url === '/api/image/tags/remove');
         assertEqual(post.options.method, 'POST');
         assertEqual(JSON.stringify(JSON.parse(post.options.body)), JSON.stringify({imageId: 7, tag: 'tagme'}));
         assertTrue(view.querySelector('.tags-link[data-tag-name="tagme"]') !== null, 'a conflict must keep the tag displayed');
         assertTrue(view.querySelector('.form-message').textContent.includes('at least 10 other tags'));
     } finally {
-        window.confirm = originalConfirm;
+        document.querySelector('.modal-backdrop .modal-cancel')?.click();
         restore();
     }
 }
 
 export async function testRemovingTagCanBeCancelledOrApplied() {
-    const originalConfirm = window.confirm;
-    let confirm = false;
-    window.confirm = () => confirm;
     const {view, fetchMock, restore} = await createView((url, options) => {
         if (url === '/api/image/detail?id=7') {
             return detailResponse({tags: ['nature', 'sky']});
@@ -346,17 +340,21 @@ export async function testRemovingTagCanBeCancelledOrApplied() {
     try {
         const removeButton = view.querySelector('.tag-remove-button[data-tag-name="nature"]');
         removeButton.click();
+        let dialog = document.querySelector('.modal-backdrop');
+        assertTrue(dialog !== null, 'removing a tag should use the shared confirmation dialog');
+        dialog.querySelector('.modal-cancel').click();
         await settle();
         assertEqual(fetchMock.calls.filter((call) => call.url === '/api/image/tags/remove').length, 0, 'cancel should not make a request');
 
-        confirm = true;
         removeButton.click();
+        dialog = document.querySelector('.modal-backdrop');
+        dialog.querySelector('.button--primary').click();
         await settle();
         assertEqual(fetchMock.calls.filter((call) => call.url === '/api/image/tags/remove').length, 1);
         assertEqual(view.querySelector('.tags-link[data-tag-name="nature"]'), null, '204 should remove the tag');
         assertTrue(view.querySelector('.form-message').textContent.includes('Removed tag'));
     } finally {
-        window.confirm = originalConfirm;
+        document.querySelector('.modal-backdrop .modal-cancel')?.click();
         restore();
     }
 }
@@ -373,16 +371,15 @@ export async function testRemovingMissingTagRefreshesImageDetails() {
         }
         return {status: 200, body: null};
     }, 'id=7', {getUser: () => testUser()});
-    const originalConfirm = window.confirm;
-    window.confirm = () => true;
     try {
         view.querySelector('.tag-remove-button[data-tag-name="nature"]').click();
+        document.querySelector('.modal-backdrop .button--primary').click();
         await settle();
 
         assertEqual(detailRequests, 2, 'a missing image/attachment should refresh image detail');
         assertTrue(view.querySelector('.form-message').textContent.includes('attachment was not found'));
     } finally {
-        window.confirm = originalConfirm;
+        document.querySelector('.modal-backdrop .modal-cancel')?.click();
         restore();
     }
 }

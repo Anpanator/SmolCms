@@ -39,7 +39,7 @@ export function isAuthError(error) {
  * Builds a labelled form field: wrapper div with label, input and a
  * field-level error message placeholder.
  */
-export function createField({ label, name, type = 'text', value = '', accept = undefined }) {
+export function createField({label, name, type = 'text', value = '', accept = undefined, className = 'field'}) {
     const errorElement = el('p', { className: 'field-error', attributes: { hidden: 'hidden' } });
     const attributes = { name, id: `field-${name}`, type };
     if (accept) {
@@ -47,15 +47,25 @@ export function createField({ label, name, type = 'text', value = '', accept = u
     }
     const input = el('input', { className: 'field-input', attributes });
     input.value = value;
+    return createControlField({label, name, control: input, errorElement, className});
+}
+
+/** Builds the common labelled wrapper for input, select, and read-only controls. */
+export function createControlField({label, name, control, errorElement = null, className = 'field'}) {
+    const id = `field-${name}`;
+    control.id = id;
+    if (!control.hasAttribute('name')) {
+        control.setAttribute('name', name);
+    }
     const wrapper = el('div', {
-        className: 'field',
+        className,
         children: [
-            el('label', { className: 'field-label', attributes: { for: `field-${name}` }, children: label }),
-            input,
+            el('label', {className: 'field-label', attributes: {for: id}, children: label}),
+            control,
             errorElement,
         ],
     });
-    return { wrapper, input, errorElement };
+    return {wrapper, input: control, control, errorElement};
 }
 
 /** Shows per-field validation error messages (value = error string). */

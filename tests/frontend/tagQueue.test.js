@@ -171,6 +171,39 @@ export async function testSelectingSuggestionFetchesImageDetailAndUpdatesViewer(
     }
 }
 
+export async function testTagQueueReusesImageDetailsWhileSuggestionsShareAnImage() {
+    let detailCalls = 0;
+    const sharedImageSuggestions = {
+        suggestions: [
+            {...QUEUE.suggestions[0]},
+            {...QUEUE.suggestions[1], id: 23, imageId: QUEUE.suggestions[0].imageId},
+        ],
+    };
+    const {view, fetchMock, restore} = await createViewWith(500, (url) => {
+        if (url === QUEUE_URL) {
+            return {status: 200, body: sharedImageSuggestions};
+        }
+        if (url === '/api/image/detail?id=7') {
+            detailCalls++;
+        }
+        if (url === '/api/tag-suggestions/approve?id=21') {
+            return {status: 204, body: null};
+        }
+        return undefined;
+    });
+    try {
+        assertEqual(detailCalls, 1, 'initial selection should fetch image details once');
+        view.querySelector('.review-actions [data-action="approve"]').click();
+        await settle();
+
+        assertEqual(fetchMock.calls.filter((call) => call.url === '/api/image/detail?id=7').length, 1);
+        assertEqual(view.querySelector('.tag-queue-select[aria-pressed="true"]')?.getAttribute('data-suggestion-id'), '23');
+        assertEqual(view.querySelector('.review-image')?.getAttribute('src'), DETAILS[7].downloadSrc);
+    } finally {
+        restore();
+    }
+}
+
 export async function testApprovePostsSuggestionIdRemovesItAndSelectsNeighbor() {
     const {view, fetchMock, restore} = await createViewWith(500, (url) => (
         url === '/api/tag-suggestions/approve?id=21' ? {status: 204, body: null} : undefined

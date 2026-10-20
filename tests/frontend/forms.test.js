@@ -1,6 +1,7 @@
 import {ApiError} from '../../public/js/api.js';
 import {
     clearMessage,
+    createControlField,
     createField,
     createMessageBox,
     isAuthError,
@@ -36,6 +37,23 @@ export function testCreateFieldBuildsLabelInputAndError() {
     assertEqual(field.wrapper.querySelector('label')?.textContent, 'Login name');
     assertEqual(field.wrapper.querySelector('label')?.getAttribute('for'), 'field-loginName');
     assertTrue(field.errorElement.hidden, 'field error should start hidden');
+}
+
+export function testCreateControlFieldLabelsSelectAndReadOnlyControls() {
+    const select = document.createElement('select');
+    select.name = 'category';
+    const field = createControlField({
+        label: 'Category',
+        name: 'tagCategory',
+        control: select,
+        className: 'field category-field',
+    });
+    assertEqual(field.wrapper.className, 'field category-field');
+    assertEqual(field.input, select);
+    assertEqual(select.id, 'field-tagCategory');
+    assertEqual(select.name, 'category', 'the helper should preserve a control-specific submitted name');
+    assertEqual(field.wrapper.querySelector('label')?.getAttribute('for'), select.id);
+    assertEqual(field.errorElement, null, 'read-only/select fields can omit an error element');
 }
 
 export function testSetFieldErrorsTogglesMessages() {

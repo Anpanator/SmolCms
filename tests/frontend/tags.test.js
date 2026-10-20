@@ -97,6 +97,8 @@ export async function testModeratorSeesTagTableAndGeneralCategoryDefault() {
     const {view, fetchMock, restore} = await createLoadedView();
     try {
         assertTrue(view.matches('.tags-page'), 'moderators should see the management page');
+        assertTrue(view.querySelector('.tags-table')?.classList.contains('data-table'), 'tag tables should use the shared table component');
+        assertTrue(view.querySelector('.tags-table-wrap')?.classList.contains('data-table-wrap'));
         assertTrue(view.querySelector('.sidebar') === null, 'tag management should not render a tags sidebar');
         assertTrue(view.querySelector('img') === null, 'tag management should not display images');
         assertEqual(view.querySelectorAll('.tags-table thead th').length, 3);

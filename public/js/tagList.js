@@ -3,11 +3,12 @@
  * Importing this module has no side effects.
  */
 import {postJson} from './api.js';
-import {AccessLevel} from './accessLevel.js';
+import {AccessLevel, hasAccessLevel} from './accessLevel.js';
 import {el} from './dom.js';
 import {clearMessage, createMessageBox, isAuthError, messageForStatus, showMessage} from './forms.js';
 import {createConfirmDialog} from './modal.js';
 import {attachTagSuggestions} from './search.js';
+import {createTagLinkList} from './tagLinks.js';
 
 const ADD_TAGS_URL = '/api/image/tags';
 const REMOVE_TAG_URL = '/api/image/tags/remove';
@@ -106,34 +107,24 @@ export function createTagList({session, navigate = () => {}, status = createMess
     }
 
     function render() {
-        list.replaceChildren(...tags.map((tag) => {
-            const removeButton = canEdit ? el('button', {
-                className: 'tag-remove-button',
-                attributes: {
-                    type: 'button',
-                    'aria-label': `Remove tag ${tag}`,
-                    'data-tag-name': tag,
-                },
-                children: '×',
-            }) : null;
-            removeButton?.addEventListener('click', () => removeTag(tag));
-
-            return el('li', {
-                className: 'tags-item',
-                attributes: {'data-tag-name': tag},
-                children: [
-                    removeButton,
-                    el('a', {
-                        className: 'tags-link',
-                        attributes: {
-                            href: buildHomePath(tag),
-                            'data-tag-name': tag,
-                        },
-                        children: tag,
-                    }),
-                ],
-            });
-        }));
+        const tagLinks = createTagLinkList({
+            tags,
+            hrefForTag: buildHomePath,
+            removeControlForTag: canEdit ? (tag) => {
+                const removeButton = el('button', {
+                    className: 'tag-remove-button',
+                    attributes: {
+                        type: 'button',
+                        'aria-label': `Remove tag ${tag}`,
+                        'data-tag-name': tag,
+                    },
+                    children: '×',
+                });
+                removeButton.addEventListener('click', () => removeTag(tag));
+                return removeButton;
+            } : null,
+        });
+        list.replaceChildren(...tagLinks.childNodes);
         updateControls();
     }
 
@@ -173,7 +164,7 @@ export function createTagList({session, navigate = () => {}, status = createMess
 
     async function handleUnknownTags(requestedImageId, unknown) {
         const user = session?.getUser?.();
-        if ((user?.accessLevel ?? 0) < AccessLevel.FELLOW) {
+        if (!hasAccessLevel(user, AccessLevel.FELLOW)) {
             showMessage(status, `Unknown tags were not added: ${unknown.join(', ')}`, 'info');
             return;
         }
@@ -201,15 +192,21 @@ export function createTagList({session, navigate = () => {}, status = createMess
         if (!canEdit || isPending || imageId === null) {
             return;
         }
-        if (!window.confirm(`Remove the tag "${tag}" from this image?`)) {
-            return;
-        }
 
         const requestedImageId = imageId;
         isPending = true;
-        clearMessage(status);
         updateControls();
         try {
+            const dialog = createConfirmDialog({
+                message: `Remove the tag "${tag}" from this image?`,
+                confirmLabel: 'Remove tag',
+                cancelLabel: 'Keep tag',
+            });
+            if (!(await dialog.result)) {
+                return;
+            }
+
+            clearMessage(status);
             await postJson(REMOVE_TAG_URL, {imageId: requestedImageId, tag});
             if (imageId === requestedImageId) {
                 tags = tags.filter((currentTag) => currentTag !== tag);

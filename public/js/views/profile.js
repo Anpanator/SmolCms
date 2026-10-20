@@ -8,6 +8,7 @@ import {el} from '../dom.js';
 import {accessLevelName} from '../accessLevel.js';
 import {
     clearMessage,
+    createControlField,
     createField,
     createMessageBox,
     isAuthError,
@@ -95,17 +96,10 @@ export function createProfileView({session, navigate}) {
 }
 
 function createReadOnlyField(label, name, value) {
-    const id = `field-${name}`;
     const input = el('input', {
         className: 'field-input',
-        attributes: {id, name, type: 'text', readonly: 'readonly', 'aria-readonly': 'true'},
+        attributes: {name, type: 'text', readonly: 'readonly', 'aria-readonly': 'true'},
     });
     input.value = value;
-    return el('div', {
-        className: 'field',
-        children: [
-            el('label', {className: 'field-label', attributes: {for: id}, children: label}),
-            input,
-        ],
-    });
+    return createControlField({label, name, control: input}).wrapper;
 }

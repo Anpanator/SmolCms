@@ -3,13 +3,15 @@
  * Importing this module has no side effects.
  */
 import {get, postJson} from '../api.js';
-import {AccessLevel, accessLevelName} from '../accessLevel.js';
+import {AccessLevel, accessLevelName, hasAccessLevel} from '../accessLevel.js';
 import {el} from '../dom.js';
 import {createModal} from '../modal.js';
 import {createPagination} from '../pagination.js';
+import {createPaginatedTable, parsePositiveInteger} from '../paginatedTable.js';
 import {createSearchBox} from '../searchBox.js';
 import {
     clearMessage,
+    createControlField,
     createField,
     createMessageBox,
     isAuthError,
@@ -40,7 +42,7 @@ export function createUsersView({
     query = new URLSearchParams(window.location.search),
 } = {}) {
     const currentUser = session?.getUser?.() ?? null;
-    if (!hasUsersAccess(currentUser)) {
+    if (!hasAccessLevel(currentUser, AccessLevel.MOD)) {
         return el('section', {
             className: 'internal-admin-denied-page users-denied-page',
             attributes: {tabindex: '-1', 'aria-label': 'User management'},
@@ -52,9 +54,8 @@ export function createUsersView({
     }
 
     const params = query instanceof URLSearchParams ? query : new URLSearchParams(query);
-    let currentPage = parsePositiveInteger(params.get('page'), 1);
-    let currentQuery = (params.get('q') ?? '').trim();
-    let requestId = 0;
+    const initialPage = parsePositiveInteger(params.get('page'), 1);
+    const initialQuery = (params.get('q') ?? '').trim();
     let users = [];
 
     const listMessage = createMessageBox();
@@ -62,7 +63,7 @@ export function createUsersView({
         children: createTableStatusRow('Loading users…'),
     });
     const table = el('table', {
-        className: 'internal-admin-table users-table',
+        className: 'data-table internal-admin-table users-table',
         attributes: {'aria-label': 'Users'},
         children: [
             el('thead', {
@@ -80,28 +81,23 @@ export function createUsersView({
             tableBody,
         ],
     });
-    const pagination = createPagination(currentPage, (pageNumber) => {
-        currentPage = pageNumber;
-        loadUsers(currentPage, currentQuery);
-    });
+    let paginatedTable;
+    const pagination = createPagination(initialPage, (pageNumber) => paginatedTable.setPage(pageNumber));
     pagination.element.setAttribute('aria-label', 'User pages');
 
     const search = createSearchBox({
         placeholder: 'Search users',
         buttonText: 'Search',
         onSearch(queryText) {
-            currentQuery = String(queryText ?? '').trim();
+            const currentQuery = String(queryText ?? '').trim();
             search.setValue(currentQuery);
-            currentPage = 1;
-            loadUsers(currentPage, currentQuery);
+            paginatedTable.setQuery(currentQuery);
         },
         onReset() {
-            currentQuery = '';
-            currentPage = 1;
-            loadUsers(currentPage, currentQuery);
+            paginatedTable.setQuery('');
         },
     });
-    search.setValue(currentQuery);
+    search.setValue(initialQuery);
 
     const page = el('section', {
         className: 'internal-admin-page users-page',
@@ -114,7 +110,7 @@ export function createUsersView({
                     attributes: {'aria-label': 'User accounts'},
                     children: [
                         listMessage,
-                        el('div', {className: 'internal-admin-table-wrap', children: table}),
+                        el('div', {className: 'data-table-wrap internal-admin-table-wrap', children: table}),
                         pagination.element,
                     ],
                 }),
@@ -127,63 +123,37 @@ export function createUsersView({
         }),
     });
 
-    loadUsers(currentPage, currentQuery);
-    return page;
-
-    async function loadUsers(pageNumber, queryText) {
-        const request = ++requestId;
-        currentPage = pageNumber;
-        clearMessage(listMessage);
-        tableBody.replaceChildren(createTableStatusRow('Loading users…'));
-        pagination.loading(pageNumber);
-
-        const queryParams = new URLSearchParams();
-        queryParams.set('page', String(pageNumber));
-        if (queryText !== '') {
-            queryParams.set('q', queryText);
-        }
-
-        try {
-            const data = await get(`${USERS_URL}?${queryParams}`);
-            if (request !== requestId) {
-                return;
+    paginatedTable = createPaginatedTable({
+        tableBody,
+        listMessage,
+        pagination,
+        fetchPage({page: pageNumber, query: queryText}) {
+            const queryParams = new URLSearchParams();
+            queryParams.set('page', String(pageNumber));
+            if (queryText !== '') {
+                queryParams.set('q', queryText);
             }
-
-            const loadedUsers = Array.isArray(data?.users) ? data.users : [];
-            const total = Number.isSafeInteger(data?.total) && data.total >= 0 ? data.total : loadedUsers.length;
-            const perPage = parsePositiveInteger(data?.perPage, PER_PAGE);
-            const responsePage = parsePositiveInteger(data?.page, pageNumber);
-            const pageCount = Math.max(1, Math.ceil(total / perPage));
-
-            if (responsePage > pageCount) {
-                currentPage = pageCount;
-                loadUsers(currentPage, queryText);
-                return;
-            }
-
-            currentPage = responsePage;
+            return get(`${USERS_URL}?${queryParams}`);
+        },
+        getItems: (data) => data?.users,
+        renderRow: createUserRow,
+        renderStatusRow: createTableStatusRow,
+        messages: {
+            loading: 'Loading users…',
+            empty: 'No users found.',
+            emptySearch: 'No users match your search.',
+            error: 'Could not load users.',
+        },
+        defaultPerPage: PER_PAGE,
+        initialPage,
+        initialQuery,
+        onItems: (loadedUsers) => {
             users = loadedUsers;
-            pagination.update({page: responsePage, total, perPage});
-            if (users.length === 0) {
-                tableBody.replaceChildren(createTableStatusRow(
-                    queryText === '' ? 'No users found.' : 'No users match your search.',
-                ));
-                return;
-            }
-            renderUsers();
-        } catch (error) {
-            if (request !== requestId) {
-                return;
-            }
-            if (isAuthError(error)) {
-                navigate('/login');
-                return;
-            }
-            showMessage(listMessage, messageForStatus(error?.status ?? 0));
-            tableBody.replaceChildren(createTableStatusRow('Could not load users.'));
-            pagination.update({page: pageNumber, total: 0, perPage: PER_PAGE});
-        }
-    }
+        },
+        navigate,
+    });
+    paginatedTable.load();
+    return page;
 
     function renderUsers() {
         tableBody.replaceChildren(...users.map(createUserRow));
@@ -350,62 +320,35 @@ export function createUsersView({
 }
 
 function createReadOnlyField(label, name, value) {
-    const id = `field-${name}`;
     const input = el('input', {
         className: 'field-input',
-        attributes: {id, name, type: 'text', readonly: 'readonly', 'aria-readonly': 'true'},
+        attributes: {name, type: 'text', readonly: 'readonly', 'aria-readonly': 'true'},
     });
     input.value = String(value ?? '');
-    return el('div', {
+    return createControlField({
+        label,
+        name,
+        control: input,
         className: 'field user-edit-readonly-field',
-        children: [
-            el('label', {className: 'field-label', attributes: {for: id}, children: label}),
-            input,
-        ],
-    });
+    }).wrapper;
 }
 
 function createAccessLevelField(value) {
-    const id = 'field-accessLevel';
     const input = el('select', {
         className: 'field-input',
-        attributes: {id, name: 'accessLevel'},
+        attributes: {name: 'accessLevel'},
         children: ACCESS_LEVELS.map((accessLevel) => el('option', {
             attributes: {value: String(accessLevel)},
             children: accessLevelName(accessLevel),
         })),
     });
     input.value = String(value);
-    return {
-        wrapper: el('div', {
-            className: 'field',
-            children: [
-                el('label', {className: 'field-label', attributes: {for: id}, children: 'Access level'}),
-                input,
-            ],
-        }),
-        input,
-    };
+    return createControlField({label: 'Access level', name: 'accessLevel', control: input});
 }
 
 function createTableStatusRow(text) {
     return el('tr', {
-        className: 'internal-admin-table-status',
+        className: 'internal-admin-table-status data-table-status',
         children: el('td', {attributes: {colspan: '6'}, children: text}),
     });
-}
-
-function parsePositiveInteger(value, fallback) {
-    if (typeof value === 'number') {
-        return Number.isSafeInteger(value) && value > 0 ? value : fallback;
-    }
-    if (!/^[1-9][0-9]*$/.test(value ?? '')) {
-        return fallback;
-    }
-    const parsed = Number(value);
-    return Number.isSafeInteger(parsed) ? parsed : fallback;
-}
-
-function hasUsersAccess(user) {
-    return Number(user?.accessLevel ?? 0) >= AccessLevel.MOD;
 }
