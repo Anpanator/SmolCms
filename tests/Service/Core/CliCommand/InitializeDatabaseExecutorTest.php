@@ -119,4 +119,40 @@ class InitializeDatabaseExecutorTest extends FunctionalTestCase
             $output,
         );
     }
+
+    public function testExecute_resetConfirmationAcceptsYesAndDropsTables(): void
+    {
+        $this->pdo->exec("INSERT INTO migration (filename) VALUES ('confirmed-reset.sql')");
+        $this->initializeDatabaseExecutor->setConfirmationInputReader(static fn(): string => "y\n");
+
+        ob_start();
+        $this->initializeDatabaseExecutor->execute(['--reset']);
+        $output = ob_get_clean();
+
+        self::assertIsString($output);
+        self::assertStringContainsString('Proceed? [y/N]', $output);
+        self::assertStringContainsString("Dropped table: migration\n", $output);
+        self::assertStringContainsString("Reset complete.\n", $output);
+        self::assertSame(0, (int)$this->pdo->query('SELECT COUNT(*) FROM migration')->fetchColumn());
+    }
+
+    public function testExecute_resetConfirmationAbortsWithoutDroppingTables(): void
+    {
+        $this->pdo->exec("INSERT INTO migration (filename) VALUES ('preserved-after-abort.sql')");
+        $this->initializeDatabaseExecutor->setConfirmationInputReader(static fn(): string => "n\n");
+
+        ob_start();
+        $this->initializeDatabaseExecutor->execute(['--reset']);
+        $output = ob_get_clean();
+
+        self::assertSame(
+            "This will drop all tables and reinitialize the database. Proceed? [y/N] Aborted.\n",
+            $output,
+        );
+        self::assertSame(
+            'preserved-after-abort.sql',
+            $this->pdo->query('SELECT filename FROM migration')->fetchColumn(),
+        );
+        self::assertSame(1, (int)$this->pdo->query('SELECT COUNT(*) FROM migration')->fetchColumn());
+    }
 }

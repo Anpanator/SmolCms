@@ -18,6 +18,7 @@ class ImageTypeDetectionFacadeTest extends SimpleTestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
         $this->facade = new ImageTypeDetectionFacade(
             new PngImageTypeDetector(),
             new JpegImageTypeDetector(),

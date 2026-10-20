@@ -310,6 +310,88 @@ class TagServiceTest extends FunctionalTestCase
         self::assertSame([mb_strtolower($attachedTag, 'UTF-8')], $this->tagService->getTagsForImage($image->getId()));
     }
 
+    public function testUnicodeFullCaseFoldingIsConsistentAcrossTagOperations(): void
+    {
+        $suffix = bin2hex(random_bytes(4));
+        $sharpSName = 'Straße-' . $suffix;
+        $sharpSNormalized = 'strasse-' . $suffix;
+        $greekName = 'Σος-' . $suffix;
+        $greekNormalized = 'σοσ-' . $suffix;
+
+        self::assertSame($sharpSNormalized, TagService::normalizeName($sharpSName));
+        self::assertSame($sharpSNormalized, TagService::normalizeName('STRASSE-' . $suffix));
+        self::assertSame($greekNormalized, TagService::normalizeName($greekName));
+        self::assertSame($greekNormalized, TagService::normalizeName('ΣΟΣ-' . $suffix));
+        self::assertSame($greekNormalized, TagService::normalizeName('σος-' . $suffix));
+
+        self::assertNotNull($this->tagService->createTag($sharpSName));
+        self::assertNull($this->tagService->createTag('STRASSE-' . $suffix));
+        self::assertNotNull($this->tagService->createTag($greekName));
+        self::assertNull($this->tagService->createTag('ΣΟΣ-' . $suffix));
+        self::assertNull($this->tagService->createTag('σος-' . $suffix));
+
+        self::assertSame([$sharpSNormalized], $this->tagService->suggestTags('Straße-' . $suffix));
+        self::assertSame([$sharpSNormalized], $this->tagService->suggestTags('STRASSE-' . $suffix));
+        foreach (['Σ', 'ς', 'σ'] as $sigmaVariant) {
+            self::assertSame([$greekNormalized], $this->tagService->suggestTags($sigmaVariant . 'ος-' . $suffix));
+        }
+        self::assertSame(
+            [$sharpSNormalized],
+            array_column($this->tagService->browseTags(1, 'STRASSE-' . $suffix)['tags'], 'name'),
+        );
+        self::assertSame(
+            [$greekNormalized],
+            array_column($this->tagService->browseTags(1, 'ΣΟΣ-' . $suffix)['tags'], 'name'),
+        );
+
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+        );
+        self::assertTrue($this->tagService->attachTagToImage($image->getId(), $sharpSName));
+        self::assertFalse($this->tagService->attachTagToImage($image->getId(), 'STRASSE-' . $suffix));
+        self::assertTrue($this->tagService->attachTagToImage($image->getId(), $greekName));
+        self::assertFalse($this->tagService->attachTagToImage($image->getId(), 'ΣΟΣ-' . $suffix));
+        self::assertEqualsCanonicalizing(
+            [$sharpSNormalized, $greekNormalized],
+            $this->tagService->getTagsForImage($image->getId()),
+        );
+    }
+
+    public function testSearchEscapesLikeMetacharactersAndEmptyBrowseIncludesAllTags(): void
+    {
+        $marker = 'literal-' . bin2hex(random_bytes(4)) . '-';
+        $cases = [
+            'percent' => [$marker . '%tail', $marker . 'Xtail', $marker . '%'],
+            'underscore' => [$marker . '_tail', $marker . 'Xtail', $marker . '_'],
+            'backslash' => [$marker . '\\tail', $marker . 'tail', $marker . '\\t'],
+        ];
+
+        foreach ($cases as $label => [$literalName, $wildcardDecoy, $suggestionPrefix]) {
+            $this->tagService->createTag($literalName);
+            $this->tagService->createTag($wildcardDecoy);
+
+            self::assertSame(
+                [$literalName],
+                array_column($this->tagService->browseTags(1, $literalName)['tags'], 'name'),
+                "Browse must treat the $label LIKE character literally.",
+            );
+            self::assertSame(
+                [$literalName],
+                $this->tagService->suggestTags($suggestionPrefix),
+                "Suggestions must treat the $label LIKE character literally.",
+            );
+        }
+
+        self::assertSame([], $this->tagService->suggestTags(''));
+        $tagCount = (int)$this->pdo->query('SELECT COUNT(*) FROM tag')->fetchColumn();
+        $emptyBrowse = $this->tagService->browseTags();
+        self::assertSame($tagCount, $emptyBrowse['total']);
+        self::assertSame(25, $emptyBrowse['perPage']);
+        self::assertCount(min(25, $tagCount), $emptyBrowse['tags']);
+    }
+
     public function testBrowseTagsPaginatesAtTwentyFiveResults(): void
     {
         $prefix = 'browse-page-' . bin2hex(random_bytes(4)) . '-';

@@ -3,10 +3,11 @@ declare(strict_types=1);
 
 namespace SmolCms\Service\Core\Session;
 
+use Closure;
 use SmolCms\Data\DTO\SessionUserData;
 use SmolCms\Exception\InvalidStateException;
 
-readonly class SessionService
+class SessionService
 {
     public const string SESSION_NAME = 'session';
     private const SESSION_OPTIONS = [
@@ -19,6 +20,14 @@ readonly class SessionService
         'use_only_cookies' => true,
     ];
     private const string KEY_USER = 'user';
+
+    private ?Closure $cookieEmitter = null;
+
+    /** Injects a cookie emitter for environments where response headers cannot be observed. */
+    public function setCookieEmitter(Closure $cookieEmitter): void
+    {
+        $this->cookieEmitter = $cookieEmitter;
+    }
 
     /**
      * @return void
@@ -41,7 +50,7 @@ readonly class SessionService
     public function discardStaleSessionCookie(): void
     {
         unset($_COOKIE[self::SESSION_NAME]);
-        if (headers_sent()) {
+        if ($this->headersSent()) {
             return;
         }
 
@@ -56,7 +65,7 @@ readonly class SessionService
         if ($cookieParams['domain'] !== '') {
             $cookieOptions['domain'] = $cookieParams['domain'];
         }
-        setcookie(self::SESSION_NAME, '', $cookieOptions);
+        $this->emitCookie(self::SESSION_NAME, '', $cookieOptions);
     }
 
     public function startSession(): void
@@ -97,7 +106,7 @@ readonly class SessionService
 
     private function refreshSessionCookie(): void
     {
-        if (headers_sent()) {
+        if ($this->headersSent()) {
             return;
         }
 
@@ -113,6 +122,22 @@ readonly class SessionService
             $cookieOptions['domain'] = $cookieParams['domain'];
         }
 
-        setcookie(self::SESSION_NAME, session_id(), $cookieOptions);
+        $this->emitCookie(self::SESSION_NAME, session_id(), $cookieOptions);
+    }
+
+    protected function headersSent(): bool
+    {
+        return headers_sent();
+    }
+
+    /** @param array<string, int|string|bool> $options */
+    private function emitCookie(string $name, string $value, array $options): void
+    {
+        if ($this->cookieEmitter !== null) {
+            ($this->cookieEmitter)($name, $value, $options);
+            return;
+        }
+
+        setcookie($name, $value, $options);
     }
 }

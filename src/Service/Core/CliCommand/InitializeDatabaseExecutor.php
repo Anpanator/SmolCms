@@ -4,18 +4,28 @@ declare(strict_types=1);
 
 namespace SmolCms\Service\Core\CliCommand;
 
+use Closure;
 use PDO;
 use RuntimeException;
 use SmolCms\Data\Constant\CliCommandFlag;
 use SmolCms\Service\File\FileSystemAccessService;
 
-final readonly class InitializeDatabaseExecutor implements CliCommandExecutor
+final class InitializeDatabaseExecutor implements CliCommandExecutor
 {
+    private Closure $confirmationInputReader;
+
     public function __construct(
-        private PDO                     $pdo,
-        private FileSystemAccessService $fileSystemAccessService,
+        private readonly PDO                     $pdo,
+        private readonly FileSystemAccessService $fileSystemAccessService,
     )
     {
+        $this->confirmationInputReader = static fn(): string|false => fgets(STDIN);
+    }
+
+    /** Injects confirmation input for destructive-reset tests. */
+    public function setConfirmationInputReader(Closure $confirmationInputReader): void
+    {
+        $this->confirmationInputReader = $confirmationInputReader;
     }
 
     public function handles(): CliCommandFlag
@@ -48,7 +58,7 @@ final readonly class InitializeDatabaseExecutor implements CliCommandExecutor
 
         if ($reset && !$noconfirm) {
             echo "This will drop all tables and reinitialize the database. Proceed? [y/N] ";
-            $input = fgets(STDIN);
+            $input = ($this->confirmationInputReader)();
             if (!is_string($input) || strtolower(trim($input)) !== 'y') {
                 echo "Aborted.\n";
                 return;

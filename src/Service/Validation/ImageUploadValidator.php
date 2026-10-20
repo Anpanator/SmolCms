@@ -46,7 +46,7 @@ readonly class ImageUploadValidator
             }
 
             // Only accept files that were actually uploaded through the SAPI
-            if (!is_uploaded_file($file['tmp_name'])) {
+            if (!$this->isUploadedFile($file['tmp_name'])) {
                 return HttpStatus::BAD_REQUEST;
             }
             if (ImageDimensions::fromFile($file['tmp_name']) === null) {
@@ -118,5 +118,10 @@ readonly class ImageUploadValidator
     public function validate(Request $request): bool
     {
         return $this->getStatus($request) === HttpStatus::OK;
+    }
+
+    protected function isUploadedFile(string $path): bool
+    {
+        return is_uploaded_file($path);
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SmolCms\Service\Factory;
 
 
+use Closure;
 use JsonException;
 use SmolCms\Data\Constant\HttpContentType;
 use SmolCms\Data\Constant\HttpHeader;
@@ -13,6 +14,7 @@ use SmolCms\Data\Request\Request;
 
 class RequestFactory
 {
+    private Closure $bodyReader;
 
 
     /**
@@ -22,6 +24,13 @@ class RequestFactory
         private UrlFactory $urlFactory
     )
     {
+        $this->bodyReader = static fn(string $stream): string|false => file_get_contents($stream);
+    }
+
+    /** Injects a body reader, primarily for request-body parsing tests. */
+    public function setBodyReader(Closure $bodyReader): void
+    {
+        $this->bodyReader = $bodyReader;
     }
 
     public function buildRequestFromGlobals(): Request
@@ -61,7 +70,7 @@ class RequestFactory
         if (!$this->isJsonContentType($headers)) {
             return $_POST ?: null;
         }
-        $requestBody = file_get_contents('php://input');
+        $requestBody = ($this->bodyReader)('php://input');
         if ($requestBody === false) {
             return null;
         }

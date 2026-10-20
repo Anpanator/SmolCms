@@ -12,10 +12,14 @@ use SmolCms\Service\Image\ImageProcessorFacade;
 use SmolCms\Service\Image\ImageProcessorInterface;
 use SmolCms\Service\Image\JpegImageProcessor;
 use SmolCms\Service\Image\PngImageProcessor;
+use SmolCms\TestUtils\Attributes\Mock;
 use SmolCms\TestUtils\SimpleTestCase;
 
 class ImageProcessorFacadeTest extends SimpleTestCase
 {
+    #[Mock(ImageProcessorInterface::class)]
+    private ImageProcessorInterface|MockObject $jpegProcessor;
+
     private ImageProcessorFacade $testee;
 
     protected function setUp(): void
@@ -30,18 +34,19 @@ class ImageProcessorFacadeTest extends SimpleTestCase
 
     public function testSanitizeImage_callsOnlyTheProcessorMatchingTheType(): void
     {
-        /** @var ImageProcessorInterface|MockObject $jpegProcessor */
-        $jpegProcessor = $this->createMock(ImageProcessorInterface::class);
-        $jpegProcessor->method('getType')->willReturn(ImageType::JPEG);
+        $this->jpegProcessor
+            ->expects($this->once())
+            ->method('getType')
+            ->willReturn(ImageType::JPEG);
         $imageData = file_get_contents(ROOT_DIR . '/tests/TestUtils/TestFiles/image.png');
         self::assertIsString($imageData);
         $expectedImage = imagecreatetruecolor(2, 2);
-        $jpegProcessor
+        $this->jpegProcessor
             ->expects($this->once())
             ->method('sanitize')
             ->with($imageData)
             ->willReturn($expectedImage);
-        $facade = new ImageProcessorFacade(new PngImageProcessor(), $jpegProcessor, new AvifImageProcessor());
+        $facade = new ImageProcessorFacade(new PngImageProcessor(), $this->jpegProcessor, new AvifImageProcessor());
 
         $result = $facade->sanitizeImage($imageData, ImageType::JPEG);
 
@@ -50,6 +55,7 @@ class ImageProcessorFacadeTest extends SimpleTestCase
 
     public function testSanitizeImage_unknownType_throwsException(): void
     {
+        $this->jpegProcessor->expects($this->never())->method('getType');
         $facade = new ImageProcessorFacade(new PngImageProcessor());
 
         $this->expectException(InvalidArgumentException::class);
@@ -60,6 +66,7 @@ class ImageProcessorFacadeTest extends SimpleTestCase
 
     public function testConstruct_duplicateProcessorForSameType_throwsException(): void
     {
+        $this->jpegProcessor->expects($this->never())->method('getType');
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessageIsOrContains('Duplicate image processor for type: png');
 
@@ -72,6 +79,7 @@ class ImageProcessorFacadeTest extends SimpleTestCase
      */
     public function testSanitizeImage_outputReallyIsTheClaimedFormat(): void
     {
+        $this->jpegProcessor->expects($this->never())->method('getType');
         // Input bytes are a PNG, but the detected (claimed) type is JPEG.
         $pngData = file_get_contents(ROOT_DIR . '/tests/TestUtils/TestFiles/image.png');
 
@@ -87,6 +95,7 @@ class ImageProcessorFacadeTest extends SimpleTestCase
      */
     public function testSanitizeImage_stripsExifMetadata(): void
     {
+        $this->jpegProcessor->expects($this->never())->method('getType');
         $withExif = self::jpegWithExifApp1Segment(
             file_get_contents(ROOT_DIR . '/tests/TestUtils/TestFiles/image.jpg')
         );

@@ -24,7 +24,11 @@ class ImageStorageServiceTest extends SimpleTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        @mkdir(ROOT_DIR . self::TEST_STORAGE_DIR, 0777, true);
+        if (!is_dir(ROOT_DIR . self::TEST_STORAGE_DIR)
+            && !mkdir(ROOT_DIR . self::TEST_STORAGE_DIR, 0777, true)
+            && !is_dir(ROOT_DIR . self::TEST_STORAGE_DIR)) {
+            throw new RuntimeException('Could not create image storage directory for tests.');
+        }
         $this->storageAllowed = true;
         $this->fileSystemAccessService
             ->method('isPathAllowed')
@@ -143,6 +147,27 @@ class ImageStorageServiceTest extends SimpleTestCase
         $this->expectExceptionMessageIsOrContains('Image storage is not allowed in path. Check config!');
 
         $this->testee->storeImage($image, ImageType::PNG);
+    }
+
+    public function testStoreBytes_refusesToWriteThroughSymlink(): void
+    {
+        $relativePath = 'ab/symlink-target.png';
+        $symlinkPath = ROOT_DIR . self::TEST_STORAGE_DIR . '/' . $relativePath;
+        $targetPath = ROOT_DIR . self::TEST_STORAGE_DIR . '/target-content.txt';
+        if (!is_dir(dirname($symlinkPath)) && !mkdir(dirname($symlinkPath), 0777, true) && !is_dir(dirname($symlinkPath))) {
+            self::fail('Could not create image storage shard for symlink test.');
+        }
+        self::assertNotFalse(file_put_contents($targetPath, 'original target content'));
+        self::assertTrue(symlink($targetPath, $symlinkPath));
+
+        try {
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionMessageIsOrContains('Refusing to write through symlink at path:');
+            $this->testee->storeBytes('replacement content', $relativePath);
+        } finally {
+            self::assertSame('original target content', file_get_contents($targetPath));
+            self::assertTrue(is_link($symlinkPath));
+        }
     }
 
     public function testGetStoragePath_returnsCorrectPath(): void

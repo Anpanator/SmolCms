@@ -14,6 +14,7 @@ namespace SmolCms\Service\Factory {
 
 namespace SmolCms\Test\Service\Factory {
 
+    use PHPUnit\Framework\Attributes\DataProvider;
     use PHPUnit\Framework\MockObject\MockObject;
     use SmolCms\Data\Business\Url;
     use SmolCms\Data\Constant\HttpContentType;
@@ -159,6 +160,50 @@ namespace SmolCms\Test\Service\Factory {
             $request = $this->requestFactory->buildRequestFromGlobals();
 
             // No JSON body is available, so downstream validation must receive null instead of $_POST
+            self::assertNull($request->postParams);
+        }
+
+        public function testBuildRequestFromGlobals_decodesJsonObjectBody(): void
+        {
+            $this->setRequestGlobals(
+                method: 'POST',
+                postParams: [],
+                headers: [HttpHeader::CONTENT_TYPE->value => HttpContentType::JSON->value . '; charset=UTF-8'],
+            );
+            $this->requestFactory->setBodyReader(
+                static fn(string $stream): string => '{"name":"Ada","count":3}',
+            );
+            $this->expectUrl('http://example.com/resource?from=uri');
+
+            $request = $this->requestFactory->buildRequestFromGlobals();
+
+            self::assertSame(['name' => 'Ada', 'count' => 3], $request->postParams);
+        }
+
+        public static function invalidJsonBodyProvider(): array
+        {
+            return [
+                'malformed JSON' => ['{malformed'],
+                'string scalar' => ['"scalar"'],
+                'integer scalar' => ['42'],
+                'boolean scalar' => ['true'],
+                'null scalar' => ['null'],
+            ];
+        }
+
+        #[DataProvider('invalidJsonBodyProvider')]
+        public function testBuildRequestFromGlobals_returnsNullForMalformedOrNonArrayJson(string $body): void
+        {
+            $this->setRequestGlobals(
+                method: 'POST',
+                postParams: [],
+                headers: [HttpHeader::CONTENT_TYPE->value => HttpContentType::JSON->value],
+            );
+            $this->requestFactory->setBodyReader(static fn(string $stream): string => $body);
+            $this->expectUrl('http://example.com/resource?from=uri');
+
+            $request = $this->requestFactory->buildRequestFromGlobals();
+
             self::assertNull($request->postParams);
         }
 

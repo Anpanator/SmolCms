@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace SmolCms\Test\Service\Image;
 
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use SmolCms\Service\Image\ImagePathLayout;
 use SmolCms\TestUtils\SimpleTestCase;
 
@@ -38,5 +39,22 @@ class ImagePathLayoutTest extends SimpleTestCase
         $this->expectExceptionMessageIsOrContains('Extension must not be empty.');
 
         ImagePathLayout::fileName(self::CHECKSUM, '');
+    }
+
+    public static function pathSeparatorProvider(): array
+    {
+        return [
+            'forward slash' => ['../' . self::CHECKSUM . '.png'],
+            'backslash' => ['..\\' . self::CHECKSUM . '.png'],
+        ];
+    }
+
+    #[DataProvider('pathSeparatorProvider')]
+    public function testRelativePathForFileName_rejectsPathSeparators(string $fileName): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageIsOrContains('File name must be a basename without path separators.');
+
+        ImagePathLayout::relativePathForFileName($fileName);
     }
 }

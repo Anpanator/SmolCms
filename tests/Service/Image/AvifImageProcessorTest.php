@@ -35,17 +35,36 @@ class AvifImageProcessorTest extends SimpleTestCase
 
     public function testSanitize_invalidImageData_throwsException(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessageIsOrContains('Invalid AVIF image data');
-
-        @$this->testee->sanitize('invalid image data');
+        $this->assertMalformedImageRejected('invalid image data', 'Invalid AVIF image data');
     }
 
     public function testSanitize_emptyImageData_throwsException(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessageIsOrContains('Invalid AVIF image data');
+        $this->assertMalformedImageRejected('', 'Invalid AVIF image data');
+    }
 
-        @$this->testee->sanitize('');
+    private function assertMalformedImageRejected(string $imageData, string $exceptionMessage): void
+    {
+        $warnings = [];
+        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+            if ($severity !== E_WARNING) {
+                return false;
+            }
+            $warnings[] = $message;
+            return true;
+        });
+        try {
+            try {
+                $this->testee->sanitize($imageData);
+                self::fail('Expected malformed image input to be rejected.');
+            } catch (InvalidArgumentException $exception) {
+                self::assertStringContainsString($exceptionMessage, $exception->getMessage());
+            }
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertNotEmpty($warnings, 'GD should issue a warning for malformed image data.');
+        self::assertStringContainsString('imagecreatefromstring', $warnings[0]);
     }
 }
