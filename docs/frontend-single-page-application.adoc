@@ -20,8 +20,7 @@ and `searchForm.js`. `accessLevel.js` exports `hasAccessLevel()`, and
 === Upload and moderation behavior
 
 The upload view sends each selected file sequentially as multipart field
-`image[]`. The home view lists accepted-image thumbnails; the image view loads
-metadata and a protected sample, with a download link labeled **Download**.
+`image[]`. The home view lists accepted-image thumbnails; the image view loads metadata and a protected sample, with a download link labeled *Download*.
 Image and tag moderation queues act on the currently selected item: Approve
 and Reject submit that selection, and a success message remains visible rather
 than auto-dismissing.
