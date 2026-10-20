@@ -100,6 +100,8 @@ export async function testAuditLogTableShowsUsersAndMapsActionNames() {
     const {view, fetchMock, restore} = await createLoadedView();
     try {
         assertEqual(view.querySelector('.page-title'), null, 'the audit log page has no title');
+        assertTrue(view.querySelector('.audit-log-table')?.classList.contains('data-table'), 'admin tables should use the shared table component');
+        assertTrue(view.querySelector('.internal-admin-table-wrap')?.classList.contains('data-table-wrap'));
         assertEqual(
             [...view.querySelectorAll('.audit-log-table thead th')].map((cell) => cell.textContent).join('|'),
             'ID|User|Action|Context|Time',

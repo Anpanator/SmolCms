@@ -100,6 +100,8 @@ export async function testUserTableRendersAccessNamesAndProtectsHigherLevelRows(
     const {view, fetchMock, restore} = await createLoadedView();
     try {
         assertEqual(view.querySelector('.page-title'), null, 'the user management page has no title');
+        assertTrue(view.querySelector('.users-table')?.classList.contains('data-table'), 'admin tables should use the shared table component');
+        assertTrue(view.querySelector('.internal-admin-table-wrap')?.classList.contains('data-table-wrap'));
         assertEqual(
             [...view.querySelectorAll('.users-table thead th')].map((cell) => cell.textContent).join('|'),
             'ID|Login name|Display name|Access level|Register date|Actions',

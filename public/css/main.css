@@ -563,45 +563,49 @@ h3 {
     font-size: 1.2rem;
 }
 
-.tags-table-wrap {
+.data-table-wrap {
     width: 100%;
+    min-width: 0;
     overflow-x: auto;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
 }
 
-.tags-table {
+.data-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.95rem;
 }
 
-.tags-table th,
-.tags-table td {
+.data-table th,
+.data-table td {
     padding: var(--space-2) var(--space-3);
     border-bottom: 1px solid var(--color-border);
     text-align: left;
 }
 
-.tags-table th {
+.data-table th {
     background: var(--color-surface-alt);
     font-weight: 600;
 }
 
-.tags-table tbody tr:last-child td {
+.data-table tbody tr:last-child td {
     border-bottom: 0;
+}
+
+.data-table-status td {
+    padding: var(--space-4);
+    color: var(--color-muted);
+    text-align: center;
+}
+
+.tags-table {
+    font-size: 0.95rem;
 }
 
 .tags-table .tags-count-cell {
     text-align: right;
     white-space: nowrap;
-}
-
-.tags-table-status td {
-    padding: var(--space-4);
-    color: var(--color-muted);
-    text-align: center;
 }
 
 .tags-management {
@@ -661,43 +665,17 @@ h3 {
     width: 100%;
 }
 
-.internal-admin-table-wrap {
-    width: 100%;
-    min-width: 0;
-    overflow-x: auto;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-}
-
 .internal-admin-table {
-    width: 100%;
-    border-collapse: collapse;
     font-size: 0.9rem;
 }
 
 .internal-admin-table th,
 .internal-admin-table td {
-    padding: var(--space-2) var(--space-3);
-    border-bottom: 1px solid var(--color-border);
-    text-align: left;
     vertical-align: top;
 }
 
 .internal-admin-table th {
-    background: var(--color-surface-alt);
-    font-weight: 600;
     white-space: nowrap;
-}
-
-.internal-admin-table tbody tr:last-child td {
-    border-bottom: 0;
-}
-
-.internal-admin-table-status td {
-    padding: var(--space-4);
-    color: var(--color-muted);
-    text-align: center;
 }
 
 .internal-admin-table .users-actions-cell {

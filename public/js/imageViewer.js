@@ -3,6 +3,7 @@
  * Importing this module has no side effects.
  */
 import {el} from './dom.js';
+import {createImageMetadataItems} from './imageMetadata.js';
 
 /**
  * @param {{image?: object|null}} [options]
@@ -185,42 +186,9 @@ export function createImageViewer({image = null} = {}) {
     }
 
     function renderMetadata(nextImage) {
-        metadata.replaceChildren(
-            createMetaItem('Image ID', nextImage.id ?? '—'),
-            createMetaItem('Uploaded', nextImage.uploadDate ?? '—'),
-            createMetaItem('Uploader', nextImage.uploader ?? '—'),
-            createMetaItem('Dimensions', formatDimensions(nextImage.width, nextImage.height)),
-            createMetaItem('Format', nextImage.format ?? '—'),
-            createMetaItem('File size', formatFileSize(nextImage.fileSize)),
-        );
+        metadata.replaceChildren(...createImageMetadataItems(nextImage, {
+            className: 'review-meta',
+            includeId: true,
+        }));
     }
-}
-
-function createMetaItem(term, value) {
-    return el('div', {
-        className: 'review-meta-item',
-        children: [
-            el('dt', {className: 'review-meta-term', children: term}),
-            el('dd', {className: 'review-meta-value', children: value}),
-        ],
-    });
-}
-
-function formatDimensions(width, height) {
-    return width === null || width === undefined || height === null || height === undefined
-        ? '—'
-        : `${width} × ${height}`;
-}
-
-function formatFileSize(bytes) {
-    if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0) {
-        return '—';
-    }
-    if (bytes < 1024) {
-        return `${bytes} B`;
-    }
-    if (bytes < 1024 ** 2) {
-        return `${(bytes / 1024).toFixed(1)} KB`;
-    }
-    return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 }

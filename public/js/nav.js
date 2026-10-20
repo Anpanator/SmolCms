@@ -8,8 +8,9 @@
  * Importing this module has no side effects.
  */
 import {postJson} from './api.js';
-import {AccessLevel, accessLevelName} from './accessLevel.js';
+import {AccessLevel, accessLevelName, hasAccessLevel} from './accessLevel.js';
 import {el} from './dom.js';
+import {RoutePath} from './routes.js';
 
 function navLink(path, label, activePath) {
     return el('a', {
@@ -24,7 +25,7 @@ function navItem(children) {
 }
 
 function internalNavItem(activePath) {
-    const isActive = activePath === '/users' || activePath === '/audit-log';
+    const isActive = activePath === RoutePath.USER_MANAGEMENT || activePath === RoutePath.AUDIT_LOG;
     return el('li', {
         className: 'nav-item has-submenu internal-nav-item',
         children: [
@@ -38,11 +39,11 @@ function internalNavItem(activePath) {
                 children: [
                     el('li', {
                         className: 'submenu-item',
-                        children: navLink('/users', 'User Management', activePath),
+                        children: navLink(RoutePath.USER_MANAGEMENT, 'User Management', activePath),
                     }),
                     el('li', {
                         className: 'submenu-item',
-                        children: navLink('/audit-log', 'Audit Log', activePath),
+                        children: navLink(RoutePath.AUDIT_LOG, 'Audit Log', activePath),
                     }),
                 ],
             }),
@@ -53,22 +54,22 @@ function internalNavItem(activePath) {
 function sessionItems(user, activePath) {
     if (user) {
         const items = [
-            navItem(navLink('/', 'Home', activePath)),
-            navItem(navLink('/upload-image', 'Upload Image', activePath)),
-            navItem(navLink('/tagme', 'Tagme', activePath)),
+            navItem(navLink(RoutePath.START_PAGE, 'Home', activePath)),
+            navItem(navLink(RoutePath.UPLOAD_IMAGE, 'Upload Image', activePath)),
+            navItem(navLink(RoutePath.TAGME_QUEUE, 'Tagme', activePath)),
         ];
-        if ((user.accessLevel ?? 0) >= AccessLevel.MOD) {
-            items.push(navItem(navLink('/review', 'Mod Queue', activePath)));
-            items.push(navItem(navLink('/tag-queue', 'Tag Queue', activePath)));
-            items.push(navItem(navLink('/tags', 'Tags', activePath)));
+        if (hasAccessLevel(user, AccessLevel.MOD)) {
+            items.push(navItem(navLink(RoutePath.IMAGE_REVIEW, 'Mod Queue', activePath)));
+            items.push(navItem(navLink(RoutePath.TAG_QUEUE, 'Tag Queue', activePath)));
+            items.push(navItem(navLink(RoutePath.TAGS_PAGE, 'Tags', activePath)));
             items.push(internalNavItem(activePath));
         }
         return items;
     }
     return [
-        navItem(navLink('/', 'Home', activePath)),
-        navItem(navLink('/login', 'Login', activePath)),
-        navItem(navLink('/register', 'Register', activePath)),
+        navItem(navLink(RoutePath.START_PAGE, 'Home', activePath)),
+        navItem(navLink(RoutePath.LOGIN, 'Login', activePath)),
+        navItem(navLink(RoutePath.REGISTER, 'Register', activePath)),
     ];
 }
 
@@ -94,12 +95,12 @@ export function createHeaderNav({ session, navigate }) {
         });
         button.addEventListener('click', async () => {
             try {
-                await postJson('/logout');
+                await postJson(RoutePath.LOGOUT);
             } catch {
                 // logout is best effort: the session refresh below decides the UI state
             }
             await session.refresh();
-            navigate('/');
+            navigate(RoutePath.START_PAGE);
         });
         return button;
     }
@@ -121,7 +122,7 @@ export function createHeaderNav({ session, navigate }) {
                     children: [
                         el('li', {
                             className: 'submenu-item',
-                            children: navLink('/settings', 'Profile', activePath),
+                            children: navLink(RoutePath.SETTINGS, 'Profile', activePath),
                         }),
                         el('li', {
                             className: 'submenu-item submenu-label',
@@ -170,8 +171,16 @@ export function createFooterNav({ session }) {
 
     function render(user) {
         const links = user
-            ? [['/', 'Home'], ['/upload-image', 'Upload Image'], ['/tagme', 'Tagme']]
-            : [['/', 'Home'], ['/login', 'Login'], ['/register', 'Register']];
+            ? [
+                [RoutePath.START_PAGE, 'Home'],
+                [RoutePath.UPLOAD_IMAGE, 'Upload Image'],
+                [RoutePath.TAGME_QUEUE, 'Tagme'],
+            ]
+            : [
+                [RoutePath.START_PAGE, 'Home'],
+                [RoutePath.LOGIN, 'Login'],
+                [RoutePath.REGISTER, 'Register'],
+            ];
         list.replaceChildren(...links.map(([path, label]) => el('li', {
             className: 'nav-item',
             children: navLink(path, label, activePath),

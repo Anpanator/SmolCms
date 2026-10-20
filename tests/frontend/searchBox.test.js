@@ -13,6 +13,8 @@ export function testSearchBoxSubmitsItsUnmodifiedQueryAndExposesValueMethods() {
     const submitEvent = new Event('submit', {bubbles: true, cancelable: true});
 
     assertEqual(search.element.className, 'search-box');
+    assertTrue(search.input instanceof HTMLInputElement, 'search boxes should expose the shared input property');
+    assertEqual(search.suggestions, null, 'plain search boxes do not create suggestions');
     assertEqual(search.element.querySelectorAll('input').length, 1);
     assertEqual(input.type, 'search');
     assertEqual(input.placeholder, 'Search users');

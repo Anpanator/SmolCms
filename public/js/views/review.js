@@ -5,10 +5,11 @@
  * Importing this module has no side effects.
  */
 import {get, postJson} from '../api.js';
-import {AccessLevel} from '../accessLevel.js';
+import {AccessLevel, hasAccessLevel} from '../accessLevel.js';
 import {el} from '../dom.js';
 import {createImageViewer} from '../imageViewer.js';
-import {clearMessage, createMessageBox, isAuthError, messageForStatus, showMessage,} from '../forms.js';
+import {createModerationQueue} from '../moderationQueue.js';
+import {clearMessage, createMessageBox, messageForStatus, showMessage} from '../forms.js';
 
 const QUEUE_URL = '/api/review/queue';
 const IMAGE_DETAIL_URL = '/api/image/detail';
@@ -16,7 +17,7 @@ const APPROVE_URL = '/api/review/approve';
 const REJECT_URL = '/api/review/reject';
 
 export function createReviewView({ session, navigate }) {
-    if (!hasReviewAccess(session.getUser())) {
+    if (!hasAccessLevel(session.getUser(), AccessLevel.MOD)) {
         return el('section', {
             className: 'page review-page review-denied-page',
             attributes: {tabindex: '-1'},
@@ -49,14 +50,6 @@ export function createReviewView({ session, navigate }) {
         attributes: {type: 'button', 'data-action': 'reject', disabled: 'disabled'},
         children: 'Reject',
     });
-
-    let queueImages = [];
-    let activeImage = null;
-    let activeIndex = -1;
-    let detailRequestId = 0;
-    let loadingImageId = null;
-    let actionPending = false;
-    const imageDetails = new Map();
 
     const page = el('section', {
         className: 'review-page',
@@ -109,60 +102,7 @@ export function createReviewView({ session, navigate }) {
         }),
     });
 
-    approveButton.addEventListener('click', () => act('approve'));
-    rejectButton.addEventListener('click', () => act('reject'));
-    page.addEventListener('keydown', handleKeyboard);
-
-    loadQueue();
-    return page;
-
-    async function loadQueue() {
-        try {
-            const data = await get(QUEUE_URL);
-            queueImages = Array.isArray(data?.images) ? data.images : [];
-            renderQueue();
-        } catch (error) {
-            if (isAuthError(error)) {
-                navigate('/login');
-                return;
-            }
-            showMessage(status, messageForStatus(error?.status ?? 0));
-            queueList.replaceChildren(el('li', {
-                className: 'review-empty',
-                children: 'Could not load the moderation queue.',
-            }));
-            imageViewer.showStatus('The moderation queue could not be loaded.');
-        }
-    }
-
-    function renderQueue(preferredIndex = null) {
-        if (queueImages.length === 0) {
-            activeImage = null;
-            activeIndex = -1;
-            detailRequestId++;
-            loadingImageId = null;
-            queueList.replaceChildren(el('li', {
-                className: 'review-empty',
-                children: 'No images are waiting for moderation.',
-            }));
-            imageViewer.clear('No images are waiting for moderation.');
-            setActionButtonsDisabled(true);
-            return;
-        }
-
-        const previousImageId = activeImage?.id;
-        queueList.replaceChildren(...queueImages.map(buildQueueItem));
-
-        let nextIndex = Number.isInteger(preferredIndex)
-            ? preferredIndex
-            : queueImages.findIndex((image) => image.id === previousImageId);
-        if (nextIndex < 0 || nextIndex >= queueImages.length) {
-            nextIndex = 0;
-        }
-        selectImage(nextIndex);
-    }
-
-    function buildQueueItem(image) {
+    function buildQueueItem(image, selectedImage, selectById) {
         const uploader = image.uploader ?? 'Unknown uploader';
         const uploadDate = image.uploadDate ?? '';
         const thumb = image.thumbSrc
@@ -177,7 +117,7 @@ export function createReviewView({ session, navigate }) {
             attributes: {
                 type: 'button',
                 'data-image-id': image.id,
-                'aria-pressed': image.id === activeImage?.id ? 'true' : 'false',
+                'aria-pressed': image.id === selectedImage?.id ? 'true' : 'false',
                 'aria-label': `Select image ${image.id}, uploaded by ${uploader}${uploadDate ? ` on ${uploadDate}` : ''}`,
             },
             children: [
@@ -196,164 +136,82 @@ export function createReviewView({ session, navigate }) {
             attributes: {'data-image-id': image.id},
             children: selectButton,
         });
-        selectButton.addEventListener('click', () => selectImageById(image.id));
+        selectButton.addEventListener('click', () => selectById(image.id));
         return item;
-    }
-
-    function selectImageById(id) {
-        const index = queueImages.findIndex((image) => image.id === id);
-        if (index >= 0) {
-            selectImage(index);
-        }
-    }
-
-    function selectImage(index) {
-        const image = queueImages[index];
-        if (!image) {
-            return;
-        }
-
-        const sameImage = activeImage?.id === image.id;
-        activeImage = image;
-        activeIndex = index;
-        for (const button of queueList.querySelectorAll('.review-select')) {
-            const selected = button.getAttribute('data-image-id') === String(image.id);
-            button.setAttribute('aria-pressed', selected ? 'true' : 'false');
-        }
-        setActionButtonsDisabled(actionPending);
-
-        const cachedDetails = imageDetails.get(image.id);
-        if (cachedDetails) {
-            renderActiveImage(image, cachedDetails);
-            return;
-        }
-        if (sameImage && loadingImageId === image.id) {
-            return;
-        }
-
-        imageViewer.update(image, {status: 'Loading full-size image…'});
-        const requestId = ++detailRequestId;
-        loadingImageId = image.id;
-        get(`${IMAGE_DETAIL_URL}?id=${image.id}`)
-            .then((data) => {
-                if (requestId !== detailRequestId || activeImage?.id !== image.id) {
-                    return;
-                }
-                loadingImageId = null;
-                const details = data?.image;
-                if (!details) {
-                    imageViewer.update(image, {status: 'Full-size image details are unavailable.'});
-                    return;
-                }
-                if (details.downloadSrc) {
-                    imageDetails.set(image.id, details);
-                }
-                renderActiveImage(image, details);
-            })
-            .catch((error) => {
-                if (requestId !== detailRequestId || activeImage?.id !== image.id) {
-                    return;
-                }
-                loadingImageId = null;
-                imageViewer.showStatus('Full-size image could not be loaded.');
-                if (isAuthError(error)) {
-                    navigate('/login');
-                    return;
-                }
-                showMessage(status, messageForStatus(error?.status ?? 0));
-            });
-    }
-
-    function renderActiveImage(queueImage, details) {
-        imageViewer.update({...queueImage, ...details});
-    }
-
-    async function act(action) {
-        const image = activeImage;
-        if (!image || actionPending) {
-            return;
-        }
-
-        clearMessage(status);
-        actionPending = true;
-        setActionButtonsDisabled(true);
-        try {
-            await postJson(`${action === 'approve' ? APPROVE_URL : REJECT_URL}?id=${image.id}`);
-            const removedIndex = queueImages.findIndex((item) => item.id === image.id);
-            if (removedIndex < 0) {
-                return;
-            }
-
-            const previousActiveId = activeImage?.id;
-            queueImages.splice(removedIndex, 1);
-            imageDetails.delete(image.id);
-            const nextIndex = previousActiveId === image.id
-                ? Math.min(removedIndex, queueImages.length - 1)
-                : queueImages.findIndex((item) => item.id === previousActiveId);
-            if (previousActiveId === image.id) {
-                activeImage = null;
-            }
-            showMessage(status, action === 'approve'
-                ? `Image #${image.id} approved.`
-                : `Image #${image.id} rejected.`, 'success');
-            renderQueue(nextIndex);
-        } catch (error) {
-            if (isAuthError(error)) {
-                navigate('/login');
-                return;
-            }
-            showMessage(status, messageForStatus(error?.status ?? 0));
-            if ((error?.status ?? 0) !== 403) {
-                await loadQueue();
-            }
-        } finally {
-            actionPending = false;
-            setActionButtonsDisabled(!activeImage);
-        }
-    }
-
-    function handleKeyboard(event) {
-        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
-            || (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable="true"]'))) {
-            return;
-        }
-        if (!activeImage) {
-            return;
-        }
-
-        switch (event.key) {
-            case 'ArrowLeft':
-            case 'ArrowUp':
-                event.preventDefault();
-                selectImage(Math.max(0, activeIndex - 1));
-                break;
-            case 'ArrowRight':
-            case 'ArrowDown':
-                event.preventDefault();
-                selectImage(Math.min(queueImages.length - 1, activeIndex + 1));
-                break;
-            case 'Enter':
-                event.preventDefault();
-                if (!event.repeat) {
-                    act('approve');
-                }
-                break;
-            case 'Delete':
-            case 'Backspace':
-                event.preventDefault();
-                if (!event.repeat) {
-                    act('reject');
-                }
-                break;
-        }
     }
 
     function setActionButtonsDisabled(disabled) {
         approveButton.disabled = disabled;
         rejectButton.disabled = disabled;
     }
-}
 
-function hasReviewAccess(user) {
-    return (user?.accessLevel ?? 0) >= AccessLevel.MOD;
+    const moderationQueue = createModerationQueue({
+        fetchQueue: async () => {
+            const data = await get(QUEUE_URL);
+            return Array.isArray(data?.images) ? data.images : [];
+        },
+        fetchDetails: async (_image, imageId) => {
+            const data = await get(`${IMAGE_DETAIL_URL}?id=${imageId}`);
+            return data?.image ?? null;
+        },
+        submitAction: (action, image) => postJson(
+            `${action === 'approve' ? APPROVE_URL : REJECT_URL}?id=${image.id}`,
+        ),
+        getImageId: (image) => image?.id,
+        renderQueue({items, selected, selectById}) {
+            queueList.replaceChildren(...items.map((image) => buildQueueItem(image, selected, selectById)));
+        },
+        onQueueError(error) {
+            showMessage(status, messageForStatus(error?.status ?? 0));
+            queueList.replaceChildren(el('li', {
+                className: 'review-empty',
+                children: 'Could not load the moderation queue.',
+            }));
+            imageViewer.showStatus('The moderation queue could not be loaded.');
+        },
+        onEmpty() {
+            queueList.replaceChildren(el('li', {
+                className: 'review-empty',
+                children: 'No images are waiting for moderation.',
+            }));
+            imageViewer.clear('No images are waiting for moderation.');
+        },
+        onSelect(image) {
+            for (const button of queueList.querySelectorAll('.review-select')) {
+                const selected = button.getAttribute('data-image-id') === String(image.id);
+                button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+            }
+        },
+        onDetailsLoading(image) {
+            imageViewer.update(image, {status: 'Loading full-size image…'});
+        },
+        onDetailsLoaded(image, details) {
+            imageViewer.update({...image, ...details});
+        },
+        onDetailsUnavailable(image) {
+            imageViewer.update(image, {status: 'Full-size image details are unavailable.'});
+        },
+        onDetailsError(error) {
+            imageViewer.showStatus('Full-size image could not be loaded.');
+            showMessage(status, messageForStatus(error?.status ?? 0));
+        },
+        onUnauthorized: () => navigate('/login'),
+        onClearStatus: () => clearMessage(status),
+        onActionSuccess(action, image) {
+            showMessage(status, action === 'approve'
+                ? `Image #${image.id} approved.`
+                : `Image #${image.id} rejected.`, 'success');
+        },
+        onActionError(error) {
+            showMessage(status, messageForStatus(error?.status ?? 0));
+        },
+        setActionsDisabled: setActionButtonsDisabled,
+        shouldCacheDetails: (details) => Boolean(details?.downloadSrc),
+    });
+
+    approveButton.addEventListener('click', () => moderationQueue.act('approve'));
+    rejectButton.addEventListener('click', () => moderationQueue.act('reject'));
+    page.addEventListener('keydown', moderationQueue.handleKeyboard);
+    moderationQueue.load();
+    return page;
 }

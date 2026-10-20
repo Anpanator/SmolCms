@@ -3,11 +3,12 @@
  * Importing this module has no side effects.
  */
 import {get} from '../api.js';
-import {AccessLevel} from '../accessLevel.js';
+import {AccessLevel, hasAccessLevel} from '../accessLevel.js';
 import {el} from '../dom.js';
 import {createPagination} from '../pagination.js';
+import {createPaginatedTable, parsePositiveInteger} from '../paginatedTable.js';
 import {createSearchBox} from '../searchBox.js';
-import {clearMessage, createMessageBox, isAuthError, messageForStatus, showMessage} from '../forms.js';
+import {createMessageBox} from '../forms.js';
 
 const AUDIT_LOG_URL = '/api/audit-log';
 const PER_PAGE = 30;
@@ -24,7 +25,7 @@ export function createAuditLogView({
     navigate = () => {},
     query = new URLSearchParams(window.location.search),
 } = {}) {
-    if (!hasAuditLogAccess(session?.getUser?.())) {
+    if (!hasAccessLevel(session?.getUser?.(), AccessLevel.MOD)) {
         return el('section', {
             className: 'internal-admin-denied-page audit-log-denied-page',
             attributes: {tabindex: '-1', 'aria-label': 'Audit log'},
@@ -36,16 +37,15 @@ export function createAuditLogView({
     }
 
     const params = query instanceof URLSearchParams ? query : new URLSearchParams(query);
-    let currentPage = parsePositiveInteger(params.get('page'), 1);
-    let currentQuery = (params.get('q') ?? '').trim();
-    let requestId = 0;
+    const initialPage = parsePositiveInteger(params.get('page'), 1);
+    const initialQuery = (params.get('q') ?? '').trim();
 
     const listMessage = createMessageBox();
     const tableBody = el('tbody', {
         children: createTableStatusRow('Loading audit log…'),
     });
     const table = el('table', {
-        className: 'internal-admin-table audit-log-table',
+        className: 'data-table internal-admin-table audit-log-table',
         attributes: {'aria-label': 'Audit log entries'},
         children: [
             el('thead', {
@@ -59,28 +59,23 @@ export function createAuditLogView({
             tableBody,
         ],
     });
-    const pagination = createPagination(currentPage, (pageNumber) => {
-        currentPage = pageNumber;
-        loadAuditLog(currentPage, currentQuery);
-    });
+    let paginatedTable;
+    const pagination = createPagination(initialPage, (pageNumber) => paginatedTable.setPage(pageNumber));
     pagination.element.setAttribute('aria-label', 'Audit log pages');
 
     const search = createSearchBox({
         placeholder: 'Search audit log users',
         buttonText: 'Search',
         onSearch(queryText) {
-            currentQuery = String(queryText ?? '').trim();
+            const currentQuery = String(queryText ?? '').trim();
             search.setValue(currentQuery);
-            currentPage = 1;
-            loadAuditLog(currentPage, currentQuery);
+            paginatedTable.setQuery(currentQuery);
         },
         onReset() {
-            currentQuery = '';
-            currentPage = 1;
-            loadAuditLog(currentPage, currentQuery);
+            paginatedTable.setQuery('');
         },
     });
-    search.setValue(currentQuery);
+    search.setValue(initialQuery);
 
     const page = el('section', {
         className: 'internal-admin-page audit-log-page',
@@ -93,7 +88,7 @@ export function createAuditLogView({
                     attributes: {'aria-label': 'Audit log entries'},
                     children: [
                         listMessage,
-                        el('div', {className: 'internal-admin-table-wrap', children: table}),
+                        el('div', {className: 'data-table-wrap internal-admin-table-wrap', children: table}),
                         pagination.element,
                     ],
                 }),
@@ -106,62 +101,34 @@ export function createAuditLogView({
         }),
     });
 
-    loadAuditLog(currentPage, currentQuery);
+    paginatedTable = createPaginatedTable({
+        tableBody,
+        listMessage,
+        pagination,
+        fetchPage({page: pageNumber, query: queryText}) {
+            const queryParams = new URLSearchParams();
+            queryParams.set('page', String(pageNumber));
+            if (queryText !== '') {
+                queryParams.set('q', queryText);
+            }
+            return get(`${AUDIT_LOG_URL}?${queryParams}`);
+        },
+        getItems: (data) => data?.entries,
+        renderRow: createAuditLogRow,
+        renderStatusRow: createTableStatusRow,
+        messages: {
+            loading: 'Loading audit log…',
+            empty: 'No audit log entries found.',
+            emptySearch: 'No audit log entries match your search.',
+            error: 'Could not load the audit log.',
+        },
+        defaultPerPage: PER_PAGE,
+        initialPage,
+        initialQuery,
+        navigate,
+    });
+    paginatedTable.load();
     return page;
-
-    async function loadAuditLog(pageNumber, queryText) {
-        const request = ++requestId;
-        currentPage = pageNumber;
-        clearMessage(listMessage);
-        tableBody.replaceChildren(createTableStatusRow('Loading audit log…'));
-        pagination.loading(pageNumber);
-
-        const queryParams = new URLSearchParams();
-        queryParams.set('page', String(pageNumber));
-        if (queryText !== '') {
-            queryParams.set('q', queryText);
-        }
-
-        try {
-            const data = await get(`${AUDIT_LOG_URL}?${queryParams}`);
-            if (request !== requestId) {
-                return;
-            }
-
-            const entries = Array.isArray(data?.entries) ? data.entries : [];
-            const total = Number.isSafeInteger(data?.total) && data.total >= 0 ? data.total : entries.length;
-            const perPage = parsePositiveInteger(data?.perPage, PER_PAGE);
-            const responsePage = parsePositiveInteger(data?.page, pageNumber);
-            const pageCount = Math.max(1, Math.ceil(total / perPage));
-
-            if (responsePage > pageCount) {
-                currentPage = pageCount;
-                loadAuditLog(currentPage, queryText);
-                return;
-            }
-
-            currentPage = responsePage;
-            pagination.update({page: responsePage, total, perPage});
-            if (entries.length === 0) {
-                tableBody.replaceChildren(createTableStatusRow(
-                    queryText === '' ? 'No audit log entries found.' : 'No audit log entries match your search.',
-                ));
-                return;
-            }
-            tableBody.replaceChildren(...entries.map(createAuditLogRow));
-        } catch (error) {
-            if (request !== requestId) {
-                return;
-            }
-            if (isAuthError(error)) {
-                navigate('/login');
-                return;
-            }
-            showMessage(listMessage, messageForStatus(error?.status ?? 0));
-            tableBody.replaceChildren(createTableStatusRow('Could not load the audit log.'));
-            pagination.update({page: pageNumber, total: 0, perPage: PER_PAGE});
-        }
-    }
 }
 
 function createAuditLogRow(entry) {
@@ -187,22 +154,7 @@ function createAuditLogRow(entry) {
 
 function createTableStatusRow(text) {
     return el('tr', {
-        className: 'internal-admin-table-status',
+        className: 'internal-admin-table-status data-table-status',
         children: el('td', {attributes: {colspan: '5'}, children: text}),
     });
-}
-
-function parsePositiveInteger(value, fallback) {
-    if (typeof value === 'number') {
-        return Number.isSafeInteger(value) && value > 0 ? value : fallback;
-    }
-    if (!/^[1-9][0-9]*$/.test(value ?? '')) {
-        return fallback;
-    }
-    const parsed = Number(value);
-    return Number.isSafeInteger(parsed) ? parsed : fallback;
-}
-
-function hasAuditLogAccess(user) {
-    return Number(user?.accessLevel ?? 0) >= AccessLevel.MOD;
 }

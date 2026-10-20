@@ -260,6 +260,43 @@ export async function testSelectingThumbnailUpdatesImageAndMetadata() {
     }
 }
 
+export async function testReviewIgnoresLateDetailsForAnInactiveThumbnail() {
+    const pendingDetails = new Map();
+    const {view, restore} = await createViewWith(500, (url) => {
+        const match = url.match(/^\/api\/image\/detail\?id=(\d+)$/);
+        if (!match) {
+            return undefined;
+        }
+        const imageId = match[1];
+        return new Promise((resolve) => {
+            const requests = pendingDetails.get(imageId) ?? [];
+            requests.push(resolve);
+            pendingDetails.set(imageId, requests);
+        });
+    });
+    try {
+        view.querySelector('.review-select[data-image-id="3"]').click();
+        view.querySelector('.review-select[data-image-id="7"]').click();
+        const detailFor = (imageId, downloadSrc) => ({
+            status: 200,
+            body: {image: {...DETAILS[imageId], downloadSrc}},
+        });
+        pendingDetails.get('7')[1](detailFor(7, '/current-image-7'));
+        await settle();
+        pendingDetails.get('3')[0](detailFor(3, '/stale-image-3'));
+        pendingDetails.get('7')[0](detailFor(7, '/stale-image-7'));
+        await settle();
+
+        assertEqual(view.querySelector('.review-image')?.getAttribute('src'), '/current-image-7');
+        assertEqual(view.querySelector('.review-select[aria-pressed="true"]')?.getAttribute('data-image-id'), '7');
+    } finally {
+        for (const requests of pendingDetails.values()) {
+            requests.forEach((resolve) => resolve({status: 200, body: {image: null}}));
+        }
+        restore();
+    }
+}
+
 export async function testReviewQueueEmptyState() {
     const {view, restore} = await createViewWith(600, (url) => (
         url === QUEUE_URL ? {status: 200, body: {images: []}} : undefined

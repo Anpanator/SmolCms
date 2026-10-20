@@ -4,12 +4,12 @@
  */
 import {get} from './api.js';
 import {el} from './dom.js';
+import {createSearchForm} from './searchForm.js';
 
 const TAG_SUGGESTIONS_URL = '/api/tags/suggest';
 const DEBOUNCE_MS = 250;
 const MAX_SUGGESTIONS = 15;
 
-let nextSearchViewId = 1;
 let nextSuggestionsId = 1;
 
 /** Normalize comma-separated tag input for API and URL use. */
@@ -23,62 +23,39 @@ export function normalizeTags(value) {
 
 /**
  * @param {{ onSearch?: (tags: string) => void, initialTags?: string }} [options]
- * @returns {{ element: HTMLFormElement, input: HTMLInputElement, suggestions: HTMLUListElement }}
+ * @returns {{
+ *   element: HTMLFormElement,
+ *   input: HTMLInputElement,
+ *   suggestions: HTMLUListElement|null,
+ *   getValue: () => string,
+ *   setValue: (value: string) => void,
+ *   clear: () => void,
+ * }}
  */
 export function createSearchView({onSearch = () => {}, initialTags = ''} = {}) {
-    const id = nextSearchViewId++;
-    const inputId = `tag-search-input-${id}`;
-    const suggestionsId = `tag-search-suggestions-${id}`;
-
-    const input = el('input', {
-        className: 'search-input',
-        attributes: {
-            id: inputId,
-            type: 'text',
-            value: initialTags,
-            placeholder: 'Search tags',
-            autocomplete: 'off',
-            role: 'combobox',
-            'aria-autocomplete': 'list',
-            'aria-expanded': 'false',
-            'aria-controls': suggestionsId,
-        },
-    });
-    const label = el('label', {
-        className: 'search-label',
-        attributes: { for: inputId },
-        children: 'Search tags',
-    });
-    const submitButton = el('button', {
-        className: 'search-submit',
-        attributes: { type: 'submit', 'aria-label': 'Search tags' },
-        children: el('span', {
+    let autocomplete = {close: () => {}};
+    const search = createSearchForm({
+        className: 'search-view',
+        inputClassName: 'search-input',
+        inputType: 'text',
+        inputLabel: 'Search tags',
+        placeholder: 'Search tags',
+        initialValue: initialTags,
+        submitText: 'Search tags',
+        submitClassName: 'search-submit',
+        submitContent: el('span', {
             className: 'search-icon',
             attributes: { 'aria-hidden': 'true' },
         }),
+        controlsClassName: 'search-control',
+        hasSuggestions: true,
+        onSearch(value) {
+            autocomplete.close();
+            onSearch(normalizeTags(value));
+        },
     });
-    const suggestions = el('ul', {
-        className: 'search-suggestions',
-        attributes: { id: suggestionsId, role: 'listbox', hidden: '' },
-    });
-    const form = el('form', {
-        className: 'search-view',
-        attributes: { role: 'search' },
-        children: [
-            label,
-            el('div', { className: 'search-control', children: [input, submitButton] }),
-            suggestions,
-        ],
-    });
-
-    const autocomplete = attachTagSuggestions({input, suggestions, container: form});
-    form.addEventListener('submit', (event) => {
-        event.preventDefault();
-        autocomplete.close();
-        onSearch(normalizeTags(input.value));
-    });
-
-    return { element: form, input, suggestions };
+    autocomplete = attachTagSuggestions({input: search.input, suggestions: search.suggestions, container: search.element});
+    return search;
 }
 
 /**

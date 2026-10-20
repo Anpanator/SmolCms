@@ -6,6 +6,7 @@ import {createFooterNav, createHeaderNav} from './nav.js';
 import {createRouter} from './router.js';
 import {createSession} from './session.js';
 import {el} from './dom.js';
+import {RoutePath} from './routes.js';
 import {createHomeView} from './views/home.js';
 import {createImageView} from './views/image.js';
 import {createLoginView} from './views/login.js';
@@ -19,6 +20,27 @@ import {createTagsView} from './views/tags.js';
 import {createTagmeView} from './views/tagme.js';
 import {createUsersView} from './views/users.js';
 import {createAuditLogView} from './views/auditLog.js';
+
+export function createRouteMap({session, navigate}) {
+    return {
+        [RoutePath.START_PAGE]: (context) => createHomeView(context),
+        [RoutePath.LOGIN]: (context) => createLoginView({session, ...context}),
+        [RoutePath.REGISTER]: (context) => createRegisterView(context),
+        [RoutePath.SETTINGS]: (context) => createProfileView({session, ...context}),
+        [RoutePath.UPLOAD_IMAGE]: (context) => createUploadView(context),
+        [RoutePath.IMAGE_DISPLAY]: (context) => createImageView({session, ...context}),
+        [RoutePath.TAGME_QUEUE]: (context) => createTagmeView({session, ...context}),
+        [RoutePath.IMAGE_REVIEW]: (context) => createReviewView({session, navigate, ...context}),
+        [RoutePath.TAG_QUEUE]: (context) => createTagQueueView({session, navigate, ...context}),
+        [RoutePath.TAGS_PAGE]: (context) => createTagsView({session, navigate, ...context}),
+        [RoutePath.USER_MANAGEMENT]: (context) => createUsersView({session, navigate, ...context}),
+        [RoutePath.AUDIT_LOG]: (context) => createAuditLogView({session, navigate, ...context}),
+    };
+}
+
+export function isModerationRoute(path) {
+    return path === RoutePath.IMAGE_REVIEW || path === RoutePath.TAG_QUEUE;
+}
 
 async function bootstrap() {
     const appRoot = document.getElementById('app');
@@ -38,27 +60,14 @@ async function bootstrap() {
     const footerNav = createFooterNav({ session });
 
     const viewContainer = el('main', { className: 'view-container' });
-    const routes = {
-        '/': (context) => createHomeView(context),
-        '/login': (context) => createLoginView({ session, ...context }),
-        '/register': (context) => createRegisterView(context),
-        '/settings': (context) => createProfileView({session, ...context}),
-        '/upload-image': (context) => createUploadView(context),
-        '/image': (context) => createImageView({session, ...context}),
-        '/tagme': (context) => createTagmeView({session, ...context}),
-        '/review': (context) => createReviewView({session, ...context}),
-        '/tag-queue': (context) => createTagQueueView({session, ...context}),
-        '/tags': (context) => createTagsView({session, ...context}),
-        '/users': (context) => createUsersView({session, ...context}),
-        '/audit-log': (context) => createAuditLogView({session, ...context}),
-    };
+    const routes = createRouteMap({session, navigate});
 
     const router = createRouter({
         container: viewContainer,
         routes,
         notFound: () => createNotFoundView(),
         onNavigate: (path) => {
-            const isModerationQueue = path === '/review' || path === '/tag-queue';
+            const isModerationQueue = isModerationRoute(path);
             viewContainer.classList.toggle('view-container--review', isModerationQueue);
             if (isModerationQueue) {
                 viewContainer.querySelector('.review-page')?.focus({preventScroll: true});

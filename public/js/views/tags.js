@@ -3,12 +3,14 @@
  * Importing this module has no side effects.
  */
 import {get, postJson} from '../api.js';
-import {AccessLevel} from '../accessLevel.js';
+import {AccessLevel, hasAccessLevel} from '../accessLevel.js';
 import {el} from '../dom.js';
 import {createPagination} from '../pagination.js';
+import {createPaginatedTable, parsePositiveInteger} from '../paginatedTable.js';
 import {createSearchView, normalizeTags} from '../search.js';
 import {
     clearMessage,
+    createControlField,
     createField,
     createMessageBox,
     isAuthError,
@@ -30,7 +32,7 @@ export function createTagsView({
     navigate = () => {},
     query = new URLSearchParams(window.location.search),
 } = {}) {
-    if (!hasTagsAccess(session?.getUser?.())) {
+    if (!hasAccessLevel(session?.getUser?.(), AccessLevel.MOD)) {
         return el('section', {
             className: 'page tags-denied-page',
             attributes: {tabindex: '-1'},
@@ -45,9 +47,8 @@ export function createTagsView({
     }
 
     const params = query instanceof URLSearchParams ? query : new URLSearchParams(query);
-    let currentPage = parsePositiveInteger(params.get('page'), 1);
-    let currentQuery = firstSearchSegment(params.get('q') ?? '');
-    let tagRequestId = 0;
+    const initialPage = parsePositiveInteger(params.get('page'), 1);
+    const initialQuery = firstSearchSegment(params.get('q') ?? '');
     let categoryRequestId = 0;
 
     const tagNameField = createField({label: 'Tag name', name: 'tagName'});
@@ -91,18 +92,16 @@ export function createTagsView({
     });
 
     const search = createSearchView({
-        initialTags: currentQuery,
+        initialTags: initialQuery,
         onSearch(searchTags) {
-            currentQuery = firstSearchSegment(searchTags);
-            currentPage = 1;
-            loadTags(currentPage, currentQuery);
+            paginatedTable.setQuery(firstSearchSegment(searchTags));
         },
     });
     const tableBody = el('tbody', {
         children: createTableStatusRow('Loading tags…'),
     });
     const table = el('table', {
-        className: 'tags-table',
+        className: 'data-table tags-table',
         children: [
             el('thead', {
                 children: el('tr', {
@@ -116,10 +115,8 @@ export function createTagsView({
             tableBody,
         ],
     });
-    const pagination = createPagination(currentPage, (page) => {
-        currentPage = page;
-        loadTags(currentPage, currentQuery);
-    });
+    let paginatedTable;
+    const pagination = createPagination(initialPage, (pageNumber) => paginatedTable.setPage(pageNumber));
     pagination.element.setAttribute('aria-label', 'Tag pages');
 
     const page = el('section', {
@@ -162,7 +159,7 @@ export function createTagsView({
                     }),
                     listMessage,
                     el('div', {
-                        className: 'tags-table-wrap',
+                        className: 'data-table-wrap tags-table-wrap',
                         children: table,
                     }),
                     pagination.element,
@@ -174,64 +171,36 @@ export function createTagsView({
     tagForm.addEventListener('submit', createTag);
     categoryForm.addEventListener('submit', createCategory);
 
+    paginatedTable = createPaginatedTable({
+        tableBody,
+        listMessage,
+        pagination,
+        fetchPage({page: pageNumber, query: queryText}) {
+            const queryParams = new URLSearchParams();
+            queryParams.set('page', String(pageNumber));
+            if (queryText !== '') {
+                queryParams.set('q', queryText);
+            }
+            return get(`${TAGS_URL}?${queryParams}`);
+        },
+        getItems: (data) => data?.tags,
+        renderRow: createTagRow,
+        renderStatusRow: createTableStatusRow,
+        messages: {
+            loading: 'Loading tags…',
+            empty: 'No tags found.',
+            emptySearch: 'No tags match your search.',
+            error: 'Could not load tags.',
+        },
+        defaultPerPage: PER_PAGE,
+        initialPage,
+        initialQuery,
+        navigate,
+    });
+
     refreshCategories();
-    loadTags(currentPage, currentQuery);
+    paginatedTable.load();
     return page;
-
-    async function loadTags(pageNumber, queryText) {
-        const requestId = ++tagRequestId;
-        currentPage = pageNumber;
-        clearMessage(listMessage);
-        tableBody.replaceChildren(createTableStatusRow('Loading tags…'));
-        pagination.loading(pageNumber);
-
-        const queryParams = new URLSearchParams();
-        queryParams.set('page', String(pageNumber));
-        if (queryText !== '') {
-            queryParams.set('q', queryText);
-        }
-
-        try {
-            const data = await get(`${TAGS_URL}?${queryParams}`);
-            if (requestId !== tagRequestId) {
-                return;
-            }
-
-            const tags = Array.isArray(data?.tags) ? data.tags : [];
-            const total = Number.isSafeInteger(data?.total) && data.total >= 0 ? data.total : tags.length;
-            const perPage = parsePositiveInteger(data?.perPage, PER_PAGE);
-            const responsePage = parsePositiveInteger(data?.page, pageNumber);
-            const pageCount = Math.max(1, Math.ceil(total / perPage));
-
-            if (responsePage > pageCount) {
-                currentPage = pageCount;
-                loadTags(currentPage, queryText);
-                return;
-            }
-
-            currentPage = responsePage;
-            pagination.update({page: responsePage, total, perPage});
-            if (tags.length === 0) {
-                tableBody.replaceChildren(createTableStatusRow(
-                    queryText === '' ? 'No tags found.' : 'No tags match your search.',
-                ));
-                return;
-            }
-
-            tableBody.replaceChildren(...tags.map(createTagRow));
-        } catch (error) {
-            if (requestId !== tagRequestId) {
-                return;
-            }
-            if (isAuthError(error)) {
-                navigate('/login');
-                return;
-            }
-            showMessage(listMessage, messageForStatus(error?.status ?? 0));
-            tableBody.replaceChildren(createTableStatusRow('Could not load tags.'));
-            pagination.update({page: pageNumber, total: 0, perPage: PER_PAGE});
-        }
-    }
 
     async function refreshCategories(preferredCategory = categorySelectField.input.value) {
         const requestId = ++categoryRequestId;
@@ -313,7 +282,7 @@ export function createTagsView({
             }
             const createdName = typeof data?.tag?.name === 'string' ? data.tag.name : name;
             showMessage(tagMessage, `Tag "${createdName}" created.`, 'success');
-            await loadTags(currentPage, currentQuery);
+            await paginatedTable.reload();
         } catch (error) {
             if (isAuthError(error)) {
                 navigate('/login');
@@ -381,51 +350,24 @@ function createTagRow(tag) {
 
 function createTableStatusRow(text) {
     return el('tr', {
-        className: 'tags-table-status',
+        className: 'tags-table-status data-table-status',
         children: el('td', {attributes: {colspan: '3'}, children: text}),
     });
 }
 
 function createSelectField({label, name, inputName, options}) {
-    const id = `field-${name}`;
     const input = el('select', {
         className: 'field-input',
-        attributes: {id, name: inputName},
+        attributes: {name: inputName},
         children: options.map((option) => el('option', {
             attributes: {value: option},
             children: option,
         })),
     });
     const errorElement = el('p', {className: 'field-error', attributes: {hidden: 'hidden'}});
-    return {
-        wrapper: el('div', {
-            className: 'field',
-            children: [
-                el('label', {className: 'field-label', attributes: {for: id}, children: label}),
-                input,
-                errorElement,
-            ],
-        }),
-        input,
-        errorElement,
-    };
+    return createControlField({label, name, control: input, errorElement});
 }
 
 function firstSearchSegment(value) {
     return normalizeTags(value).split(',')[0]?.trim() ?? '';
-}
-
-function parsePositiveInteger(value, fallback) {
-    if (typeof value === 'number') {
-        return Number.isSafeInteger(value) && value > 0 ? value : fallback;
-    }
-    if (!/^[1-9][0-9]*$/.test(value ?? '')) {
-        return fallback;
-    }
-    const parsed = Number(value);
-    return Number.isSafeInteger(parsed) ? parsed : fallback;
-}
-
-function hasTagsAccess(user) {
-    return (user?.accessLevel ?? 0) >= AccessLevel.MOD;
 }
