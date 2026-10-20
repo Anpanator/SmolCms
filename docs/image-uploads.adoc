@@ -1,76 +1,43 @@
 == Image uploads
 
-Users with `NOVICE` or higher (`401` when anonymous, `403` when below the level) can select any number of images in the client; it uploads them sequentially, one file per multipart `POST /upload-image` request in the field `image[]`.
-The API accepts one to ten files per request. `GET /upload-image` serves the same HTML shell as every other client path, and the upload form is rendered client-side.
-`ImageUploadController::postAction` manually runs `ImageUploadValidator` (it is not a `ValidatedRequest`): the validator normalizes PHP's column-oriented multi-file `files['image']` structure, requires each entry to have `tmp_name` and `name`, checks `is_uploaded_file()`, and rejects empty requests or requests above ten files.
-It maps each PHP upload `error` code to explicit response statuses instead of failing silently: `UPLOAD_ERR_INI_SIZE`/`UPLOAD_ERR_FORM_SIZE` → `413`, `UPLOAD_ERR_NO_FILE`/`UPLOAD_ERR_PARTIAL` → `400`, `UPLOAD_ERR_NO_TMP_DIR`/`UPLOAD_ERR_CANT_WRITE`/`UPLOAD_ERR_EXTENSION` → `500`; structural failures and non-SAPI paths → `400`.
+Authenticated users can select multiple images. The browser uploads each
+sequentially in a multipart `POST /upload-image` request using field `image[]`.
+The server recognizes PNG, JPEG, AVIF, and WebP by signature and verifies that
+each image can be decoded. Dimensions are checked before GD decoding: neither
+side may exceed 16,384 pixels and the image may not exceed 20 million pixels.
+The Docker PHP/Nginx configuration allows up to 100 MB per file and request;
+manual hosts must set compatible PHP and web-server limits.
 
-Uploads are limited to **100 MB per file** (`upload_max_filesize = 100M`) and **100 MB total per request** (`post_max_size = 100M`, nginx `client_max_body_size 100m` — keep the aggregate request limits in sync; larger bodies are rejected by nginx with `413` before PHP sees them).
-The request limit includes the full multipart body and its overhead.
-Since the client sends each selected image in its own sequential request, this limit applies separately to each upload rather than to the combined selection.
-Nginx spills request bodies to `private/upload/tmp/nginx/client_body` on the upload bind mount, rather than the container's `/tmp` tmpfs (capped at 64 MiB); PHP's own multipart temp files remain directly under `private/upload/tmp`.
-`memory_limit = 1024M` gives GD headroom for decoding large uploads into uncompressed RGBA buffers.
+Upload validation decodes the image to confirm it is readable and capture its
+dimensions, but stores the original bytes unchanged. Stored files are
+content-addressed by SHA-256. A new image starts pending and is tagged `tagme`.
 
-For every file the controller runs `file_get_contents(tmp_name)` (guarded by `is_readable()`, `false` returns `500`; in docker `php.ini` pins `upload_tmp_dir` to the whitelisted `private/upload/tmp`, and for local runs `config.php` adds `sys_get_temp_dir()` to `FS_DIRECTORY_WHITELIST`), then gates on `ImageTypeDetectionFacade` (`Png`, `Jpeg`, `Avif`, and `Webp` detectors, first match wins; `null` returns `400`).
-It checks all files before storing any, then rereads and uploads them one at a time to bound memory use.
-PNG checks the first 4 bytes for `89504E47`, JPEG checks `FFD8FF`, AVIF checks `ftypavif` or `ftypavis` at offset 4, and WebP checks `RIFF` at offset 0 plus `WEBP` at offset 8.
+=== Processing and delivery
 
-The rest of the flow is orchestrated by `ImageUploadService::upload(string $imageData, ImageType $imageType): ImageEntity`, which takes the uploader identity from `SessionService::getUserData()` (an unauthenticated session throws `InvalidStateException`; the controller relies on `#[Authenticated]` so this does not occur in practice):
+The asynchronous worker re-decodes each original and creates three re-encoded
+variants: a public AVIF thumbnail, a private WebP viewing sample, and a private
+download. Downloads remain in the source format except PNG, which becomes
+pixel-lossless WebP. The worker moves the image to the accepted collection or
+moderation queue according to the uploader's role, then removes the original
+when no other image record references it.
 
-. `ImageProcessorFacade::sanitizeImage()` decodes the upload through exactly the processor registered for the detected type (`PngImageProcessor`, `JpegImageProcessor`, `AvifImageProcessor`, or `WebpImageProcessor`; each declares its type via `getType()`). All use generic `imagecreatefromstring()`; a decode failure throws `InvalidArgumentException` and becomes `500`. The returned `GdImage` holds pure pixel data.
-. `ImageStorageService::storeImage()` encodes that `GdImage` as the detected type (`imagepng` quality 9, `imagejpeg` quality 100, `imageavif` quality 100, `imagewebp` quality 100), which strips EXIF and other metadata and guarantees the stored file truly is the detected format. It then writes the bytes below `IMAGE_STORAGE_DIR` (`private/upload/img`) and returns a `StoredImage` (checksum, filename, width, height, file size, type).
-. An `ImageEntity` row is inserted via `ImageEntityService::saveAsNew()`: the logged-in `user_id`, `upload_date = now`, `status = pending`, the content `checksum`, `original_extension`, `format`, `width`, `height`, `file_size`, and `NULL` for the three variant filenames (`thumb_filename`, `sample_filename`, `download_filename`).
+Run `php src/app.php --process-images 100` to process a batch; Docker runs the
+same command periodically in the background. Failed images remain pending for
+retry. The original is never served to users. Thumbnails are static public
+files; viewing and download files are served only to authorized users through
+internal Nginx locations and `X-Accel-Redirect`.
 
-The client-supplied filename is never used for storage.
+The public `GET /api/images` list contains accepted images. For protected details,
+viewing, downloads, and image-tag actions, regular users can access accepted
+images and pending-review images tagged `tagme`; `MOD` and higher can access
+all image states. Tag input is capped at 2,048 characters and 20 names, with a
+maximum of 100 characters per tag.
 
-=== Storage naming rules
-
-Every stored image file is named `<sha-256 hex checksum>.<extension>` and lives under a two-character subdirectory (the first two checksum characters) of its base directory: `<base>/<c[0]><c[1]>/<checksum>.<extension>` (see `ImagePathLayout`, which is the single source of truth for this layout).
-The extension is the `ImageType` value itself — `png`, `jpeg` (not `jpg`), `avif`, `webp`.
-
-The sanitized original is stored under `IMAGE_STORAGE_DIR` with the extension of its detected type.
-The variant directories are filled by the post-upload processing pipeline below: thumbs (`IMAGE_THUMB_DIR = public/img/thumb`, filenames `\{checksum}.avif`), samples (`IMAGE_SAMPLE_DIR = private/img/sample`, filenames `\{checksum}.webp`), and downloads (`IMAGE_DOWNLOAD_DIR = private/img/dl`, filenames `\{checksum}.<jpeg|webp|avif>` — WebP for PNG sources).
-Because the name is derived from the content, re-uploading identical bytes stores the same file again (no duplicate); different bytes cannot collide.
-Two-character subdirectories are created on demand and are covered by the app-level whitelist through `FileSystemAccessService::isPathAllowed()` (checked via `realpath()` after creation).
-
-=== Post-upload processing pipeline
-
-Uploaded images start in status `pending` and are processed in batches by `ImageProcessingService::processBatch(int $batchSize): int`, triggered through the `--process-images [batch-size]` CLI command (default batch size `100`; the Docker container runs it in a background loop every minute).
-The processor fetches up to `batch-size` pending images ordered by `upload_date` ascending and, per image:
-
-. Reads the sanitized original from `IMAGE_STORAGE_DIR/<first 2 checksum chars>/<checksum>.<originalExtension>` via `FileSystemAccessService::readFile()` (whitelist-checked).
-. Decodes it with `imagecreatefromstring()`.
-. **Thumbnail** into `IMAGE_THUMB_DIR`: resized (downscale only, aspect ratio kept) to fit within 512x512 and encoded as AVIF quality `66`.
-. **Sample (viewing image)** into `IMAGE_SAMPLE_DIR`: resized to fit within 2048x2048 and encoded as WebP quality `66`.
-. **Download image** into `IMAGE_DOWNLOAD_DIR`: resized to fit within 16384x16384 (normally a no-op), then transcoded by original type — JPEG, AVIF, and WebP originals are copied byte-identical (no re-encode), while PNG originals are re-encoded as pixel-lossless WebP via `imagewebp(..., IMG_WEBP_LOSSLESS)` (GD does not expose a separate "best compression" tuning for lossless WebP).
-All variants are written through `ImageStorageService::storeBytes()` under the SHA-256 checksum of their own content (see the storage naming rules above).
-. The entity is updated with the three variant filenames and — because the frontend metadata sidebar shows the download image's data — `width`, `height`, `format`, and `file_size` of the download variant.
-. The next status comes from the uploader's access level: `accepted` for `WIZARD` or higher (skips the moderation queue), otherwise `pending_review`.
-If the uploader no longer exists, an error is logged and the image is treated as `pending_review`.
-. After successful processing, the sanitized original is deleted once no other `pending` image record references it.
-Failed images keep their original so the next batch can retry them; duplicate uploads share the original until all pending records using it have processed.
-
-Status flow: `pending` → (`accepted` | `pending_review`) → (`rejected` via the moderation queue; see the image-serving documentation).
-
-Error policy: failures are caught per image, logged via `LoggingService`, and the row stays `pending` so it is retried on the next run; one broken image never aborts the batch.
-Resizing happens through `ImageResizer`, which computes the largest dimensions that fit the box while keeping the aspect ratio (exact integer math, at least one pixel per side) and never upscales.
-
-=== Processing lock
-
-Only one worker may process images at a time: `ProcessImagesExecutor` takes a non-blocking exclusive `flock()` on `IMAGE_PROCESSING_LOCK_FILE` (`private/img/processing.lock`).
-If the lock is held, the command prints a short notice and exits cleanly without processing.
-The lock is always released when the run finishes, including on exceptions, and the lock file is removed after an owned run.
-Batch-level exceptions are logged and rethrown.
-The Docker entrypoint also removes a stale lock file before starting the worker.
-
-=== Response and database record
-
-Success returns `201` with `{"message":"Image uploaded successfully."}`; the response does not expose the stored image filename.
-Each accepted upload has exactly one row in the `image` table (see `private/init/init_sqlite.sql`; kept in sync by the `create image table` migration).
-`ImageEntityService` exposes `findOneById(int)` and `findByStatus(ImageStatus, ?int $limit = null)` (ordered by `upload_date` ascending, via `QueryCriteria::orderBy()`); the lifecycle status is the `ImageStatus` enum (`pending`, `pending_review`, `accepted`, `rejected`).
-
-There is no public image-delivery route and no upload quota; `private/` is not web-exposed, while generated thumbnails are stored under `public/img/thumb`.
-
-`ext-gd` with PNG, JPEG, AVIF, and WebP support is required — AVIF support is required for every successful upload under the current configuration, not only "where used".
-Image handling should be treated as experimental.
-Functional tests must stub `ImageUploadValidator` because `is_uploaded_file()` fails outside real uploads.
+Authenticated `GET /api/image/detail?id=...` returns details for an accessible
+image. The sample and download endpoints are `GET /api/image/sample` and
+`GET /api/image/download`; they deliver protected files through
+`X-Accel-Redirect`. Moderators use `GET /api/review/queue`,
+`POST /api/review/approve`, and `POST /api/review/reject`. Approval moves a
+pending-review image to accepted. Rejection deletes its row and attempts to
+delete unreferenced files instead of assigning a rejected status; a
+content-addressed file is retained while another image record references it.

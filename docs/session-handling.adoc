@@ -1,20 +1,16 @@
 == Session handling
 
-Sessions are stored in the `session` table (`private/init/init_sqlite.sql`, `private/init/init.sql`, `#[Entity('session')]` in `src/Data/Persistence/SessionEntity.php`).
-`RegisterSessionHandlerStartupAction` calls `session_set_save_handler($handler)` during `ApplicationCore::init()` (second of the three default startup actions, before `ResumeSessionStartupAction`).
-`SessionHandler` implements `SessionHandlerInterface` and `SessionUpdateTimestampHandlerInterface`, uses `SessionEntityService::findOneBySessionId` and `saveOrUpdate` for `read` and `write` (`read` returns `''` when no row exists), `deleteBySessionId` for `destroy`, `deleteOlderThan(max_lifetime)` (`DELETE WHERE created < now - max_lifetime`) for `gc`, and `sessionIdExists` for `validateId`.
-`write()` validates via `Validator` and throws `RuntimeException` on failure; `updateTimestamp()` currently does nothing and returns `true`.
-`open()` and `close()` return `true` with only `TODO` locking comments; no locking is implemented.
-Garbage collection uses `created` (the insert time, never refreshed on `write`), so a long-lived session can be collected `max_lifetime` after creation even when active; `gc_maxlifetime` itself is not set in `SESSION_OPTIONS`.
+Session data is stored in the database through PHP's session handler. The
+session cookie lasts 24 hours and is `HttpOnly` and `SameSite=Strict`; the
+`Secure` flag is currently off, so HTTPS deployments should review that
+setting.
 
-`SessionEntity::$data` has `#[ValidateStringSizeBytes(max: 2 ** 24 - 1)]` (the `MEDIUMTEXT` maximum) and `::$sessionId` has `max: 64`; both also carry `#[ValidateNotNull]`.
-Enforcement happens in `SessionHandler::write()`; the SQLite `TEXT` column alone does not enforce the limit.
+At startup, a presented session ID is checked against stored sessions before
+it is resumed. A valid resume refreshes the cookie's expiry for another 24
+hours; the session record's creation time is not refreshed, and garbage
+collection uses that timestamp. Session locking is not implemented.
 
-`SessionService::SESSION_OPTIONS` passed to `session_start()`: `name = 'session'`, `cookie_lifetime = 3600`, `cookie_secure = false` (`// TODO: Change for live`), `cookie_httponly = true`, `cookie_samesite = 'Strict'`, `use_strict_mode = true`, `use_only_cookies = true`.
-`ResumeSessionStartupAction` validates a presented `session` cookie against stored session IDs before calling `resumeSession()`; stale or malformed cookies are expired and ignored. `resumeSession()` throws `InvalidStateException` when a session is active, returns without starting when `$_COOKIE['session']` is unset, and otherwise calls `session_start()`.
-`startSession()` throws when a session is active and otherwise calls `session_start()` unconditionally.
-`destroySession()` always clears `$_SESSION`, then returns early when inactive; when active and `session.use_cookies` is set, it clears the `session` cookie via `setcookie('session', '', 0, path, domain, secure, httponly)` (no `samesite`, expiry `0` rather than a past timestamp) and then calls `session_destroy()`.
-
-On login success, the controller stores `SessionUserData(id, displayName, accessLevel)` as `$_SESSION['user']`; `AuthorizationPreControllerAction`, `AuthController::getSessionAction`, and `UserProfileController` read it via `SessionService::getUserData()`.
-The session cookie is `HttpOnly`, so it is inaccessible to the SPA's JavaScript; auth is cookie-based and the SPA relies on the browser sending the cookie with same-origin `fetch()` requests.
-A regression test in `SessionServiceTest` pins `cookie_httponly = true`.
+The session user snapshot includes `AccessLevel`, the role used for
+authorization. Protected requests reload the current user role from the
+database, rather than trusting the snapshot alone; see
+<<_precontrolleraction_chain>>.

@@ -1,30 +1,30 @@
 [#_running_the_application]
 == Running the application
 
-The canonical entry point is `src/app.php`.
-The application uses CLI mode for the commands documented in <<_cli_commands>>.
-For HTTP requests, use a web server with PHP-FPM or another CGI-compatible PHP runtime.
+The entry point is `src/app.php`. It handles the commands in
+<<_cli_commands>>; HTTP requests require a web server with PHP-FPM or another
+CGI-compatible PHP runtime.
 
-The application is a JavaScript single-page application (SPA) backed by a JSON API.
-The PHP backend serves only two kinds of HTTP responses: the same minimal static HTML shell for every client page (`GET /`, `/login`, `/register`, `/settings`, `/upload-image`), and JSON on every other route.
-The shell loads `/public/css/main.css` and `/public/js/main.js` (an ES module), which render all views client-side into a `<div id="app"></div>` element.
+Every configured `GET` route for a client page returns the same HTML shell,
+which loads the SPA into `<div id="app"></div>`. API routes normally return
+JSON; unmatched routes and framework errors are status responses, while
+protected image delivery uses `X-Accel-Redirect` rather than a JSON body.
 
-`private/references/nginx.conf` contains a reference Nginx configuration.
-Adapt its document roots and PHP-FPM socket for the target system.
-It serves `/public/` as static files, denies `/private/` with 403, and forwards other requests to `src/app.php` via FastCGI.
+The reference Nginx configuration (`private/references/nginx.conf`) serves
+`/public/` as static files, denies `/private/`, and sends other requests to
+`src/app.php`. The Docker configuration follows the same boundary. Image
+originals remain private, thumbnails are public static files, and sample and
+download variants are private and delivered only through authenticated
+internal Nginx locations (see <<_image_uploads>>).
 
-The `public/` directory contains the SPA sources — vanilla JavaScript ES modules and the stylesheet — plus `layout_reference.html`, a static mockup of the real markup for styling reference.
-It has no PHP entry point and requires no build step; nginx serves its files as-is.
-Uploaded images are stored under `private/` and are not publicly served.
+=== Non-Docker PHP-FPM deployments
 
-[#_systemd_sandboxing]
-=== Systemd sandboxing and writable paths
+On a manual host, ensure PHP-FPM can write the runtime data directories. A
+systemd `ProtectSystem` policy can make an application installed under `/usr`
+read-only; use `private/references/php-fpm-override.conf` as a starting point
+and include every writable path used by the deployment, including logs.
 
-On systems where `php-fpm` runs under a systemd unit with `ProtectSystem=full` (the Arch Linux default), the service's filesystem tree including `/usr` is mounted read-only.
-Deploying the application below `/usr` (for example to `/usr/share/nginx/html`) therefore makes the SQLite database and the image storage read-only for PHP: reads succeed, but every write — user registration, session persistence on login, image upload — fails and surfaces as an empty `500` response (for login, the response status can flip to `500` even though the buffered `200` JSON body is still sent, because the failing session write happens during shutdown after output was buffered).
-
-`private/references/php-fpm-override.conf` is a ready-to-use systemd drop-in that re-enables writes for exactly the writable paths (`private/db`, `private/upload/img`, `private/img`, and `public/img`) via `ReadWritePaths` while keeping the rest of the sandbox intact.
-Install it as described in the file's header comment and restart `php-fpm`.
-
-PHP errors are logged per `php.ini`'s `error_log` setting (default on this reference system: `/var/log/php_errors.log`); the file must exist and be writable by the FPM user (`touch /var/log/php_errors.log && chown http:http /var/log/php_errors.log`), otherwise logging silently does nothing.
-
+The bare-metal reference host may configure PHP errors at
+`/var/log/php_errors.log`; that host-level path must exist and be writable by
+PHP-FPM. Docker instead configures PHP to log under
+`private/logs/php-error.log`.
