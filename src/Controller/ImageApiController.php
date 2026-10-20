@@ -9,12 +9,16 @@ use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Attribute\Authenticated;
+use SmolCms\Service\Core\Session\SessionService;
+use SmolCms\Service\Image\ImageAccessPolicy;
 use SmolCms\Service\Image\ImageQueryService;
 
 readonly class ImageApiController
 {
     public function __construct(
         private ImageQueryService $imageQueryService,
+        private ImageAccessPolicy $imageAccessPolicy,
+        private SessionService $sessionService,
     )
     {
     }
@@ -37,6 +41,14 @@ readonly class ImageApiController
         $id = self::parseImageId(($request->getParams ?? [])['id'] ?? null);
         if ($id === null) {
             return new Response(HttpStatus::BAD_REQUEST);
+        }
+
+        $user = $this->sessionService->getUserData();
+        if ($user === null) {
+            return new Response(HttpStatus::UNAUTHORIZED);
+        }
+        if ($this->imageAccessPolicy->findAccessibleImage($id, $user->accessLevel) === null) {
+            return new Response(HttpStatus::NOT_FOUND);
         }
 
         $detail = $this->imageQueryService->getImageDetail($id);

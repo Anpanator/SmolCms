@@ -11,6 +11,7 @@ use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Constant\ImageStatus;
+use SmolCms\Data\Constant\TagInputLimits;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Session\SessionService;
@@ -98,12 +99,50 @@ class TagSuggestionControllerTest extends FunctionalTestCase
         );
         self::assertSame(
             HttpStatus::BAD_REQUEST,
+            $this->simulateSuggestionPost('/api/tag-suggestions', [
+                'imageId' => $image->getId(),
+                'tags' => str_repeat('x', TagInputLimits::MAX_TAG_LIST_LENGTH + 1),
+            ])->getStatus(),
+        );
+        self::assertSame(
+            HttpStatus::BAD_REQUEST,
+            $this->simulateSuggestionPost('/api/tag-suggestions', [
+                'imageId' => $image->getId(),
+                'tags' => implode(',', array_fill(0, TagInputLimits::MAX_TAG_COUNT + 1, 'tag')),
+            ])->getStatus(),
+        );
+        self::assertSame(
+            HttpStatus::BAD_REQUEST,
             $this->simulateSuggestionPost('/api/tag-suggestions', ['imageId' => 0, 'tags' => 'valid'])->getStatus(),
         );
         self::assertSame(
             HttpStatus::NOT_FOUND,
             $this->simulateSuggestionPost('/api/tag-suggestions', ['imageId' => 999999, 'tags' => 'valid'])->getStatus(),
         );
+    }
+
+    public function testSuggestionsHidePendingImagesUnlessTheyAreInTheTagmeGame(): void
+    {
+        $loginName = 'suggest-pending-' . bin2hex(random_bytes(4));
+        $this->loginUserWithAccessLevel($loginName, 'Suggest Pending', AccessLevel::FELLOW);
+        $userId = $this->sessionService->getUserData()->id;
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            $userId,
+            status: ImageStatus::PENDING_REVIEW,
+        );
+        $tags = 'pending-suggest-' . bin2hex(random_bytes(4));
+
+        self::assertSame(HttpStatus::NOT_FOUND, $this->simulateSuggestionPost('/api/tag-suggestions', [
+            'imageId' => $image->getId(),
+            'tags' => $tags,
+        ])->getStatus());
+
+        $this->tagService->attachTagToImage($image->getId(), 'tagme');
+        self::assertSame(HttpStatus::CREATED, $this->simulateSuggestionPost('/api/tag-suggestions', [
+            'imageId' => $image->getId(),
+            'tags' => $tags,
+        ])->getStatus());
     }
 
     public function testQueueRequiresModAndReturnsOldestFirstSuggestions(): void

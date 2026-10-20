@@ -39,6 +39,10 @@ readonly class ImageProcessorFacade
         $processor = $this->processorsByType[$type->value]
             ?? throw new InvalidArgumentException("No image processor registered for type: {$type->value}");
 
+        if (ImageDimensions::fromString($imageData) === null) {
+            throw new InvalidArgumentException('Image data is invalid or exceeds the configured dimension limits.');
+        }
+
         return $processor->sanitize($imageData);
     }
 }

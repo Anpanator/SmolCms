@@ -6,6 +6,7 @@ namespace SmolCms\Service\Validation;
 
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Request\Request;
+use SmolCms\Service\Image\ImageDimensions;
 
 readonly class ImageUploadValidator
 {
@@ -46,6 +47,9 @@ readonly class ImageUploadValidator
 
             // Only accept files that were actually uploaded through the SAPI
             if (!is_uploaded_file($file['tmp_name'])) {
+                return HttpStatus::BAD_REQUEST;
+            }
+            if (ImageDimensions::fromFile($file['tmp_name']) === null) {
                 return HttpStatus::BAD_REQUEST;
             }
         }

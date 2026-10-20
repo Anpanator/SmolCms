@@ -10,6 +10,7 @@ use SmolCms\Data\Request\Request;
 use SmolCms\Data\Request\UserManagementUpdateRequest;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
+use SmolCms\Exception\UserUpdateForbiddenException;
 use SmolCms\Service\Core\Attribute\Authenticated;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\UserService;
@@ -70,7 +71,9 @@ readonly class UserManagementController
         if ($actor === null) {
             return new Response(HttpStatus::UNAUTHORIZED);
         }
-        if ($target->getAccessLevel()->value > $actor->accessLevel->value) {
+        if ($id === $actor->id
+            || $target->getAccessLevel()->value >= $actor->accessLevel->value
+            || $requestedAccessLevel->value >= $actor->accessLevel->value) {
             return new Response(HttpStatus::FORBIDDEN);
         }
 
@@ -82,7 +85,17 @@ readonly class UserManagementController
             }
         }
 
-        $updated = $this->userService->updateUser($id, $displayName, $requestedAccessLevel, $loginName);
+        try {
+            $updated = $this->userService->updateUser(
+                $id,
+                $displayName,
+                $requestedAccessLevel,
+                $actor->id,
+                $loginName,
+            );
+        } catch (UserUpdateForbiddenException) {
+            return new Response(HttpStatus::FORBIDDEN);
+        }
         if ($updated === null) {
             return new Response(HttpStatus::NOT_FOUND);
         }

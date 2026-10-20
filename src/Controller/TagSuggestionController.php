@@ -7,20 +7,21 @@ namespace SmolCms\Controller;
 use InvalidArgumentException;
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpStatus;
+use SmolCms\Data\Constant\TagInputLimits;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Request\TagSuggestionCreateRequest;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Attribute\Authenticated;
 use SmolCms\Service\Core\Session\SessionService;
-use SmolCms\Service\DB\ImageEntityService;
+use SmolCms\Service\Image\ImageAccessPolicy;
 use SmolCms\Service\Tag\TagSuggestionService;
 
 readonly class TagSuggestionController
 {
     public function __construct(
         private TagSuggestionService $tagSuggestionService,
-        private ImageEntityService $imageEntityService,
+        private ImageAccessPolicy $imageAccessPolicy,
         private SessionService $sessionService,
     )
     {
@@ -34,12 +35,12 @@ readonly class TagSuggestionController
         if ($tagNames === null) {
             return new Response(HttpStatus::BAD_REQUEST);
         }
-        if ($this->imageEntityService->findOneById($imageId) === null) {
-            return new Response(HttpStatus::NOT_FOUND);
-        }
         $user = $this->sessionService->getUserData();
         if ($user === null) {
             return new Response(HttpStatus::UNAUTHORIZED);
+        }
+        if ($this->imageAccessPolicy->findAccessibleImage($imageId, $user->accessLevel) === null) {
+            return new Response(HttpStatus::NOT_FOUND);
         }
 
         try {
@@ -84,6 +85,11 @@ readonly class TagSuggestionController
     /** @return list<string>|null */
     private static function parseTagNames(string $tags): ?array
     {
+        if (mb_strlen($tags, 'UTF-8') > TagInputLimits::MAX_TAG_LIST_LENGTH
+            || substr_count($tags, ',') + 1 > TagInputLimits::MAX_TAG_COUNT) {
+            return null;
+        }
+
         $tagNames = [];
         foreach (explode(',', $tags) as $tagName) {
             $tagName = trim($tagName);

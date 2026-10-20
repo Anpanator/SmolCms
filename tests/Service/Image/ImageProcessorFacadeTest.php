@@ -33,15 +33,17 @@ class ImageProcessorFacadeTest extends SimpleTestCase
         /** @var ImageProcessorInterface|MockObject $jpegProcessor */
         $jpegProcessor = $this->createMock(ImageProcessorInterface::class);
         $jpegProcessor->method('getType')->willReturn(ImageType::JPEG);
+        $imageData = file_get_contents(ROOT_DIR . '/tests/TestUtils/TestFiles/image.png');
+        self::assertIsString($imageData);
         $expectedImage = imagecreatetruecolor(2, 2);
         $jpegProcessor
             ->expects($this->once())
             ->method('sanitize')
-            ->with('test image data')
+            ->with($imageData)
             ->willReturn($expectedImage);
         $facade = new ImageProcessorFacade(new PngImageProcessor(), $jpegProcessor, new AvifImageProcessor());
 
-        $result = $facade->sanitizeImage('test image data', ImageType::JPEG);
+        $result = $facade->sanitizeImage($imageData, ImageType::JPEG);
 
         self::assertSame($expectedImage, $result);
     }

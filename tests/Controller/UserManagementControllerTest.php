@@ -13,6 +13,7 @@ use SmolCms\Data\Persistence\UserEntity;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\DB\UserService;
+use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\TestUtils\Attributes\Autowire;
 use SmolCms\TestUtils\FunctionalTestCase;
 use SmolCms\TestUtils\LoginWithAccessLevel;
@@ -23,6 +24,9 @@ class UserManagementControllerTest extends FunctionalTestCase
 
     #[Autowire]
     private UserService $userService;
+
+    #[Autowire]
+    private SessionService $sessionService;
 
     public function testUserSearchRequiresModFiltersAndPaginatesThirtyPerPage(): void
     {
@@ -94,10 +98,12 @@ class UserManagementControllerTest extends FunctionalTestCase
         );
 
         $admin = $this->createUser('users-admin-' . bin2hex(random_bytes(4)), 'Protected Admin', AccessLevel::ADMIN);
-        $mod = $this->createUser('users-target-mod-' . bin2hex(random_bytes(4)), 'Target Mod', AccessLevel::MOD);
+        $sameLevelMod = $this->createUser('users-target-mod-' . bin2hex(random_bytes(4)), 'Target Mod', AccessLevel::MOD);
+        $fellow = $this->createUser('users-target-fellow-' . bin2hex(random_bytes(4)), 'Target Fellow', AccessLevel::FELLOW);
         $novice = $this->createUser('users-target-novice-' . bin2hex(random_bytes(4)), 'Target Novice', AccessLevel::NOVICE);
+        $actorLoginName = 'users-update-mod-' . bin2hex(random_bytes(4));
         $this->loginUserWithAccessLevel(
-            'users-update-mod-' . bin2hex(random_bytes(4)),
+            $actorLoginName,
             'Users Update Mod',
             AccessLevel::MOD,
         );
@@ -105,27 +111,37 @@ class UserManagementControllerTest extends FunctionalTestCase
         self::assertSame(
             HttpStatus::FORBIDDEN,
             $this->simulateUserUpdate($admin->getId(), [
-                'displayName' => 'Should Not Change',
-                'accessLevel' => AccessLevel::MOD->value,
+                'displayName' => 'Should Not Change Admin',
+                'accessLevel' => AccessLevel::NOVICE->value,
             ])->getStatus(),
         );
         self::assertSame('Protected Admin', $this->userService->findOneById($admin->getId())->getDisplayName());
 
-        $modResponse = $this->simulateUserUpdate($mod->getId(), [
-            'displayName' => 'Updated Mod Display',
-            'accessLevel' => AccessLevel::FELLOW->value,
+        self::assertSame(
+            HttpStatus::FORBIDDEN,
+            $this->simulateUserUpdate($sameLevelMod->getId(), [
+                'displayName' => 'Should Not Change Same-Level User',
+                'accessLevel' => AccessLevel::FELLOW->value,
+            ])->getStatus(),
+        );
+        self::assertSame('Target Mod', $this->userService->findOneById($sameLevelMod->getId())->getDisplayName());
+        self::assertSame(AccessLevel::MOD, $this->userService->findOneById($sameLevelMod->getId())->getAccessLevel());
+
+        $fellowResponse = $this->simulateUserUpdate($fellow->getId(), [
+            'displayName' => 'Updated Fellow Display',
+            'accessLevel' => AccessLevel::NOVICE->value,
         ]);
-        self::assertSame(HttpStatus::OK, $modResponse->getStatus());
+        self::assertSame(HttpStatus::OK, $fellowResponse->getStatus());
         self::assertSame(
             ['user' => [
-                'id' => $mod->getId(),
-                'loginName' => $mod->getLoginName(),
-                'displayName' => 'Updated Mod Display',
-                'accessLevel' => AccessLevel::FELLOW->value,
+                'id' => $fellow->getId(),
+                'loginName' => $fellow->getLoginName(),
+                'displayName' => 'Updated Fellow Display',
+                'accessLevel' => AccessLevel::NOVICE->value,
             ]],
-            json_decode((string)$modResponse->getContent(), true, JSON_THROW_ON_ERROR),
+            json_decode((string)$fellowResponse->getContent(), true, JSON_THROW_ON_ERROR),
         );
-        self::assertSame(AccessLevel::FELLOW, $this->userService->findOneById($mod->getId())->getAccessLevel());
+        self::assertSame(AccessLevel::NOVICE, $this->userService->findOneById($fellow->getId())->getAccessLevel());
 
         $noviceResponse = $this->simulateUserUpdate($novice->getId(), [
             'displayName' => 'Updated Novice Display',
@@ -133,6 +149,34 @@ class UserManagementControllerTest extends FunctionalTestCase
         ]);
         self::assertSame(HttpStatus::OK, $noviceResponse->getStatus());
         self::assertSame(AccessLevel::FELLOW, $this->userService->findOneById($novice->getId())->getAccessLevel());
+
+        foreach ([AccessLevel::MOD, AccessLevel::ADMIN] as $forbiddenLevel) {
+            self::assertSame(
+                HttpStatus::FORBIDDEN,
+                $this->simulateUserUpdate($novice->getId(), [
+                    'displayName' => 'Escalation Attempt',
+                    'accessLevel' => $forbiddenLevel->value,
+                ])->getStatus(),
+            );
+            $unchangedNovice = $this->userService->findOneById($novice->getId());
+            self::assertSame('Updated Novice Display', $unchangedNovice->getDisplayName());
+            self::assertSame(AccessLevel::FELLOW, $unchangedNovice->getAccessLevel());
+        }
+
+        $actor = $this->userService->findOneByLoginName($actorLoginName);
+        self::assertNotNull($actor);
+        foreach ([AccessLevel::FELLOW, AccessLevel::ADMIN] as $requestedActorLevel) {
+            self::assertSame(
+                HttpStatus::FORBIDDEN,
+                $this->simulateUserUpdate($actor->getId(), [
+                    'displayName' => 'Self Update Attempt',
+                    'accessLevel' => $requestedActorLevel->value,
+                ])->getStatus(),
+            );
+            $unchangedActor = $this->userService->findOneById($actor->getId());
+            self::assertSame('Users Update Mod', $unchangedActor->getDisplayName());
+            self::assertSame(AccessLevel::MOD, $unchangedActor->getAccessLevel());
+        }
 
         self::assertSame(
             HttpStatus::NOT_FOUND,
@@ -162,6 +206,24 @@ class UserManagementControllerTest extends FunctionalTestCase
                 'accessLevel' => 123,
             ])->getStatus(),
         );
+    }
+
+    public function testProtectedRequestsUseDatabaseRoleAndRefreshSessionRoleAfterDemotion(): void
+    {
+        $loginName = 'users-stale-session-' . bin2hex(random_bytes(4));
+        $this->loginUserWithAccessLevel($loginName, 'Stale Session Mod', AccessLevel::MOD);
+        $user = $this->userService->findOneByLoginName($loginName);
+        self::assertNotNull($user);
+
+        $user->setAccessLevel(AccessLevel::FELLOW);
+        $this->userService->update($user);
+
+        self::assertSame(HttpStatus::FORBIDDEN, $this->simulateUsersRequest()->getStatus());
+
+        $sessionUser = $this->sessionService->getUserData();
+        self::assertNotNull($sessionUser);
+        self::assertSame(AccessLevel::FELLOW, $sessionUser->accessLevel);
+        self::assertSame('Stale Session Mod', $sessionUser->displayName);
     }
 
     public function testUserUpdateCanChangeLoginNameAndChecksUniquenessAndValidation(): void

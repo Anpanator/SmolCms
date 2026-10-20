@@ -216,4 +216,21 @@ class AuthControllerTest extends FunctionalTestCase
         $this->assertNull($response->getContent());
         $this->assertNull($this->sessionService->getUserData());
     }
+
+    public function testCrossOriginPostIsForbiddenBeforeControllerValidation(): void
+    {
+        $fetchMetadataResponse = $this->simulateRequest(new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: '/logout'),
+            method: HttpMethod::POST,
+            headers: [HttpHeader::SEC_FETCH_SITE->value => 'cross-site'],
+        ));
+        self::assertSame(HttpStatus::FORBIDDEN, $fetchMetadataResponse->getStatus());
+
+        $originResponse = $this->simulateRequest(new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: '/logout'),
+            method: HttpMethod::POST,
+            headers: [HttpHeader::ORIGIN->value => 'https://evil.example'],
+        ));
+        self::assertSame(HttpStatus::FORBIDDEN, $originResponse->getStatus());
+    }
 }

@@ -6,12 +6,12 @@ namespace SmolCms\Controller;
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpStatus;
-use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Attribute\Authenticated;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\ImageEntityService;
+use SmolCms\Service\Image\ImageAccessPolicy;
 use SmolCms\Service\Image\ImagePathLayout;
 
 /**
@@ -37,6 +37,7 @@ readonly class ImageFileController
 
     public function __construct(
         private ImageEntityService $imageEntityService,
+        private ImageAccessPolicy  $imageAccessPolicy,
         private SessionService     $sessionService,
     )
     {
@@ -85,11 +86,8 @@ readonly class ImageFileController
             return new Response(HttpStatus::NOT_FOUND);
         }
 
-        // Only ACCEPTED images are visible to regular users; MOD+ may preview
-        // queued images. Hidden images answer 404 so their existence is not disclosed.
         $userData = $this->sessionService->getUserData();
-        $isModerator = $userData !== null && $userData->accessLevel->value >= AccessLevel::MOD->value;
-        if ($entity->getStatus() !== ImageStatus::ACCEPTED && !$isModerator) {
+        if ($userData === null || !$this->imageAccessPolicy->canAccess($entity, $userData->accessLevel)) {
             return new Response(HttpStatus::NOT_FOUND);
         }
 

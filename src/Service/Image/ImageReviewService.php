@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace SmolCms\Service\Image;
 
+use SmolCms\Data\Constant\ImageFileVariant;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Constant\LogLevel;
 use SmolCms\Data\Persistence\ImageEntity;
@@ -89,24 +90,33 @@ readonly class ImageReviewService
 
     private function deleteImageFiles(ImageEntity $entity): void
     {
-        $paths = [
-            IMAGE_STORAGE_DIR . '/' . ImagePathLayout::relativePath(
-                $entity->getChecksum(),
-                $entity->getOriginalExtension()
-            ),
+        $files = [
+            [
+                'path' => IMAGE_STORAGE_DIR . '/' . ImagePathLayout::relativePath(
+                    $entity->getChecksum(),
+                    $entity->getOriginalExtension()
+                ),
+                'variant' => ImageFileVariant::ORIGINAL,
+            ],
         ];
         $variantFileNames = [
-            IMAGE_THUMB_DIR => $entity->getThumbFilename(),
-            IMAGE_SAMPLE_DIR => $entity->getSampleFilename(),
-            IMAGE_DOWNLOAD_DIR => $entity->getDownloadFilename(),
+            IMAGE_THUMB_DIR => [$entity->getThumbFilename(), ImageFileVariant::THUMB],
+            IMAGE_SAMPLE_DIR => [$entity->getSampleFilename(), ImageFileVariant::SAMPLE],
+            IMAGE_DOWNLOAD_DIR => [$entity->getDownloadFilename(), ImageFileVariant::DOWNLOAD],
         ];
-        foreach ($variantFileNames as $baseDir => $fileName) {
+        foreach ($variantFileNames as $baseDir => [$fileName, $variant]) {
             if ($fileName !== null) {
-                $paths[] = $baseDir . '/' . ImagePathLayout::relativePathForFileName($fileName);
+                $files[] = [
+                    'path' => $baseDir . '/' . ImagePathLayout::relativePathForFileName($fileName),
+                    'variant' => $variant,
+                ];
             }
         }
 
-        foreach ($paths as $path) {
+        foreach ($files as ['path' => $path, 'variant' => $variant]) {
+            if ($this->imageEntityService->hasOtherImageReference($entity, $variant)) {
+                continue;
+            }
             if (!is_file($path)) {
                 continue;
             }
