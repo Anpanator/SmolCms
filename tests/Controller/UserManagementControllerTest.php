@@ -208,6 +208,40 @@ class UserManagementControllerTest extends FunctionalTestCase
         );
     }
 
+    public function testUserUpdateRequiresIdDisplayNameAndAccessLevel(): void
+    {
+        $this->loginUserWithAccessLevel(
+            'users-required-fields-mod-' . bin2hex(random_bytes(4)),
+            'Users Required Fields Mod',
+            AccessLevel::MOD,
+        );
+        $target = $this->createUser(
+            'users-required-fields-target-' . bin2hex(random_bytes(4)),
+            'Required Fields Target',
+            AccessLevel::NOVICE,
+        );
+        $validFields = [
+            'displayName' => 'Updated Required Fields Target',
+            'accessLevel' => AccessLevel::NOVICE->value,
+        ];
+
+        $withoutQuery = $this->simulateUserUpdate(null, $validFields);
+        self::assertSame(HttpStatus::BAD_REQUEST, $withoutQuery->getStatus());
+
+        $withoutIdOrBody = $this->simulateUserUpdate(null, []);
+        self::assertSame(HttpStatus::BAD_REQUEST, $withoutIdOrBody->getStatus());
+
+        $withoutDisplayName = $this->simulateUserUpdate($target->getId(), [
+            'accessLevel' => AccessLevel::NOVICE->value,
+        ]);
+        self::assertSame(HttpStatus::BAD_REQUEST, $withoutDisplayName->getStatus());
+
+        $withoutAccessLevel = $this->simulateUserUpdate($target->getId(), [
+            'displayName' => 'Missing Access Level',
+        ]);
+        self::assertSame(HttpStatus::BAD_REQUEST, $withoutAccessLevel->getStatus());
+    }
+
     public function testProtectedRequestsUseDatabaseRoleAndRefreshSessionRoleAfterDemotion(): void
     {
         $loginName = 'users-stale-session-' . bin2hex(random_bytes(4));
@@ -320,12 +354,12 @@ class UserManagementControllerTest extends FunctionalTestCase
         ));
     }
 
-    private function simulateUserUpdate(int|string $id, array $postParams): Response
+    private function simulateUserUpdate(int|string|null $id, array $postParams): Response
     {
         return $this->simulateRequest(new Request(
             url: new Url(protocol: 'https', host: 'localhost', path: '/api/users/update'),
             method: HttpMethod::POST,
-            getParams: ['id' => (string)$id],
+            getParams: $id === null ? null : ['id' => (string)$id],
             postParams: $postParams,
         ));
     }

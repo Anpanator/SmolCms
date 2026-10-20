@@ -14,6 +14,7 @@ use SmolCms\Data\Business\ServiceRegistry;
 use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpMethod;
+use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Persistence\UserEntity;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
@@ -113,10 +114,33 @@ class FunctionalTestCase extends SimpleTestCase
         self::$contextService->setIsCliMode($isCliMode);
     }
 
+    /**
+     * Dispatches an already-parsed request through ApplicationCore.
+     *
+     * This does not invoke RequestFactory::buildRequestFromGlobals() or read
+     * php://input. Tests must provide postParams as parsed values; Content-Type
+     * headers may exercise controller/pre-controller behavior but do not select
+     * request-body parsing here. Raw JSON/form decoding belongs in RequestFactory
+     * seam tests, since php://input cannot be supplied by this in-process helper.
+     */
     protected function simulateRequest(Request $request): Response
     {
         self::setCliModeTest(false);
-        return self::$applicationCore->simulateRequest($request);
+        $response = self::$applicationCore->simulateRequest($request);
+        if (in_array($response->getStatus(), [
+            HttpStatus::BAD_REQUEST,
+            HttpStatus::UNAUTHORIZED,
+            HttpStatus::FORBIDDEN,
+            HttpStatus::NOT_FOUND,
+            HttpStatus::CONFLICT,
+            HttpStatus::INTERNAL_SERVER_ERROR,
+        ], true)) {
+            self::assertNull(
+                $response->getContent(),
+                sprintf('HTTP %d framework error responses must have an empty body.', $response->getStatus()->value),
+            );
+        }
+        return $response;
     }
 
     protected function loginUser(string $loginName, string $displayName): void

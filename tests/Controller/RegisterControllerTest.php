@@ -59,6 +59,36 @@ class RegisterControllerTest extends FunctionalTestCase
         $this->assertSame('testuser', $savedUser->getLoginName());
     }
 
+    public function testPostAction_PublicRegistrationSucceedsForLoggedInUser(): void
+    {
+        $this->loginUser('register-session-user-' . bin2hex(random_bytes(4)), 'Existing Session User');
+        $loginName = 'registered-while-logged-in-' . bin2hex(random_bytes(4));
+        $displayName = 'Registered While Logged In';
+        $request = new Request(
+            url: $this->url,
+            method: HttpMethod::POST,
+            postParams: [
+                'email' => 'user@example.com',
+                'password' => 'long-enough-password',
+                'passwordRepeat' => 'long-enough-password',
+                'displayName' => $displayName,
+                'loginName' => $loginName,
+            ],
+        );
+
+        $response = $this->simulateRequest($request);
+
+        self::assertSame(HttpStatus::CREATED, $response->getStatus());
+        self::assertSame(HttpContentType::JSON->value, $response->getHeaders()[HttpHeader::CONTENT_TYPE->value]);
+        self::assertSame(
+            ['created' => true],
+            json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR),
+        );
+        $savedUser = $this->userService->findOneByLoginName($loginName);
+        self::assertNotNull($savedUser);
+        self::assertSame($displayName, $savedUser->getDisplayName());
+    }
+
     public function testPostAction_PasswordMismatch(): void
     {
         $request = new Request(
