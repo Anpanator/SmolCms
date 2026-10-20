@@ -6,19 +6,25 @@ namespace SmolCms\Controller;
 
 use InvalidArgumentException;
 use SmolCms\Data\Constant\AccessLevel;
+use SmolCms\Data\Constant\AuditActionType;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Request\TagCategoryCreateRequest;
 use SmolCms\Data\Request\TagCreateRequest;
+use SmolCms\Data\Request\TagDeleteRequest;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Attribute\Authenticated;
+use SmolCms\Service\Core\Session\SessionService;
+use SmolCms\Service\DB\AuditLogService;
 use SmolCms\Service\Tag\TagService;
 
 readonly class TagApiController
 {
     public function __construct(
         private TagService $tagService,
+        private AuditLogService $auditLogService,
+        private SessionService  $sessionService,
     )
     {
     }
@@ -80,6 +86,29 @@ readonly class TagApiController
         }
 
         return new JsonResponse(['category' => $category], HttpStatus::CREATED);
+    }
+
+    #[Authenticated(AccessLevel::ADMIN)]
+    public function deleteTagAction(TagDeleteRequest $request): Response
+    {
+        $tagName = TagService::normalizeName($request->name ?? '');
+        if ($this->tagService->getUsageCount($tagName) === null) {
+            return new Response(HttpStatus::NOT_FOUND);
+        }
+        if (!$this->tagService->deleteTag($tagName)) {
+            return new Response(HttpStatus::CONFLICT);
+        }
+
+        $user = $this->sessionService->getUserData();
+        if ($user !== null) {
+            $this->auditLogService->record(
+                $user->id,
+                AuditActionType::TAG_DELETED,
+                "tag=$tagName",
+            );
+        }
+
+        return new JsonResponse(status: HttpStatus::NO_CONTENT);
     }
 
     private static function parsePage(mixed $page): ?int

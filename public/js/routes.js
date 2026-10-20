@@ -19,6 +19,7 @@ export const RoutePath = Object.freeze({
     API_TAGS: '/api/tags',
     API_TAG_SUGGEST: '/api/tags/suggest',
     API_TAG_CATEGORIES: '/api/tag-categories',
+    API_TAG_DELETE: '/api/tags/delete',
     API_IMAGE_SAMPLE: '/api/image/sample',
     API_IMAGE_DOWNLOAD: '/api/image/download',
     API_REVIEW_QUEUE: '/api/review/queue',

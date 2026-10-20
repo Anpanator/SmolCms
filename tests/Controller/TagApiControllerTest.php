@@ -8,6 +8,7 @@ use DateTime;
 use PDO;
 use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\AccessLevel;
+use SmolCms\Data\Constant\AuditActionType;
 use SmolCms\Data\Constant\HttpContentType;
 use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpMethod;
@@ -15,6 +16,7 @@ use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
+use SmolCms\Service\DB\AuditLogService;
 use SmolCms\Service\DB\ImageEntityService;
 use SmolCms\Service\Tag\TagService;
 use SmolCms\TestUtils\Attributes\Autowire;
@@ -31,6 +33,9 @@ class TagApiControllerTest extends FunctionalTestCase
 
     #[Autowire]
     private ImageEntityService $imageEntityService;
+
+    #[Autowire]
+    private AuditLogService $auditLogService;
 
     #[Autowire]
     private PDO $pdo;
@@ -277,6 +282,83 @@ class TagApiControllerTest extends FunctionalTestCase
         $sortedCategories = $categories;
         usort($sortedCategories, static fn(string $left, string $right): int => strcasecmp($left, $right));
         self::assertSame($sortedCategories, $categories);
+    }
+
+    public function testDeleteTagRequiresAdminAccess(): void
+    {
+        $this->tagService->createTag('delete-guard-tag');
+
+        $anonymous = $this->simulateApiRequest(HttpMethod::POST, '/api/tags/delete', ['name' => 'delete-guard-tag']);
+        self::assertSame(HttpStatus::UNAUTHORIZED, $anonymous->getStatus());
+        self::assertNull($anonymous->getContent());
+
+        $this->loginUser('tag-delete-novice', 'Tag Delete Novice');
+        $novice = $this->simulateApiRequest(HttpMethod::POST, '/api/tags/delete', ['name' => 'delete-guard-tag']);
+        self::assertSame(HttpStatus::FORBIDDEN, $novice->getStatus());
+        self::assertNull($novice->getContent());
+
+        $this->loginUserWithAccessLevel('tag-delete-mod', 'Tag Delete Mod', AccessLevel::MOD);
+        $moderator = $this->simulateApiRequest(HttpMethod::POST, '/api/tags/delete', ['name' => 'delete-guard-tag']);
+        self::assertSame(HttpStatus::FORBIDDEN, $moderator->getStatus());
+        self::assertNull($moderator->getContent());
+
+        self::assertNotNull($this->tagService->getUsageCount('delete-guard-tag'));
+    }
+
+    public function testAdminDeletesTagUnassignsItFromImagesAndWritesAuditEntry(): void
+    {
+        $loginName = 'tag-delete-admin-' . bin2hex(random_bytes(4));
+        $this->loginUserWithAccessLevel($loginName, 'Tag Delete Admin', AccessLevel::ADMIN);
+        $tagName = 'deletable-' . bin2hex(random_bytes(4));
+        $this->tagService->createTag($tagName);
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+            uploadDate: new DateTime('2026-10-03 10:00:00'),
+        );
+        $this->tagService->attachTagToImage($image->getId(), $tagName);
+        self::assertSame(1, $this->tagService->getUsageCount($tagName));
+
+        $response = $this->simulateApiRequest(HttpMethod::POST, '/api/tags/delete', [
+            'name' => '  ' . mb_strtoupper($tagName, 'UTF-8') . '  ',
+        ]);
+
+        self::assertSame(HttpStatus::NO_CONTENT, $response->getStatus());
+        self::assertNull($response->getContent());
+        self::assertNull($this->tagService->getUsageCount($tagName));
+
+        $associationStatement = $this->pdo->prepare('SELECT COUNT(*) FROM image_tag WHERE image_id = :image_id');
+        $associationStatement->execute(['image_id' => $image->getId()]);
+        self::assertSame(0, (int)$associationStatement->fetchColumn());
+
+        $entries = $this->auditLogService->getEntries(1, $loginName)['entries'];
+        self::assertCount(1, $entries);
+        self::assertSame(AuditActionType::TAG_DELETED->value, $entries[0]['actionType']);
+        self::assertSame("tag=$tagName", $entries[0]['context']);
+    }
+
+    public function testDeleteTagProtectedUnknownAndInvalidNamesReturnExpectedStatuses(): void
+    {
+        $this->loginUserWithAccessLevel('tag-delete-admin-errors', 'Tag Delete Admin Errors', AccessLevel::ADMIN);
+
+        $protected = $this->simulateApiRequest(HttpMethod::POST, '/api/tags/delete', ['name' => 'TaGmE']);
+        self::assertSame(HttpStatus::CONFLICT, $protected->getStatus());
+        self::assertNull($protected->getContent());
+
+        $unknown = $this->simulateApiRequest(
+            HttpMethod::POST,
+            '/api/tags/delete',
+            ['name' => 'never-created-' . bin2hex(random_bytes(4))],
+        );
+        self::assertSame(HttpStatus::NOT_FOUND, $unknown->getStatus());
+        self::assertNull($unknown->getContent());
+
+        foreach ([[], ['name' => ''], ['name' => str_repeat('x', 101)]] as $body) {
+            $invalid = $this->simulateApiRequest(HttpMethod::POST, '/api/tags/delete', $body);
+            self::assertSame(HttpStatus::BAD_REQUEST, $invalid->getStatus());
+            self::assertNull($invalid->getContent());
+        }
     }
 
     private function simulateApiRequest(HttpMethod $method, string $path, ?array $params = null): Response

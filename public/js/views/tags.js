@@ -1,10 +1,13 @@
 /**
  * Tag management page for moderators: browse, search and create tags/categories.
+ * Admins can additionally delete tags (after a confirmation dialog);
+ * deleting a tag also removes it from every tagged image.
  * Importing this module has no side effects.
  */
 import {get, postJson} from '../api.js';
 import {AccessLevel, hasAccessLevel} from '../accessLevel.js';
 import {el} from '../dom.js';
+import {createConfirmDialog} from '../modal.js';
 import {createPagination} from '../pagination.js';
 import {createPaginatedTable, parsePositiveInteger} from '../paginatedTable.js';
 import {createSearchView, normalizeTags} from '../search.js';
@@ -22,6 +25,7 @@ import {normalizeTagName, validateTagCategoryName, validateTagName} from '../val
 
 const TAGS_URL = '/api/tags';
 const CATEGORIES_URL = '/api/tag-categories';
+const DELETE_TAG_URL = '/api/tags/delete';
 const PER_PAGE = 25;
 
 /**
@@ -45,6 +49,7 @@ export function createTagsView({
             ],
         });
     }
+    const canDeleteTags = hasAccessLevel(session?.getUser?.(), AccessLevel.ADMIN);
 
     const params = query instanceof URLSearchParams ? query : new URLSearchParams(query);
     const initialPage = parsePositiveInteger(params.get('page'), 1);
@@ -109,6 +114,7 @@ export function createTagsView({
                         el('th', {attributes: {scope: 'col'}, children: 'Tag name'}),
                         el('th', {attributes: {scope: 'col'}, children: 'Category'}),
                         el('th', {className: 'tags-count-cell', attributes: {scope: 'col'}, children: 'Usage count'}),
+                        ...(canDeleteTags ? [el('th', {attributes: {scope: 'col'}, children: 'Actions'})] : []),
                     ],
                 }),
             }),
@@ -184,8 +190,8 @@ export function createTagsView({
             return get(`${TAGS_URL}?${queryParams}`);
         },
         getItems: (data) => data?.tags,
-        renderRow: createTagRow,
-        renderStatusRow: createTableStatusRow,
+        renderRow: (tag) => createTagRow(tag, canDeleteTags, deleteTag),
+        renderStatusRow: (text) => createTableStatusRow(text, canDeleteTags),
         messages: {
             loading: 'Loading tags…',
             empty: 'No tags found.',
@@ -333,9 +339,44 @@ export function createTagsView({
             categorySubmit.disabled = false;
         }
     }
+
+    async function deleteTag(tagName, button) {
+        if (button.disabled) {
+            return;
+        }
+        button.disabled = true;
+        try {
+            const dialog = createConfirmDialog({
+                message: `Delete the tag "${tagName}"? All images using it will lose this tag.`,
+                confirmLabel: 'Delete tag',
+                cancelLabel: 'Keep tag',
+            });
+            if (!(await dialog.result)) {
+                return;
+            }
+
+            clearMessage(listMessage);
+            await postJson(DELETE_TAG_URL, {name: tagName});
+            await paginatedTable.reload();
+            showMessage(listMessage, `Tag "${tagName}" deleted.`, 'success');
+        } catch (error) {
+            if (isAuthError(error)) {
+                navigate('/login');
+                return;
+            }
+            await paginatedTable.reload().catch(() => {
+            });
+            showMessage(listMessage, messageForStatus(
+                error?.status ?? 0,
+                'Protected tags such as "tagme" cannot be deleted.',
+            ));
+        } finally {
+            button.disabled = false;
+        }
+    }
 }
 
-function createTagRow(tag) {
+function createTagRow(tag, canDeleteTags, onDelete) {
     const usageCount = Number.isSafeInteger(tag?.usageCount) && tag.usageCount >= 0 ? tag.usageCount : 0;
     return el('tr', {
         className: 'tags-table-row',
@@ -344,14 +385,29 @@ function createTagRow(tag) {
             el('td', {className: 'tags-table-name', children: tag?.name ?? ''}),
             el('td', {className: 'tags-table-category', children: tag?.category ?? ''}),
             el('td', {className: 'tags-count-cell', children: usageCount}),
+            ...(canDeleteTags ? [el('td', {
+                className: 'tags-table-actions',
+                children: createDeleteTagButton(tag, onDelete)
+            })] : []),
         ],
     });
 }
 
-function createTableStatusRow(text) {
+function createDeleteTagButton(tag, onDelete) {
+    const tagName = tag?.name ?? '';
+    const button = el('button', {
+        className: 'button button--danger tag-delete-button',
+        attributes: {type: 'button'},
+        children: 'Delete',
+    });
+    button.addEventListener('click', () => onDelete(tagName, button));
+    return button;
+}
+
+function createTableStatusRow(text, canDeleteTags) {
     return el('tr', {
         className: 'tags-table-status data-table-status',
-        children: el('td', {attributes: {colspan: '3'}, children: text}),
+        children: el('td', {attributes: {colspan: canDeleteTags ? '4' : '3'}, children: text}),
     });
 }
 

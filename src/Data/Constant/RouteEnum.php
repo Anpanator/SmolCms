@@ -24,6 +24,7 @@ enum RouteEnum: string
     case API_TAGS = '/api/tags';
     case API_TAG_SUGGEST = '/api/tags/suggest';
     case API_TAG_CATEGORIES = '/api/tag-categories';
+    case API_TAG_DELETE = '/api/tags/delete';
     case API_IMAGE_SAMPLE = '/api/image/sample';
     case API_IMAGE_DOWNLOAD = '/api/image/download';
     case API_REVIEW_QUEUE = '/api/review/queue';

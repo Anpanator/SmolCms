@@ -371,3 +371,119 @@ export async function testCreateCategoryConflictUsesCategoryMessage() {
         restore();
     }
 }
+
+export async function testDeleteActionsAreOnlyVisibleToAdmins() {
+    const moderator = await createLoadedView();
+    try {
+        assertEqual(moderator.view.querySelectorAll('.tags-table thead th').length, 3);
+        assertTrue(
+            moderator.view.querySelector('.tag-delete-button') === null,
+            'moderators must not get delete buttons',
+        );
+    } finally {
+        moderator.restore();
+    }
+
+    const admin = await createLoadedView(undefined, {accessLevel: 600});
+    try {
+        assertEqual(
+            [...admin.view.querySelectorAll('.tags-table thead th')].map((cell) => cell.textContent).join('|'),
+            'Tag name|Category|Usage count|Actions',
+        );
+        assertEqual(admin.view.querySelectorAll('.tag-delete-button').length, 2);
+    } finally {
+        admin.restore();
+    }
+}
+
+export async function testAdminDeleteAsksForConfirmationThenUnassignsAndReloads() {
+    let deleted = false;
+    const {view, fetchMock, restore} = await createLoadedView((url, options) => {
+        const parsed = new URL(url, 'http://localhost');
+        if (parsed.pathname === '/api/tags/delete' && options.method === 'POST') {
+            deleted = true;
+            return {status: 204, body: null};
+        }
+        if (parsed.pathname === '/api/tags' && (options.method ?? 'GET') === 'GET') {
+            const tags = deleted ? TAGS.filter((tag) => tag.name !== 'unused tag') : TAGS;
+            return {status: 200, body: {tags, page: 1, perPage: 100, total: tags.length}};
+        }
+        return undefined;
+    }, {accessLevel: 600});
+    try {
+        const deleteCalls = () => fetchMock.calls.filter(
+            (call) => call.options.method === 'POST' && call.url === '/api/tags/delete',
+        );
+
+        const button = view.querySelector('.tags-table-row[data-tag-name="unused tag"] .tag-delete-button');
+        button.click();
+        await settle();
+        let dialog = document.querySelector('.modal-backdrop');
+        assertTrue(dialog !== null, 'deleting a tag should open the confirmation dialog');
+        assertTrue(dialog.querySelector('.modal-message').textContent.includes('unused tag'));
+        assertTrue(
+            dialog.querySelector('.modal-message').textContent.includes('images'),
+            'the dialog should warn that tagged images lose the tag',
+        );
+        assertEqual(dialog.querySelector('.button--primary')?.textContent, 'Delete tag');
+
+        dialog.querySelector('.modal-cancel').click();
+        await settle();
+        assertTrue(!dialog.isConnected, 'cancelling should close the dialog');
+        assertEqual(deleteCalls().length, 0, 'cancelling must not send a delete request');
+        assertTrue(view.querySelector('.tags-table-row[data-tag-name="unused tag"]') !== null);
+
+        button.click();
+        await settle();
+        dialog = document.querySelector('.modal-backdrop');
+        dialog.querySelector('.button--primary').click();
+        await settle();
+
+        assertEqual(deleteCalls().length, 1, 'confirming should send one delete request');
+        assertEqual(JSON.stringify(JSON.parse(deleteCalls()[0].options.body)), JSON.stringify({name: 'unused tag'}));
+        assertTrue(
+            view.querySelector('.tags-table-row[data-tag-name="unused tag"]') === null,
+            'the deleted tag should disappear from the table',
+        );
+        const message = view.querySelector('.tags-browser .form-message:not([hidden])');
+        assertTrue(message !== null);
+        assertTrue(message.textContent.includes('unused tag'));
+    } finally {
+        document.querySelectorAll('.modal-backdrop .modal-cancel').forEach((cancel) => cancel.click());
+        restore();
+    }
+}
+
+export async function testAdminDeleteShowsProtectedAndMissingTagMessages() {
+    let calls = 0;
+    const {view, restore} = await createLoadedView((url, options) => {
+        if (url === '/api/tags/delete' && options.method === 'POST') {
+            calls++;
+            return {status: calls === 1 ? 409 : 404, body: null};
+        }
+        return undefined;
+    }, {accessLevel: 600});
+    try {
+        const confirmDeletion = async () => {
+            view.querySelector('.tag-delete-button').click();
+            await settle();
+            document.querySelector('.modal-backdrop .button--primary').click();
+            await settle();
+        };
+
+        await confirmDeletion();
+        assertEqual(
+            view.querySelector('.tags-browser .form-message:not([hidden])').textContent,
+            'Protected tags such as "tagme" cannot be deleted.',
+        );
+
+        await confirmDeletion();
+        assertEqual(
+            view.querySelector('.tags-browser .form-message:not([hidden])').textContent,
+            'This item no longer exists.',
+        );
+    } finally {
+        document.querySelectorAll('.modal-backdrop .modal-cancel').forEach((cancel) => cancel.click());
+        restore();
+    }
+}

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace SmolCms\Config;
 
 
-use SmolCms\Controller\AuthController;
 use SmolCms\Controller\AuditLogController;
+use SmolCms\Controller\AuthController;
 use SmolCms\Controller\ImageApiController;
 use SmolCms\Controller\ImageFileController;
 use SmolCms\Controller\ImageReviewController;
@@ -15,9 +15,9 @@ use SmolCms\Controller\ImageUploadController;
 use SmolCms\Controller\IndexController;
 use SmolCms\Controller\ProfileController;
 use SmolCms\Controller\RegisterController;
-use SmolCms\Controller\TagSuggestionController;
-use SmolCms\Controller\TagmeController;
 use SmolCms\Controller\TagApiController;
+use SmolCms\Controller\TagmeController;
+use SmolCms\Controller\TagSuggestionController;
 use SmolCms\Controller\UserManagementController;
 use SmolCms\Controller\UserProfileController;
 use SmolCms\Data\Business\Route;
@@ -168,6 +168,12 @@ class RoutingConfiguration
                 method: HttpMethod::POST,
                 controller: TagApiController::class,
                 handler: 'createCategoryAction',
+            ),
+            RouteEnum::API_TAG_DELETE->name => new Route(
+                path: RouteEnum::API_TAG_DELETE->value,
+                method: HttpMethod::POST,
+                controller: TagApiController::class,
+                handler: 'deleteTagAction',
             ),
             RouteEnum::API_IMAGE_SAMPLE->name => new Route(
                 path: RouteEnum::API_IMAGE_SAMPLE->value,

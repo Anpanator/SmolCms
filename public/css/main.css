@@ -608,6 +608,11 @@ h3 {
     white-space: nowrap;
 }
 
+.tags-table .tags-table-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
 .tags-management {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
