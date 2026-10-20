@@ -7,45 +7,33 @@ Install the Composer dependencies from the repository root:
 composer install
 ----
 
-The application requires these directories:
+=== Manual-host setup
 
-* `private/db` for the SQLite database
-* `private/sql` for migration files
-* `private/upload` and `private/upload/img` for image storage
-* `private/img` with `private/img/sample` and `private/img/dl` for image samples and downloads
-* `public/img` with `public/img/thumb` for web-deliverable image thumbs
-* `private/init` for the driver-specific schema files
-* `private/assets` for the HTML shell
+This section covers a direct host install. For the container workflow, see
+link:docker/README.md[Docker images].
 
-`private/db`, `private/sql`, `private/upload/img`, `private/img/sample`, `private/img/dl`, and `public/img/thumb` ship via `.gitkeep` placeholder files.
-`private/upload` and `private/img` ship implicitly as parents of tracked child paths and have no `.gitkeep` of their own.
-`private/init` ships via its tracked `init.sql` and `init_sqlite.sql` files.
-`private/assets` ships via its tracked `index.html` shell.
-The `FS_APP_LEVEL_WHITELIST` directories (`private/init`, `private/sql`, `private/upload`, `private/img`, `private/assets`, `public/js`, and `public/img`) must exist before `FileSystemAccessService` construction; `private/db`, `private/upload/img`, and the image directories below `private/img` and `public/img` must exist before database and image operations, respectively.
+The roots in `FS_APP_LEVEL_WHITELIST` (`config.php`) must exist before the
+application starts. Tracked files and placeholders provide them in a checkout;
+in particular, `private/upload/.gitkeep` creates `private/upload`, not
+`private/upload/img`. The SQLite database and application logs also need their
+directories, `private/db` and `private/logs`.
 
-The CLI and PHP-FPM users need read access to the application files, including `private/init` and `private/assets`.
-The CLI user needs write access to `private/db` for `--init-db` and `--migrations`, to `private/sql` for `--generate-migration`, and to `private/assets` for `--generate-js-integrity`.
-The PHP-FPM user needs write access to `private/db`, to `private/upload/img`, and to the writable image directories `private/img` and `public/img`.
-`private/sql` needs only read access for `--migrations` execution, and `private/upload` itself needs only existence/traverse permission.
-PHP's upload temporary directory must additionally be readable and covered by `FS_DIRECTORY_WHITELIST` in `config.php`.
+`ImageStorageService` creates missing image-storage directories on the first
+write, including `private/upload/img` and the thumbnail, sample, download, and
+checksum subdirectories. The parent allowlisted roots must already exist.
 
-Ignored by Git (see `.gitignore`): `/vendor`, `/composer.lock`, `/.phpunit.cache/`, `/private/db/smolcms.sq3`.
-`composer.json` is the tracked dependency source.
+PHP-FPM needs read access to the application and write access to the database,
+logs, upload tree, generated image stores, and PHP's upload temporary directory.
+The CLI user needs corresponding access for commands it runs; in particular,
+write access to `private/sql` is needed to generate migrations, and to
+`private/assets` to refresh script integrity attributes. The CLI worker also
+needs write access to image stores when it runs `--process-images`. PHP's
+upload temporary directory must be writable by PHP, readable by the
+application, and included in `FS_DIRECTORY_WHITELIST`.
+`config.php` includes `PHP_TEMP_DIR` by default; add a custom `upload_tmp_dir`
+there if it is outside the existing whitelist. See
+<<_directory_access_restrictions>> for the separate PHP restriction.
 
-Initialize an empty database without changing an existing database or running pending migrations:
-
-[source,shell]
-----
-php src/app.php --init-db
-----
-
-To intentionally drop existing tables and reload the schema, pass `--reset`:
-
-[source,shell]
-----
-php src/app.php --init-db --reset
-----
-
-This reset prompts for confirmation, even when no tables exist.
-Add `--noconfirm` to suppress it; that modifier also suppresses the `--migrations` prompt and does nothing by itself.
-The command loads `private/init/init_sqlite.sql` for SQLite (the default) and `private/init/init.sql` for MySQL; other drivers are rejected.
+Initialize a new default SQLite database with `php src/app.php --init-db`.
+Existing databases are left unchanged; see <<_cli_commands>> before applying
+migrations or using the destructive reset option.

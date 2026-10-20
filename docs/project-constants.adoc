@@ -1,11 +1,16 @@
 == Project constants
 
-Root-level `constants.php` defines only the global `ROOT_DIR` constant (`__DIR__`).
-Root-level `config.php` defines the global path constants derived from `ROOT_DIR`: `FS_DIRECTORY_WHITELIST`, `FS_APP_LEVEL_WHITELIST`, `MIGRATION_DIR`, `IMAGE_STORAGE_DIR` (`private/upload/img`, the sanitized originals), `IMAGE_THUMB_DIR` (`public/img/thumb`), `IMAGE_SAMPLE_DIR` (`private/img/sample`), and `IMAGE_DOWNLOAD_DIR` (`private/img/dl`); it currently holds no credentials.
+`constants.php` defines `ROOT_DIR` and `PHP_TEMP_DIR` (PHP's current system
+temporary directory). `config.php` groups the filesystem allowlists and the
+migration, image-storage, processing-lock, and application-log path settings.
+Use it as the source for these configured paths rather than copying path
+literals into deployment notes or code.
 
-The production entry point `src/app.php` requires, in order, `constants.php` (via `dirname(__DIR__)`), then `config.php`, then `vendor/autoload.php` via `ROOT_DIR`.
-`tests/TestUtils/SimpleTestCase.php` requires `constants.php` then `config.php` at file scope; direct and indirect subclasses (including `FunctionalTestCase`) inherit them via that inclusion, not via per-test requires.
-Under PHPUnit, `vendor/autoload.php` loads first via the `phpunit.xml` bootstrap, unlike `src/app.php`.
+Change these settings when moving application data, narrowing filesystem
+access, relocating PHP's upload temporary directory, or choosing a different
+log location. Keep the directories, allowlists, and PHP-FPM/CLI permissions in
+sync; see <<_installation_and_setup>> and
+<<_directory_access_restrictions>>.
 
-Note that `config.php` is not the sole place for paths: `GenerateMigrationExecutor` duplicates the migration directory as a private constant, and the `PDO` DSN in `CoreServiceConfiguration` builds the `private/db` path directly from `ROOT_DIR`.
-
+`AccessLevel` is the int-backed role type used for authorization and persisted
+with user records; its cases are deliberately not enumerated here.

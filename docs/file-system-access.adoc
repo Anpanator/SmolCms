@@ -1,15 +1,13 @@
 == File system access
 
-The `FileSystemAccessService` provides the application-level allowlist and file-operation helpers (`readFile`, `fileExists`, `writeFile`, `deleteFile`, `listFiles`, `isPathAllowed`).
-Its configured paths come from `FS_APP_LEVEL_WHITELIST` in `config.php` and are passed to the service in `CoreServiceConfiguration`.
-The default app-level paths are `private/init`, `private/sql`, `private/upload`, `private/img`, `private/assets`, `public/js`, and `public/img`.
+`FileSystemAccessService` adds an application-level allowlist on top of PHP's
+`open_basedir`. It canonicalizes configured roots and existing paths before
+checking that operations stay inside an allowed root; this catches ordinary
+path traversal and symlink escapes, but does not replace OS permissions or
+protect against filesystem races.
 
-This policy is separate from the `open_basedir` whitelist (`FS_DIRECTORY_WHITELIST` in `config.php`, applied by `RestrictDirectoryAccessStartupAction` via `ini_set`).
-After `ApplicationCore::init()`, native calls — including those inside this service — are still enforced by `open_basedir`; this service adds a further allowlist check.
-By default it is narrower (selected paths under `private` plus `public/js` and `public/img`), but narrowness is configuration, not enforced in code.
-
-Every configured path must resolve via `realpath()` at construction or construction throws; any existing file or directory is accepted there, but only `readFile`, `deleteFile`, and `isPathAllowed` work with exact file entries — `fileExists` and `writeFile` also require the resolved parent directory to be allowed.
-Keep the app-level entries inside `open_basedir`; the service never compares the two lists.
-
-`realpath()` canonicalizes allowed entries, existing targets and parents, and each `listFiles` entry (broken, disallowed, or non-file entries are silently skipped), handling ordinary `..` traversal and symlink resolution; prefix matching requires `DIRECTORY_SEPARATOR`.
-`writeFile()` checks `realpath(dirname)`, rejects `is_link(path)`, checks `realpath(path)` when it exists, then writes to `resolvedDir/basename(path)`.
+Every configured root must exist when the service is constructed. For example,
+thumbnail writes under `public/img/thumb` are allowed because they remain
+inside the configured `public/img` root. Add or move a storage root only after
+it exists and is also covered by PHP's directory restriction. See
+<<_directory_access_restrictions>> for that separate boundary.

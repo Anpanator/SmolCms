@@ -2,19 +2,18 @@
 
 ## Build dependencies
 
-- **Docker engine** with a reachable daemon — rootless Docker on this machine (`deploy.sh` selects the `rootless`
-  context when available; `DOCKER_CONTEXT`/`DOCKER_HOST` override it).
-- **Docker Compose v2** CLI plugin (`docker compose`) — `deploy.sh` delegates building and running to Compose.
-- **Docker Buildx** CLI plugin (`docker buildx`) — required for BuildKit builds; without it Compose falls back to the
-  deprecated classic builder.
-- **POSIX shell, GNU coreutils, and findutils** for `deploy.sh` (`stat`, `chgrp`, `chmod`, `find`).
-- Base images pulled during the build: `php:8.5-fpm` and `composer:2`.
+- Docker Engine with a reachable daemon and Docker Compose v2; Compose builds
+  the Dockerfile target used by the development service.
+- POSIX shell, GNU coreutils, and findutils for `deploy.sh` (`stat`, `chgrp`, `chmod`, `find`).
+- Network access to pull `php:8.5-fpm` and `composer:2` and install build packages.
 
-Both image targets run Nginx and PHP-FPM as the unprivileged `10001:10001` user, listen on container port `8080`, and
-mount writable data paths separately from the read-only application image. The Docker build copies only the application
-runtime files into `/var/www/html`; the `docker/` and `docs/` directories are not deployed into the application tree.
-The `prod` target (display errors disabled) remains in the Dockerfile for when a production deployment becomes a
-requirement.
+The Dockerfile builds `dev` and `prod` targets from the same Nginx/PHP-FPM
+base. Both use the unprivileged `10001:10001` account and listen on container
+port `8080`. The supplied Compose service runs only the `dev` target with a
+read-only root filesystem and writable bind mounts for database, uploads,
+images, public thumbnails, and logs. The `prod` target disables PHP
+`display_errors`; it does not include a production Compose deployment and is
+not a production-hardening guarantee.
 
 ## Local development
 
@@ -24,15 +23,25 @@ Run from the project root:
 ./deploy.sh
 ```
 
-The script prepares the host state directories, then uses Docker Compose v2 (BuildKit) to build the `smolcms:dev`
-target and start the `smolcms-dev` container at <http://localhost:8080>. The port is bound to localhost only; set
-`SMOLCMS_DEV_PORT` to change it.
-SQLite, uploaded images, and logs persist in bind-mounted directories under `~/SmolCms` (`db`, `upload`, `img`,
-`public-img`, `logs`); the script creates them with setgid group-write permissions and repairs group permissions on
-host-owned existing data so the rootless Docker user namespace can write while the data stays host-accessible.
-`display_errors` is enabled in this image.
-On startup the container initializes the database, runs pending migrations, and starts a background loop that processes
-pending image uploads every minute (up to 100 per run).
+The script selects the `rootless` Docker context when available (unless
+`DOCKER_CONTEXT` or `DOCKER_HOST` is set), prepares writable host state
+directories, then uses Compose to build the `dev` target and start
+`smolcms-dev` at <http://localhost:8080>. The port binds to localhost only;
+set `SMOLCMS_DEV_PORT` to change it.
 
-The script uses a working Docker context named `rootless` when available. Compose can also be invoked directly with
-`docker compose -f docker/compose.yaml up --build -d` after preparing the host directories as above.
+SQLite data, uploads, generated images, and logs persist below `~/SmolCms`
+(`db`, `upload`, `img`, `public-img`, and `logs`). The script creates these
+directories with setgid group-write permissions and repairs group permissions
+on existing host-owned data for the rootless container user. The development
+image enables `display_errors`.
+
+On startup the container initializes an empty database, applies pending
+migrations, and starts a background worker that processes up to 100 pending
+images periodically. Nginx and PHP errors are written to the mounted logs
+directory.
+
+After preparing the host directories, Compose can also be run directly with:
+
+```sh
+docker compose -f docker/compose.yaml up --build -d
+```

@@ -1,11 +1,18 @@
 == Application flow
 
-The high-level flow of a request (or CLI invocation) is:
+. `src/app.php` loads `constants.php`, `config.php`, and Composer's autoloader,
+  then builds the service graph and resolves `ApplicationCore`.
+. `ApplicationCore::init()` restricts PHP file access, registers the database-
+  backed session handler, and resumes a valid session.
+. CLI invocations run the selected command. HTTP requests are built from the
+  request environment and matched to a route by both path and HTTP method.
+. Before a handler runs, the pre-controller chain checks request origin,
+  authorization, request mapping, and validation. The handler then produces a
+  response.
+. An unmatched route returns `404`; a `BadRequestException` maps to `400`, and
+  other handler errors or invalid handler results map to `500`.
 
-. `src/app.php` loads `constants.php`, `config.php`, and `vendor/autoload.php`, builds the service graph via `ServiceBuilder::getService(ApplicationCore::class)`, and calls `ApplicationCore::init()`.
-. `init()` runs the startup actions in order: restrict directory access (`open_basedir`), register the DB-backed session handler, and resume the session.
-. Under the CLI SAPI, `runCli()` executes the documented commands and exits; under a web SAPI, `runCgi()` builds a `Request` from the PHP globals via `RequestFactory`.
-. `handleRequest()` matches the URL path against the configured routes, resolves the controller through the service container, extracts path parameters, and runs the pre-controller chain: authorization, request mapping, then validation.
-. The controller handler runs and returns a `Response`; a missing route or a falsy result becomes a `404`, and `Throwable`s from the chain or the controller become empty `400`/`500` responses via `ExceptionResponseService`.
-. `output()` sends the response: response headers via `header()` (guarded by `headers_sent()`), then the status code via `http_response_code()` and the body via `echo`.
-
+Image variants are generated asynchronously by `--process-images`; the Docker
+container runs this command in a background worker. See <<_image_uploads>> for
+the upload lifecycle and <<_error_handling_and_responses>> for response
+behavior.

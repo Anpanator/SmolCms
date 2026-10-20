@@ -1,111 +1,50 @@
 [#_cli_commands]
 == CLI Commands
 
-The application supports CLI commands through `php src/app.php`.
-Flags use a `--` prefix.
-Non-flag tokens following a recognized flag are collected as that flag's `$arguments` array in `$argv` order and passed to `execute()`; separate arguments with spaces and quote values containing spaces.
-Currently only `--generate-migration` and `--process-images` use positional arguments. `--reset` is a modifier forwarded to `--init-db` as an argument.
-Recognized command executors are registered positionally as parameters to `CliCommandHandler` in `CoreServiceConfiguration`.
-A single invocation may contain several distinct flags; each executor whose flag is present runs at most once, in the order its flag first appears on the command line.
-Repeating a flag does not re-run it; the last occurrence's arguments win.
-`--noconfirm` and `--reset` never run as executors; `--reset` has no effect unless `--init-db` is also present.
-
-`runCli()` exits `0` whenever `PHP_SAPI` is `cli` (even when only printing the command list for unknown flags), so `runCgi()` only runs under a non-CLI SAPI.
-Functional tests use `TestContextService` and force non-CLI mode for `simulateRequest()`.
-
-To add a command, add a case to the `CliCommandFlag` enum, create a class implementing `CliCommandExecutor`, and add the executor to the `CliCommandHandler` service definition.
-The enum `value` is the literal flag text without `--`.
-The executor's `handles()` must return the new case and `helptext()` supplies the command-list output.
-When the executor has builtin or string constructor dependencies, add its own `Service` definition, as done for `MigrationsExecutor`.
-`--noconfirm` and `--reset` are modifiers consumed by the handler; they are not executors.
-
-=== Available commands
+Commands run through `php src/app.php`. Non-flag values following an executable
+command are passed as its arguments. `--reset` and `--noconfirm` are modifiers,
+not executors: `--reset` changes `--init-db`, while `--noconfirm` suppresses
+confirmation prompts. A modifier by itself runs no command.
 
 |===
-| Flag | Description
+| Command | Description
 
 | `--generate-migration "<description>"`
-a|Creates a timestamped migration skeleton in `private/sql`, named `YYYY-MM-DD_HH-MM-SS__<sanitized-description>.sql`, where `<sanitized-description>` replaces every `[^a-zA-Z0-9_-]` character with `_`, trims leading and trailing `_`, and falls back to `migration`.
-The file content is `-- Migration: <original description>\n`.
-Only the first argument is used; extra tokens are ignored.
-An empty or missing description prints the usage text and creates nothing.
-Generation does not execute the migration.
+| Creates an empty, timestamped SQL migration file in `private/sql`; edit it
+before applying migrations.
 
 | `--generate-js-integrity`
-a|Reads `private/assets/index.html`, computes SHA-384 Subresource Integrity hashes for local script tags whose sources are under `/public/js/`, and writes the `integrity` and `crossorigin="anonymous"` attributes back to the HTML asset.
-Existing integrity attributes are refreshed. External scripts and inline scripts are left unchanged.
-The Docker image build runs this command after copying the application and JavaScript assets, so the built image has hashes for its current assets.
+| Refreshes Subresource Integrity attributes for local scripts in the HTML
+shell. Docker image builds run it automatically.
 
 | `--migrations`
-a|Scans `private/sql` non-recursively via `FileSystemAccessService::listFiles` for regular allowed files ending case-sensitively in `.sql`, sorts them by filename, and executes files not recorded in the `migration` table.
-Comparison and recording use the `basename()` against `migration.filename`.
-Successful migrations are recorded; already-recorded files are skipped, and empty files (including whitespace-only files) are skipped without being recorded but still count as pending for the confirmation prompt.
-Confirmation lists the pending basenames and is required only when pending files exist, unless `--noconfirm` is supplied; only `y` (case-insensitive) proceeds — any other answer, including `yes`, aborts.
-A failed migration is not recorded, later files are not attempted, and `Migrations complete.` is not printed.
-Arguments to `--migrations` are ignored, and a missing directory prints an error.
+| Applies pending, non-empty `.sql` migrations in filename order and records
+successfully executed filenames in the `migration` table. A confirmation
+prompt can be skipped with `--noconfirm`.
 
-| `--init-db [--reset]`
-a|Without `--reset`, loads the driver-specific schema only when the database has no tables; an existing database is left unchanged. No confirmation is required for initialization.
-With `--reset`, destructively drops tables and reloads the schema: SQLite drops all tables except `sqlite_%`, while MySQL drops all tables in `DATABASE()`.
-The default SQLite configuration uses `private/init/init_sqlite.sql`; MySQL uses `private/init/init.sql` and temporarily disables foreign-key checks during drops.
-Reset confirmation is required unless `--noconfirm` is supplied. The prompt is unconditional even with no tables; in that case it prints `No tables to drop.` and still reloads the schema.
-
-| `--reset`
-a|Modifier for `--init-db`; drops existing tables before loading the schema. It does not run by itself.
+| `--init-db`
+| Initializes an empty database and leaves an existing one unchanged. Add
+`--reset` to drop and recreate its tables; this destructive operation prompts
+unless `--noconfirm` is supplied.
 
 | `--process-images [batch-size]`
-a|Processes one batch of `pending` image uploads into their variants (see "Post-upload processing pipeline" in the image uploads documentation).
-`batch-size` must be a positive integer literal and defaults to `100` when omitted; invalid, non-positive, or fractional input prints the usage message and processes nothing.
-The processor fetches up to `batch-size` pending images (oldest uploads first); a failing image is logged and left `pending` for the next run, and the rest of the batch still completes.
-Concurrency guard: the run takes a non-blocking `flock()` on `IMAGE_PROCESSING_LOCK_FILE` (`private/img/processing.lock`), so only one worker can process at a time; if the lock is held, a short notice is printed and the command exits cleanly without processing.
+| Processes pending uploads into image variants; the batch defaults to 100.
+Docker also runs a background worker periodically.
 
-| `--noconfirm`
-a|Modifier for `--migrations` and `--init-db --reset`; suppresses their confirmation prompts.
-It does not execute by itself and has no effect on `--generate-migration` or `--generate-js-integrity`.
+| `--noconfirm`, `--reset`
+| Modifiers for migration confirmation and database initialization; they do
+not execute by themselves.
 |===
 
-=== Usage examples
+For example, create and apply a migration:
 
-Generate a migration file:
+[source,shell]
+----
+php src/app.php --generate-migration "add image metadata"
+# Edit the generated SQL file.
+php src/app.php --migrations --noconfirm
+----
 
-`php src/app.php --generate-migration "add users table"`
-
-Generate current JavaScript integrity attributes:
-
-`php src/app.php --generate-js-integrity`
-
-Edit the generated SQL file, then run pending migrations with confirmation:
-
-`php src/app.php --migrations`
-
-Run pending migrations without confirmation:
-
-`php src/app.php --migrations --noconfirm`
-
-Initialize the database if it has no tables; existing data is left unchanged:
-
-`php src/app.php --init-db`
-
-Reset the database with confirmation:
-
-`php src/app.php --init-db --reset`
-
-Reset the database without confirmation:
-
-`php src/app.php --init-db --reset --noconfirm`
-
-Process up to 100 pending images (the default batch size):
-
-`php src/app.php --process-images`
-
-Process up to 25 pending images per run:
-
-`php src/app.php --process-images 25`
-
-`--process-images` is also run by a background worker loop in the Docker container (every minute, up to 100 images per run).
-
-`--noconfirm` and `--reset` may appear before or after `--init-db`; `--reset` has no effect without `--init-db`.
-The position of `--noconfirm` does not affect suppression, but non-flag tokens immediately after `--noconfirm` are consumed as its ignored arguments.
-If no executable command flag is provided, such as with no arguments, an unknown flag, or only `--noconfirm`, the handler prints the available-command list.
-Unknown `--` flags are ignored and reset the current flag, so following bare tokens are also ignored until the next recognized flag.
-Bare tokens before any recognized flag (or after an unknown flag) are ignored; bare tokens after a recognized flag become that flag's arguments.
+In CLI mode, the application exits successfully after the command handler
+returns normally, including when it prints the command list. An executor
+exception escapes before that successful exit.

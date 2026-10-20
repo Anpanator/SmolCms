@@ -1,110 +1,28 @@
 == Routing
 
-Routes are defined as `Route` objects in the `$routes` array constructed by `RoutingConfiguration`.
-Each route has a path, an `HttpMethod` enum, a controller service identifier, and an optional handler.
-The array keys are not used for matching.
+`RoutingConfiguration` registers `Route` objects using paths from
+`RouteEnum`. A match requires both the URL path and HTTP method; routes are
+checked in configuration order. A `{name}` path segment is passed to a
+same-named handler argument. If no handler is specified, the method name
+defaults to `getAction`, `postAction`, and so on.
 
 [source,php]
 ----
-// Illustrative example; no current production route uses placeholders.
 new Route(
-    path: '/some/path/with/{parameter}',
-    method: HttpMethod::POST,
-    controller: SomeController::class,
-    // If omitted, the handler defaults to postAction.
+    path: RouteEnum::API_IMAGES->value,
+    method: HttpMethod::GET,
+    controller: ImageApiController::class,
+    handler: 'getImageListAction',
 ),
 ----
 
-The controller value is passed to `ServiceBuilder::getService()`.
-Lookup order is `ServiceRegistry`, then `CoreServiceConfiguration`, then autowiring; the result is cached.
-Autowiring requires an existing class whose constructor parameters are all resolvable class types.
-A non-class identifier that is in neither store fails in `autowireService()`.
+Handlers accept a `$request` typed as `Request` or a readonly
+`ValidatedRequest` subclass and return a `Response`. Client-page `GET` routes
+serve the SPA shell; API handlers usually return `JsonResponse`. Protected
+sample and download routes instead return a plain `Response` with
+`X-Accel-Redirect` for Nginx file delivery.
 
-Both the URL path and the route pattern are trimmed with `rtrim(..., ' /')` (any trailing `/` and space combination) and split with `explode('/')`; segment counts must match.
-A route segment starting with `{` matches any one URL segment (including an empty middle segment); an empty pattern segment also matches anything.
-Otherwise, non-empty literal segments must match with `===` (case-sensitive).
-The host, protocol, port, and query string are ignored.
-Extraction uses `trim('/')` and `trim('{}')` with no regular-expression constraints or type conversion; values remain strings.
-The first route in `getRoutes()` order wins.
-A null or empty path never matches.
-
-The placeholder name is passed as a named handler argument, so the controller method must have a parameter with the same name.
-Handler parameter order is irrelevant.
-
-A handler must be a public method with a parameter named `$request`.
-`Request` is matched by exact `=== Request::class` (subclasses of `Request` are not accepted); `ValidatedRequest` subtypes may be direct or indirect but must be `readonly` concrete classes (not abstract `ValidatedRequest` itself).
-`RequestMapper` finds the candidate by type, but the request-mapping action stores it under the handler argument named `request`, and the facade invokes the handler with those named arguments, so the parameter must be named `$request`.
-Only one request parameter is supported.
-The handler must return a `Response` or a subclass.
-
-If the handler is omitted, its name is the lowercase HTTP method followed by `Action`: `getAction`, `postAction`, `putAction`, `deleteAction`, or `optionsAction`.
-
-[source,php]
-----
-class SomeController
-{
-    public function postAction(Request $request, string $parameter): Response
-    {
-        // ...
-    }
-}
-----
-
-A path with no matching route returns `new Response(NOT_FOUND)` with `null` content.
-Most `Throwable` values from `PreControllerActionFacade::process()` become an empty `500 INTERNAL_SERVER_ERROR` response; `BadRequestException` (request-mapping `TypeError`, validation failure) becomes an empty `400 BAD_REQUEST` response.
-Controller-resolution and path-parameter count failures thrown before the `try` block propagate uncaught.
-
-=== Current HTTP routes
-
-The current configuration contains these user-facing routes:
-
-|===
-| Method | Path | Handler | Authentication
-
-| `GET` | `/` | `IndexController::getAction` | None
-| `GET` | `/login` | `IndexController::getAction` | None
-| `GET` | `/register` | `IndexController::getAction` | None
-| `GET` | `/settings` | `IndexController::getAction` | None
-| `GET` | `/upload-image` | `IndexController::getAction` | None
-| `GET` | `/image` | `IndexController::getAction` | None
-| `GET` | `/review` | `IndexController::getAction` | None
-| `GET` | `/api/session` | `AuthController::getSessionAction` | None
-| `POST` | `/login` | `AuthController::postAction` | None
-| `POST` | `/register` | `RegisterController::postAction` | None
-| `POST` | `/settings` | `UserProfileController::postAction` | `NOVICE` or higher
-| `POST` | `/logout` | `AuthController::logoutAction` | None
-| `POST` | `/upload-image` | `ImageUploadController::postAction` | `NOVICE` or higher
-| `GET` | `/api/images` | `ImageApiController::getImageListAction` | None
-| `GET` | `/api/image/detail` | `ImageApiController::getImageDetailAction` | `NOVICE` or higher
-| `GET` | `/api/image/sample` | `ImageFileController::sampleAction` | `NOVICE` or higher
-| `GET` | `/api/image/download` | `ImageFileController::downloadAction` | `NOVICE` or higher
-| `GET` | `/api/review/queue` | `ImageReviewController::queueAction` | `MOD` or higher
-| `POST` | `/api/review/approve` | `ImageReviewController::approveAction` | `MOD` or higher
-| `POST` | `/api/review/reject` | `ImageReviewController::rejectAction` | `MOD` or higher
-|===
-
-The seven `GET` client paths all return the same HTML shell (see <<_running_the_application>> and <<_frontend_single_page_application>>); the client-side router decides which view to render from the URL path.
-Every other route returns a `JsonResponse` or an empty framework error response (see <<_error_handling_and_responses>>).
-The image endpoints are specified in detail in <<_image_serving_and_review>>.
-
-=== Request construction
-
-`RequestFactory::buildRequestFromGlobals()` maps `$_SERVER['HTTPS']`, `$_SERVER['HTTP_HOST']`, `$_SERVER['REQUEST_URI']`, and `$_SERVER['REQUEST_METHOD']` plus `getallheaders()`, `$_POST`, `$_GET`, and `$_FILES` into a `Request`.
-When the request's `Content-Type` header contains `application/json`, the post parameters come from the request body instead of `$_POST`: `buildRequestFromGlobals()` reads `php://input` and `json_decode()`s it (associative) into `postParams`.
-Malformed JSON or a non-array decode result degrades to `null` post params, so downstream validation then yields the usual bare `400`.
-Form and multipart requests are unaffected: `$_POST` (empty becomes `null`) and `$_FILES` are mapped as before.
-`UrlFactory` parses the URL with `parse_url()` and validates the resulting `Url`: protocol must be `http` or `https`, host must pass `ValidateHost`, a present port must be within `1..65535`, while path and query are unvalidated.
-`InvalidArgumentException` (unparseable or invalid URL) and `ValueError` (unknown `HttpMethod::from()` value) during `buildRequestFromGlobals()` happen in `runCgi()` before the `handleRequest()` try block, so they are uncaught — `ExceptionResponseService` never converts them into `Response` objects.
-
-=== Adding a page
-
-To add a user-facing page:
-
-. Add a case to `RouteEnum` (`src/Data/Constant/RouteEnum.php`): route paths in `RoutingConfiguration` derive from it, so server-side paths are never hardcoded.
-. Register a `Route` for the new path in `RoutingConfiguration`.
-For a deep-linkable client page, point the `GET` route at `IndexController::getAction` so a direct hit or browser refresh serves the HTML shell; the client-side router then renders the correct view from the URL path.
-. Add any JSON endpoints the page needs as additional `Route` entries with controller handlers returning `JsonResponse`, using a `ValidatedRequest` DTO for input and `#[Authenticated(...)]` when a logged-in user is required.
-. Add a view module in `public/js/views/` and map the URL path to its factory in the routes object of `public/js/main.js`.
-. Add the page to the header and footer navigation items in `public/js/nav.js` when it should appear in the navigation.
-
-The client route map (`main.js`) and navigation items (`nav.js`) are hardcoded in JavaScript and mirror the backend routes; `RouteEnum` remains the single source of truth for server-side paths, so keep all three in sync.
+When adding a page, register its `RouteEnum` case and server route, then update
+the client path map and view wiring (and navigation when needed); see
+<<_frontend_single_page_application>>. An unmatched path/method pair returns
+`404`; see <<_error_handling_and_responses>> for handler errors.

@@ -1,23 +1,33 @@
 == Database and persistence
 
-The default runtime database is SQLite at `private/db/smolcms.sq3`.
-The active SQLite schema in `private/init/init_sqlite.sql` contains `user`, `session`, `article`, `migration`, and `image` tables.
-`private/init/init.sql` is the MySQL schema (used by `--init-db` when the PDO driver is `mysql`); using MySQL requires changing the `PDO` service DSN in `CoreServiceConfiguration` and installing `pdo_mysql`.
+SQLite is the default runtime database. Its schema covers users and sessions,
+content and migration tracking, images, tags/categories and image-tag links,
+tag suggestions and approvals, and a limited image-tag audit log.
+`TagService` coordinates tags, categories, image associations, and usage
+counts; suggestion and approval records are handled by the tag-suggestion
+services.
 
-Persisted entities use `#[Entity(table: ...)]` and `#[Id]`.
-Database snake_case columns map to camelCase entity properties in both directions via `CaseConverter`, and hydration calls `new $entityClass(...$entityProps)`, so every entity property must be an accepted (named) constructor parameter; unknown columns are dropped and missing values become `null`.
-Saving via `EntityService` currently requires `get<Prop>()` for every entity property and `set<IdProp>()` for the `#[Id]` property to backfill `lastInsertId`.
+`private/init/init.sql` is a MySQL reference, not a parity guarantee: it lacks
+the image table, and the checked-in migrations use SQLite-specific SQL. The
+SQLite schema in `private/init/init_sqlite.sql` is the supported default.
 
-Beyond the case conversion, `EntityService` maps `DateTime` properties and backed enum properties automatically in both directions: database values hydrate into `DateTime` objects or enum instances, and entities serialize `DateTime` as `Y-m-d H:i:s` strings and enums as their backing values for storage.
-Only `DateTime` is supported (not `DateTimeImmutable` or `DateTimeInterface`); null or missing values stay `null`, and an invalid enum value throws from `::from()`.
+Entity services map database columns to typed entities, including dates and
+backed enums. `AccessLevel` is persisted by its backing value and represents a
+user's authorization role. Missing or `NULL` database fields are passed as
+`null` during hydration, so constructors must accept null for fields that can
+be absent or nullable in the schema.
 
-To persist a new kind of entity: create its table through a migration (`--generate-migration`, then `--migrations`), add an entity class with `#[Entity(table: ...)]` and `#[Id]`, and add a thin `EntityService` subclass for it (autowired like `UserService`).
-The unused `article` entity and `ArticleService` are an in-repo example; `ImageEntity`/`ImageEntityService` back the upload feature.
+`QueryCriteria` provides a small parameterized query interface:
 
-Queries are built with `QueryCriteria` and `QueryBuilder`.
-`select()`, `update()`, and `delete()` start a criteria and fix its query type; conditions are collected with `andWhere()` and `orWhere()`, where the first condition must be an `andWhere()`; `withParameters()` supplies (and overwrites) bound values; `orderBy()` collects `ORDER BY` terms (direction restricted to `ASC`/`DESC`, emitted for selects between the `WHERE` and `LIMIT` parts); `maxResults()` and `skipResults()` translate into a `LIMIT` clause emitted as `LIMIT [offset,] count` with `PHP_INT_MAX` substituted when only an offset is set.
-`WHERE` is emitted as `WHERE 1 AND/OR ...`.
-Select criteria enumerate all entity fields, update criteria set all entity fields (including the id column), and criteria cannot express inserts; `EntityService` builds insert statements from the entity's field values instead.
+[source,php]
+----
+$criteria = (new QueryCriteria())
+    ->select(UserEntity::class)
+    ->andWhere('id = :id')
+    ->withParameters(['id' => $id])
+    ->maxResults(1);
+----
 
-The `article` table, entity, and service exist (`slug`, `title`, `state`, `content`, `created`, `updated`) but are currently unreferenced — no routes or controllers implement article listing or editing.
-`UserEntity::$lastLoginDate` is always `NULL` because login never writes it; `state` is hardcoded to `active` on registration.
+`--migrations` scans pending, non-empty `.sql` files in filename order and
+records each successfully executed filename in the `migration` table; see
+<<_cli_commands>>.

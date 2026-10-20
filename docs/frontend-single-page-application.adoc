@@ -1,55 +1,31 @@
 [#_frontend_single_page_application]
 == Frontend (single-page application)
 
-The frontend is a vanilla JavaScript SPA served statically from `public/` under the `/public/` URL prefix: plain ES modules and one stylesheet, with no frameworks, no Node.js, and no build or transpilation step.
-The only HTML the backend serves is the static shell in `private/assets/index.html`; `IndexController` obtains it through `AssetService`.
-It contains `<head>` with `main.css`, a `<div id="app"></div>`, and the module script with generated SHA-384 `integrity` and `crossorigin="anonymous"` attributes.
-Run `php src/app.php --generate-js-integrity` to refresh the hash; Docker image builds do this automatically.
+The frontend is a vanilla JavaScript SPA served from `public/`; it uses ES
+modules and CSS with no framework, Node.js, or build step. The backend serves
+the shell in `private/assets/index.html`, which loads the stylesheet and the
+entry module into `#app`.
 
-=== Module map
+Client path constants live in `public/js/routes.js` and mirror the backend's
+`RouteEnum`. `main.js` maps those paths to views, while `nav.js` builds the
+navigation. Keep the path map, view wiring, and navigation in sync when adding
+or renaming a page.
 
-* `main.js`: entry point.
-Loads the session, builds the header/footer navigation, maps client routes (`/`, `/login`, `/register`, `/settings` for Profile, `/upload-image`, `/image` for the image display view, `/review` for the moderation view) to view factories, mounts everything into `#app`, and starts the router.
-* `api.js`: `fetch` wrapper.
-JSON bodies are serialized and sent with `Content-Type: application/json`; `FormData` instances pass through untouched (the browser sets the multipart boundary).
-Responses are decoded from JSON (raw text for other bodies, `null` for empty ones such as `204`); non-2xx statuses and network failures reject with `ApiError`, which carries the status (`0` for network errors).
-* `router.js`: History-API router.
-Renders the active view into a container element, intercepts clicks on internal links, handles `popstate`, and renders the not-found view for unknown paths.
-* `session.js`: session state store.
-Loads `GET /api/session` once, caches the user, and exposes `refresh()` plus subscriber notification on every change.
-* `nav.js`: header and footer navigation rendered from session state — anonymous users see Home/Login/Register, logged-in users see Home/Upload Image plus an account dropdown titled with the display name and containing Profile, the named access level, and Logout.
-Moderators (`accessLevel >= 500`, `AccessLevel::MOD`) additionally get a Review link in the header; the footer navigation never shows it.
-* `views/`: `home` (tag sidebar plus a tile grid of the newest accepted images loaded from `GET /api/images` — each tile is a link to `/image?id=<id>` with loading skeletons, an empty state, and a non-blocking error message), `login`, `register`, `profile` (editable display name and read-only access level from session state), `upload` (multipart `FormData` with the field `image`), `image` (image display view), `review` (moderation queue for MOD+), and `notFound`.
-* `accessLevel.js`: maps the numeric API values to user-facing names matching the `AccessLevel` enum cases.
-* `dom.js`: the `el()` element-builder helper used by all view and nav modules.
-* `forms.js`: form-field and message builders plus the status-to-message mapping.
-* `validation.js`: client-side validation mirroring the backend field rules.
+`api.js`, `router.js`, and `session.js` handle HTTP, history navigation, and
+session state. Page modules live in `views/`; shared UI helpers include
+`paginatedTable.js`, `moderationQueue.js`, `imageMetadata.js`, `tagLinks.js`,
+and `searchForm.js`. `accessLevel.js` exports `hasAccessLevel()`, and
+`validation.js` mirrors backend field rules for client feedback.
 
-=== Image display and review
+=== Upload and moderation behavior
 
-* The home grid fetches `GET /api/images` (public) and renders the returned `thumbSrc` URLs directly as `<img>` sources inside tiles linking to `/image?id=<id>`; an empty list shows "No images uploaded yet." and a failed request a non-blocking error inside the grid, while the tag sidebar stays usable.
-* The image display view (`/image`) reads the `id` from the URL query string (`new URLSearchParams(window.location.search)`, like the login view's `registered` flag) and fetches `GET /api/image/detail?id=<id>`.
-It shares the two-column layout with the home view: tags plus an image-metadata section (upload date, uploader, dimensions, format, human-readable file size) in the sidebar, the image itself in the content area.
-The image uses the `sampleSrc` viewing variant and the download link ("Download full size") the `downloadSrc` variant, always taken verbatim from the API; both are hidden while the values are still `null` ("Image is still being processed.").
-A `401` navigates to the login view, an unknown id shows "Image not found." (a missing or malformed query id is treated the same without a request), and other failures map through `messageForStatus`.
-* The review view (`/review`) is gated client-side to `accessLevel >= 500`; other users see an access-denied message and no queue request is made (the server still enforces the real rules).
-Moderators see the `GET /api/review/queue` items — thumbnail (with fallback text while `thumbSrc` is `null`), uploader, upload date — each with Approve (`POST /api/review/approve?id=<id>`) and Reject (`POST /api/review/reject?id=<id>`) buttons.
-A `204` removes the item from the displayed queue and shows a brief success message; `401` navigates to login, `403` shows a permission message, and `404`/other failures map through `messageForStatus` and refresh the queue.
-* Deep links to `/image?id=7` and `/review` work after a reload because the backend serves the SPA shell for both client-page routes (see <<_image_serving_and_review>>).
+The upload view sends each selected file sequentially as multipart field
+`image[]`. The home view lists accepted-image thumbnails; the image view loads
+metadata and a protected sample, with a download link labeled **Download**.
+Image and tag moderation queues act on the currently selected item: Approve
+and Reject submit that selection, and a success message remains visible rather
+than auto-dismissing.
 
-=== Client behavior
-
-* Bootstrapping loads `GET /api/session`, then renders the navigation and the view for the current URL.
-* Client-side validation (`validation.js`) mirrors the backend rules — `loginName` `1..255` characters, `password` `10..72` characters and at most `72` UTF-8 bytes, a non-empty valid `email`, and `displayName` `1..69` characters — for fast feedback; the backend re-validates, and the client treats status codes as the source of truth.
-* Error responses have empty bodies, so the client maps status codes to user-facing messages (`forms.js::messageForStatus`): `400` input, `401` login, `403` permission, `409` taken login name, `500` server error.
-* A `401` on an authenticated action navigates to the login view.
-* Successful login refreshes the session and navigates home; successful registration navigates to `/login?registered=1`, which shows a success notice; logout POSTs `/logout` (best effort), refreshes the session, and navigates home.
-* A successful profile save updates the local session state with the returned user.
-
-=== CSS conventions
-
-`public/css/main.css` is a single stylesheet organized in commented sections and built on custom properties.
-State and behavior live in CSS rather than JavaScript ("CSS over JS"): the account dropdown is a nested list revealed purely by `:hover` and `:focus-within` (keyboard accessible), with no inline style manipulation.
-The code uses modern browser features (ES modules, custom properties, `:focus-within`) and targets evergreen Firefox and Chromium — the engines the frontend test suite runs in.
-
-`public/layout_reference.html` is a static mockup mirroring the real markup and class names; it is a styling reference, not part of the application.
+Client-page deep links work on reload because their `GET` routes return the
+same HTML shell. API errors are handled by status code; exception bodies are
+normally empty, although development PHP settings may include a stack trace.

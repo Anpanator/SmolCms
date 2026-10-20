@@ -2,12 +2,13 @@
 :toc: macro
 :icons: font
 
-SmolCms is a small PHP web application learning project with a JavaScript single-page application frontend backed by a JSON API, user registration and authentication, SQLite persistence (default; MySQL schema included), and experimental image uploads.
-It requires PHP 8.5 or newer and the `PDO`, `mbstring`, `PDO_SQLite`, and `GD` extensions (see `composer.json` `require`).
-The requirement is enforced by `composer.json` at `composer install` time and at runtime via Composer's generated platform check, which `src/app.php` loads through `vendor/autoload.php`.
+SmolCms is a small PHP learning project with a vanilla-JavaScript SPA, JSON
+API, user accounts, SQLite persistence by default, image uploads, tagging,
+and moderation. It requires PHP 8.5 or newer and the extensions declared in
+`composer.json`; the MySQL schema is a reference, not a parity guarantee.
 
-The project has no `LICENSE` file and no `license` field in `composer.json` (all rights reserved), and contributions are not currently accepted.
-Third-party Composer dependencies (currently dev-only via `phpunit/phpunit`) retain their own licenses.
+The repository has no `LICENSE` file or `license` field in `composer.json`;
+review licensing before reuse.
 
 toc::[]
 
