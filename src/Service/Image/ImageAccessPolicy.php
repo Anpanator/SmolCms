@@ -48,4 +48,15 @@ final readonly class ImageAccessPolicy
         return $image->getUserId() === $userId
             || in_array('tagme', $this->tagService->getTagsForImage($imageId), true);
     }
+
+    public function canAccessImageDetail(ImageEntity $image, AccessLevel $accessLevel, ?int $userId = null): bool
+    {
+        if ($accessLevel->value >= AccessLevel::MOD->value
+            || $image->getStatus() === ImageStatus::ACCEPTED) {
+            return true;
+        }
+
+        return $image->getStatus() === ImageStatus::PENDING_REVIEW
+            && $image->getUserId() === $userId;
+    }
 }

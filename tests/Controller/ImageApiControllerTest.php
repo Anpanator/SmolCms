@@ -300,7 +300,7 @@ class ImageApiControllerTest extends FunctionalTestCase
         $this->assertNull($response->getContent());
     }
 
-    public function testGetImageDetailAction_PendingReviewImagesAreVisibleToUploaderTagmeViewersAndMods(): void
+    public function testGetImageDetailAction_PendingReviewImagesAreVisibleToUploaderAndModsButNotTagmeViewers(): void
     {
         $this->loginUser('image-detail-queue-' . bin2hex(random_bytes(4)), 'Queue Viewer');
         $viewer = $this->sessionService->getUserData();
@@ -324,8 +324,7 @@ class ImageApiControllerTest extends FunctionalTestCase
 
         $this->tagService->attachTagToImage($foreignPending->getId(), 'tagme');
         $response = $this->simulateDetailRequest((string)$foreignPending->getId());
-        self::assertSame(HttpStatus::OK, $response->getStatus());
-        self::assertSame($foreignPending->getId(), json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR)['image']['id']);
+        self::assertSame(HttpStatus::FORBIDDEN, $response->getStatus());
 
         $this->loginUserWithAccessLevel(
             'image-detail-mod-' . bin2hex(random_bytes(4)),
