@@ -45,6 +45,11 @@ export async function testImageViewRendersSampleImageInLayout() {
         assertTrue(view.matches('.layout'), 'image view should use the .layout grid');
         assertTrue(view.querySelector('.sidebar .tags') !== null, 'sidebar tag list should exist');
         assertTrue(view.querySelector('.sidebar .search-view') !== null, 'image sidebar should have tag search');
+        assertTrue(
+            (view.querySelector('.sidebar .search-view').compareDocumentPosition(view.querySelector('.sidebar .tag-editor'))
+                & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+            'the tag editor should follow the tag search field',
+        );
         assertEqual(view.querySelector('.tag-add-row'), null, 'anonymous users should not see tag controls');
         assertEqual(view.querySelector('.tag-remove-button'), null, 'anonymous users should not see remove controls');
         assertEqual(view.querySelectorAll('.sidebar .tags-item').length, 2, 'detail tags should replace static tags');
@@ -86,23 +91,18 @@ export async function testImageViewShowsMetadataAndDownloadLink() {
     }
 }
 
-export async function testImageViewShowsPendingApprovalWarningBetweenDateAndTags() {
+export async function testImageViewShowsPendingApprovalWarningAboveUploadDate() {
     const {view, restore} = await createView(() => detailResponse({status: 'pending_review'}));
     try {
         const uploaded = [...view.querySelectorAll('.image-meta-item')]
             .find((node) => node.querySelector('dt')?.textContent === 'Uploaded');
         const warning = view.querySelector('.image-pending-warning');
-        const tags = view.querySelector('.sidebar .tag-editor');
         assertTrue(uploaded !== undefined, 'uploaded date should be displayed');
         assertTrue(warning !== null && !warning.hidden, 'pending-review images should show the warning');
         assertEqual(warning.textContent, 'This image is pending approval.');
         assertTrue(
-            (uploaded.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
-            'warning should follow the upload date',
-        );
-        assertTrue(
-            (warning.compareDocumentPosition(tags) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
-            'warning should precede the tags',
+            (warning.compareDocumentPosition(uploaded) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+            'warning should precede the upload date',
         );
     } finally {
         restore();
@@ -227,6 +227,11 @@ export async function testImageTagAddRequiresButtonAndMergesAppliedTags() {
         const addButton = view.querySelector('.tag-add-submit');
         assertTrue(input !== null, 'logged-in users should see the tag input');
         assertEqual(addButton.textContent, 'Add');
+        assertTrue(
+            (view.querySelector('.search-view').compareDocumentPosition(view.querySelector('.tag-add-row'))
+                & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+            'the Add tags controls should follow the tag search field',
+        );
 
         addButton.click();
         input.value = 'bird, nature';

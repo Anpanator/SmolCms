@@ -33,9 +33,9 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
         className: 'sidebar',
         children: [
             search.element,
-            imageDetails.metaSection,
             el('h2', {className: 'sidebar-title', children: 'Tags'}),
             tagList.element,
+            imageDetails.metaSection,
         ],
     });
     const content = el('section', {

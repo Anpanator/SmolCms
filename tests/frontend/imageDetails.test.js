@@ -46,6 +46,12 @@ export function testImageDetailsShowsPendingApprovalWarningOnlyForPendingReview(
     details.update({...IMAGE, status: 'pending_review'});
     assertTrue(!details.pendingWarning.hidden, 'pending-review details should show the warning');
     assertEqual(details.pendingWarning.textContent, 'This image is pending approval.');
+    const uploadedItem = [...details.metadata.querySelectorAll('.image-meta-item')]
+        .find((node) => node.querySelector('dt')?.textContent === 'Uploaded');
+    assertTrue(
+        (details.pendingWarning.compareDocumentPosition(uploadedItem) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+        'pending warning should precede the upload date',
+    );
 
     details.update(null);
     assertTrue(details.pendingWarning.hidden, 'clearing the image should hide the warning');

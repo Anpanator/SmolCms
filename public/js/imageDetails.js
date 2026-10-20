@@ -27,7 +27,7 @@ export function createImageDetails() {
     });
     const metadataContent = el('div', {
         className: 'image-meta image-meta-content',
-        children: [uploadMetadata, pendingWarning, metadata],
+        children: [pendingWarning, uploadMetadata, metadata],
     });
     const metaSection = el('div', {
         className: 'image-meta-section',
