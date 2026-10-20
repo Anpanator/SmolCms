@@ -11,26 +11,39 @@ export {formatDimensions, formatFileSize} from './imageMetadata.js';
  * @returns {{
  *   imageHolder: HTMLDivElement,
  *   metaSection: HTMLDivElement,
- *   metadata: HTMLDListElement,
+ *   metadata: HTMLDivElement,
+ *   pendingWarning: HTMLParagraphElement,
  *   update: (image: object|null) => void,
  * }}
  */
 export function createImageDetails() {
     const imageHolder = el('div', {className: 'image-view'});
-    const metadata = el('dl', {className: 'image-meta'});
+    const uploadMetadata = el('dl', {className: 'image-meta-list'});
+    const metadata = el('dl', {className: 'image-meta-list'});
+    const pendingWarning = el('p', {
+        className: 'image-pending-warning',
+        attributes: {role: 'status', hidden: 'hidden'},
+        children: 'This image is pending approval.',
+    });
+    const metadataContent = el('div', {
+        className: 'image-meta image-meta-content',
+        children: [uploadMetadata, pendingWarning, metadata],
+    });
     const metaSection = el('div', {
         className: 'image-meta-section',
-        children: [el('hr', {className: 'image-meta-separator'}), metadata],
+        children: [el('hr', {className: 'image-meta-separator'}), metadataContent],
     });
     let downloadLink = null;
 
-    return {imageHolder, metaSection, metadata, update};
+    return {imageHolder, metaSection, metadata: metadataContent, pendingWarning, update};
 
     function update(image) {
         imageHolder.replaceChildren();
+        uploadMetadata.replaceChildren();
         metadata.replaceChildren();
         downloadLink?.remove();
         downloadLink = null;
+        pendingWarning.hidden = image?.status !== 'pending_review';
 
         if (!image) {
             return;
@@ -48,7 +61,9 @@ export function createImageDetails() {
             }));
         }
 
-        metadata.append(...createImageMetadataItems(image));
+        const metadataItems = createImageMetadataItems(image);
+        uploadMetadata.append(metadataItems[0]);
+        metadata.append(...metadataItems.slice(1));
 
         if (image.downloadSrc) {
             downloadLink = el('a', {

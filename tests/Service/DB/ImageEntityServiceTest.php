@@ -7,6 +7,7 @@ use DateTime;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Persistence\ImageEntity;
 use SmolCms\Service\DB\ImageEntityService;
+use SmolCms\Service\Tag\TagService;
 use SmolCms\TestUtils\Attributes\Autowire;
 use SmolCms\TestUtils\FunctionalTestCase;
 
@@ -15,15 +16,19 @@ class ImageEntityServiceTest extends FunctionalTestCase
     #[Autowire]
     private ImageEntityService $imageEntityService;
 
+    #[Autowire]
+    private TagService $tagService;
+
     private function makeEntity(
         ImageStatus $status = ImageStatus::PENDING,
         ?string $checksum = null,
         ?DateTime $uploadDate = null,
+        int $userId = 1,
     ): ImageEntity
     {
         return new ImageEntity(
             id: null,
-            userId: 1,
+            userId: $userId,
             uploadDate: $uploadDate ?? new DateTime(),
             status: $status,
             checksum: $checksum ?? hash('sha256', uniqid('image-entity-test', true)),
@@ -125,5 +130,76 @@ class ImageEntityServiceTest extends FunctionalTestCase
             static fn(ImageEntity $entity) => $entity->getId(),
             $result
         ));
+    }
+
+    public function testVisibleImagePageAndCountMatchViewerStatusFilterAndPagination(): void
+    {
+        $viewerId = 4321;
+        $otherUserId = 9876;
+        $markerTag = 'visible-page-' . bin2hex(random_bytes(4));
+        $this->tagService->createTag($markerTag);
+        $olderAccepted = $this->makeEntity(
+            status: ImageStatus::ACCEPTED,
+            uploadDate: new DateTime('2026-01-01 10:00:00'),
+            userId: $otherUserId,
+        );
+        $ownPending = $this->makeEntity(
+            status: ImageStatus::PENDING_REVIEW,
+            uploadDate: new DateTime('2026-01-01 12:00:00'),
+            userId: $viewerId,
+        );
+        $otherPending = $this->makeEntity(
+            status: ImageStatus::PENDING_REVIEW,
+            uploadDate: new DateTime('2026-01-01 13:00:00'),
+            userId: $otherUserId,
+        );
+        $unprocessed = $this->makeEntity(
+            status: ImageStatus::PENDING,
+            uploadDate: new DateTime('2026-01-01 14:00:00'),
+            userId: $viewerId,
+        );
+        $rejected = $this->makeEntity(
+            status: ImageStatus::REJECTED,
+            uploadDate: new DateTime('2026-01-01 15:00:00'),
+            userId: $otherUserId,
+        );
+        foreach ([$olderAccepted, $ownPending, $otherPending, $unprocessed, $rejected] as $image) {
+            $this->imageEntityService->saveAsNew($image);
+            $this->tagService->attachTagToImage($image->getId(), $markerTag);
+        }
+
+        self::assertSame(1, $this->imageEntityService->countVisible([$markerTag]));
+        self::assertSame(
+            [$olderAccepted->getId()],
+            array_map(
+                static fn(ImageEntity $image) => $image->getId(),
+                $this->imageEntityService->findVisiblePage(10, 0, [$markerTag]),
+            ),
+        );
+
+        self::assertSame(2, $this->imageEntityService->countVisible([$markerTag], $viewerId));
+        self::assertSame(
+            [$ownPending->getId(), $olderAccepted->getId()],
+            array_map(
+                static fn(ImageEntity $image) => $image->getId(),
+                $this->imageEntityService->findVisiblePage(10, 0, [$markerTag], $viewerId),
+            ),
+        );
+
+        self::assertSame(3, $this->imageEntityService->countVisible([$markerTag], $viewerId, true));
+        self::assertSame(
+            [$otherPending->getId(), $ownPending->getId()],
+            array_map(
+                static fn(ImageEntity $image) => $image->getId(),
+                $this->imageEntityService->findVisiblePage(2, 0, [$markerTag], $viewerId, true),
+            ),
+        );
+        self::assertSame(
+            [$olderAccepted->getId()],
+            array_map(
+                static fn(ImageEntity $image) => $image->getId(),
+                $this->imageEntityService->findVisiblePage(2, 2, [$markerTag], $viewerId, true),
+            ),
+        );
     }
 }

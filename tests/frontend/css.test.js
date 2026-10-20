@@ -59,6 +59,9 @@ export function testTileHoverRuleExists() {
 export function testImageTileAndReviewStylesExist() {
     const rules = collectRules(findMainStylesheet());
 
+    assertTrue(findRule(rules, '.tile-unapproved', 'border:2pxsolid') !== undefined, 'unapproved thumbnails should have an orange border');
+    assertTrue(findRule(rules, '.image-pending-warning', 'color:var(--color-danger)') !== undefined, 'pending warnings should use the danger color');
+
     const tileImageRule = findRule(rules, '.tile-image', 'object-fit:cover');
     assertTrue(tileImageRule !== undefined, 'tile images should be cropped with object-fit: cover');
 

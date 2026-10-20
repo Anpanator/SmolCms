@@ -28,13 +28,18 @@ readonly class ImageQueryService
     }
 
     /**
-     * Accepted-image page and tag cloud. The subquery matches every requested tag,
+     * Visible-image page and tag cloud. The subquery matches every requested tag,
      * while the cloud is calculated only over the images returned on this page.
      *
      * @param list<string> $tagNames
-     * @return array{images: list<array{id: int, thumbSrc: ?string}>, page: int, perPage: int, total: int, tags: list<array{name: string, imageCount: int}>}
+     * @return array{images: list<array{id: int, thumbSrc: ?string, status: string}>, page: int, perPage: int, total: int, tags: list<array{name: string, imageCount: int}>}
      */
-    public function getAcceptedImagePage(int $page = 1, array $tagNames = []): array
+    public function getImagePage(
+        int $page = 1,
+        array $tagNames = [],
+        ?int $viewerId = null,
+        bool $includeAllPending = false,
+    ): array
     {
         if ($page < 1 || $page > intdiv(PHP_INT_MAX, self::IMAGES_PER_PAGE) + 1) {
             throw new InvalidArgumentException('Page must be a positive integer.');
@@ -43,12 +48,19 @@ readonly class ImageQueryService
         $tagNames = self::deduplicateTagNames($tagNames);
         $offset = ($page - 1) * self::IMAGES_PER_PAGE;
 
-        $total = $this->imageEntityService->countAccepted($tagNames);
+        $total = $this->imageEntityService->countVisible($tagNames, $viewerId, $includeAllPending);
         $images = [];
-        foreach ($this->imageEntityService->findAcceptedPage(self::IMAGES_PER_PAGE, $offset, $tagNames) as $entity) {
+        foreach ($this->imageEntityService->findVisiblePage(
+            self::IMAGES_PER_PAGE,
+            $offset,
+            $tagNames,
+            $viewerId,
+            $includeAllPending,
+        ) as $entity) {
             $images[] = [
                 'id' => $entity->getId(),
                 'thumbSrc' => $this->getThumbSrc($entity),
+                'status' => $entity->getStatus()->value,
             ];
         }
         $imageIds = array_column($images, 'id');
@@ -75,6 +87,7 @@ readonly class ImageQueryService
         }
         $uploader = $this->userService->findOneById($entity->getUserId());
         return [
+            'status' => $entity->getStatus()->value,
             'id' => $entity->getId(),
             'uploadDate' => $entity->getUploadDate()->format(self::UPLOAD_DATE_FORMAT),
             'uploader' => $uploader?->getDisplayName(),

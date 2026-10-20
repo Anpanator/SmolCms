@@ -87,8 +87,11 @@ readonly class ImageFileController
         }
 
         $userData = $this->sessionService->getUserData();
-        if ($userData === null || !$this->imageAccessPolicy->canAccess($entity, $userData->accessLevel)) {
+        if ($userData === null) {
             return new Response(HttpStatus::NOT_FOUND);
+        }
+        if (!$this->imageAccessPolicy->canAccess($entity, $userData->accessLevel, $userData->id)) {
+            return new Response(HttpStatus::FORBIDDEN);
         }
 
         $filePath = $baseDir . '/' . ImagePathLayout::relativePathForFileName($name);

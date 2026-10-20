@@ -5,7 +5,7 @@
  */
 import {get} from '../api.js';
 import {el} from '../dom.js';
-import {createMessageBox, isAuthError, messageForStatus, showMessage} from '../forms.js';
+import {createMessageBox, messageForStatus, showMessage} from '../forms.js';
 import {createImageDetails, formatFileSize} from '../imageDetails.js';
 import {createSearchView, normalizeTags} from '../search.js';
 import {createTagList} from '../tagList.js';
@@ -14,6 +14,7 @@ export {formatFileSize};
 
 const DETAIL_URL = '/api/image/detail';
 const NOT_FOUND_MESSAGE = 'Image not found.';
+const FORBIDDEN_MESSAGE = 'You do not have permission to view this image.';
 
 export function createImageView({session, navigate = () => {}, query = new URLSearchParams(window.location.search)} = {}) {
     const imageId = parseImageId(query.get('id'));
@@ -32,9 +33,9 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
         className: 'sidebar',
         children: [
             search.element,
+            imageDetails.metaSection,
             el('h2', {className: 'sidebar-title', children: 'Tags'}),
             tagList.element,
-            imageDetails.metaSection,
         ],
     });
     const content = el('section', {
@@ -72,8 +73,8 @@ async function loadImage(id, {navigate, imageDetails, tagList, status}) {
         imageDetails.update(image);
         tagList.update(image);
     } catch (error) {
-        if (isAuthError(error)) {
-            navigate('/login');
+        if (error?.status === 401 || error?.status === 403) {
+            showMessage(status, FORBIDDEN_MESSAGE);
             return;
         }
         showMessage(status, error?.status === 404 ? NOT_FOUND_MESSAGE : messageForStatus(error?.status ?? 0));

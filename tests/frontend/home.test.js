@@ -4,8 +4,8 @@ import {createHomeView} from '../../public/js/views/home.js';
 
 const IMAGES = {
     images: [
-        { id: 7, thumbSrc: '/public/img/thumb/ab/ab89c0.avif' },
-        { id: 3, thumbSrc: '/public/img/thumb/cd/cd1234.avif' },
+        { id: 7, thumbSrc: '/public/img/thumb/ab/ab89c0.avif', status: 'accepted' },
+        { id: 3, thumbSrc: '/public/img/thumb/cd/cd1234.avif', status: 'accepted' },
     ],
     page: 1,
     perPage: 25,
@@ -200,6 +200,29 @@ export async function testHomeTileWithoutThumbShowsPlaceholder() {
         assertEqual(tile.getAttribute('href'), '/image?id=9');
         assertTrue(tile.querySelector('img') === null, 'a tile without a thumb renders no image');
         assertTrue(tile.querySelector('.tile-placeholder') !== null, 'a tile without a thumb shows placeholder text');
+    } finally {
+        restore();
+    }
+}
+
+export async function testPendingReviewTilesGetUnapprovedClass() {
+    const {view, restore} = await createLoadedView(
+        () => ({status: 200, body: {
+            images: [
+                {id: 9, thumbSrc: '/public/img/thumb/ab/ab89c0.avif', status: 'pending_review'},
+                {id: 10, thumbSrc: '/public/img/thumb/cd/cd1234.avif', status: 'accepted'},
+            ],
+            page: 1,
+            perPage: 25,
+            total: 2,
+            tags: [],
+        }}),
+    );
+    try {
+        const pendingTile = view.querySelector('.grid a.tile[data-image-id="9"]');
+        const acceptedTile = view.querySelector('.grid a.tile[data-image-id="10"]');
+        assertTrue(pendingTile.classList.contains('tile-unapproved'), 'pending-review tiles should be marked unapproved');
+        assertTrue(!acceptedTile.classList.contains('tile-unapproved'), 'accepted tiles should keep the normal style');
     } finally {
         restore();
     }

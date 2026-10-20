@@ -32,7 +32,14 @@ readonly class ImageApiController
             return new Response(HttpStatus::BAD_REQUEST);
         }
 
-        return new JsonResponse($this->imageQueryService->getAcceptedImagePage($page, $tags));
+        $user = $this->sessionService->getUserData();
+        $canViewAllPending = $user !== null && $user->accessLevel->value >= AccessLevel::MOD->value;
+        return new JsonResponse($this->imageQueryService->getImagePage(
+            $page,
+            $tags,
+            $user?->id,
+            $canViewAllPending,
+        ));
     }
 
     #[Authenticated(AccessLevel::NOVICE)]
@@ -47,8 +54,12 @@ readonly class ImageApiController
         if ($user === null) {
             return new Response(HttpStatus::UNAUTHORIZED);
         }
-        if ($this->imageAccessPolicy->findAccessibleImage($id, $user->accessLevel) === null) {
+        $image = $this->imageAccessPolicy->findImage($id);
+        if ($image === null) {
             return new Response(HttpStatus::NOT_FOUND);
+        }
+        if (!$this->imageAccessPolicy->canAccess($image, $user->accessLevel, $user->id)) {
+            return new Response(HttpStatus::FORBIDDEN);
         }
 
         $detail = $this->imageQueryService->getImageDetail($id);

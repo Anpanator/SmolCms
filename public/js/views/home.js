@@ -168,7 +168,7 @@ function createTile(image) {
         ? el('img', { className: 'tile-image', attributes: { src: image.thumbSrc, alt: '', loading: 'lazy' } })
         : el('span', { className: 'tile-placeholder', children: 'No preview' });
     return el('a', {
-        className: 'tile tile--link',
+        className: `tile tile--link${image.status === 'pending_review' ? ' tile-unapproved' : ''}`,
         attributes: {href: `/image?id=${image.id}`, 'data-image-id': image.id},
         children: child,
     });

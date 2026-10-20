@@ -4,6 +4,7 @@ import {createImageView, formatFileSize} from '../../public/js/views/image.js';
 
 const DETAIL = {
     id: 7,
+    status: 'accepted',
     uploadDate: '2026-10-19 10:30:00',
     uploader: 'Upload User',
     width: 100,
@@ -85,6 +86,29 @@ export async function testImageViewShowsMetadataAndDownloadLink() {
     }
 }
 
+export async function testImageViewShowsPendingApprovalWarningBetweenDateAndTags() {
+    const {view, restore} = await createView(() => detailResponse({status: 'pending_review'}));
+    try {
+        const uploaded = [...view.querySelectorAll('.image-meta-item')]
+            .find((node) => node.querySelector('dt')?.textContent === 'Uploaded');
+        const warning = view.querySelector('.image-pending-warning');
+        const tags = view.querySelector('.sidebar .tag-editor');
+        assertTrue(uploaded !== undefined, 'uploaded date should be displayed');
+        assertTrue(warning !== null && !warning.hidden, 'pending-review images should show the warning');
+        assertEqual(warning.textContent, 'This image is pending approval.');
+        assertTrue(
+            (uploaded.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+            'warning should follow the upload date',
+        );
+        assertTrue(
+            (warning.compareDocumentPosition(tags) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+            'warning should precede the tags',
+        );
+    } finally {
+        restore();
+    }
+}
+
 export async function testImageTagSearchNavigatesToHomeFilter() {
     const { view, navigateCalls, restore } = await createView(() => detailResponse());
     try {
@@ -132,12 +156,17 @@ export async function testImageViewUnknownIdShowsNotFound() {
     }
 }
 
-export async function testImageViewUnauthorizedNavigatesToLogin() {
-    const { view, navigateCalls, restore } = await createView(() => ({ status: 401, body: null }));
-    try {
-        assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/login']), '401 should navigate to the login view');
-    } finally {
-        restore();
+export async function testImageViewShowsForbiddenMessageFor401And403() {
+    for (const statusCode of [401, 403]) {
+        const {view, navigateCalls, restore} = await createView(() => ({status: statusCode, body: null}));
+        try {
+            const message = view.querySelector('.form-message');
+            assertTrue(message !== null && !message.hidden, `${statusCode} should show a forbidden message`);
+            assertEqual(message.textContent, 'You do not have permission to view this image.');
+            assertEqual(JSON.stringify(navigateCalls), JSON.stringify([]), `${statusCode} should not redirect to login`);
+        } finally {
+            restore();
+        }
     }
 }
 
