@@ -8,4 +8,6 @@ enum HttpHeader: string
     case CONTENT_TYPE = 'Content-Type';
     case CONTENT_DISPOSITION = 'Content-Disposition';
     case X_ACCEL_REDIRECT = 'X-Accel-Redirect';
+    case ORIGIN = 'Origin';
+    case SEC_FETCH_SITE = 'Sec-Fetch-Site';
 }

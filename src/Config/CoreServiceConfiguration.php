@@ -12,6 +12,7 @@ use SmolCms\Service\Asset\JavaScriptIntegrityService;
 use SmolCms\Service\Core\Action\AuthorizationPreControllerAction;
 use SmolCms\Service\Core\Action\PreControllerActionFacade;
 use SmolCms\Service\Core\Action\RequestMappingPreControllerAction;
+use SmolCms\Service\Core\Action\SameOriginPreControllerAction;
 use SmolCms\Service\Core\Action\ValidationPreControllerAction;
 use SmolCms\Service\Core\ApplicationStartupHandler;
 use SmolCms\Service\Core\CliCommand\GenerateJsIntegrityExecutor;
@@ -103,6 +104,7 @@ class CoreServiceConfiguration
             new Service(
                 identifier: PreControllerActionFacade::class,
                 parameters: [
+                    SameOriginPreControllerAction::class,
                     AuthorizationPreControllerAction::class,
                     RequestMappingPreControllerAction::class,
                     ValidationPreControllerAction::class,

@@ -6,6 +6,7 @@ namespace SmolCms\Service\Tag;
 
 use InvalidArgumentException;
 use RuntimeException;
+use SmolCms\Data\Constant\TagInputLimits;
 use SmolCms\Data\Persistence\ImageEntity;
 use SmolCms\Data\Persistence\ImageTagEntity;
 use SmolCms\Data\Persistence\TagCategoryEntity;
@@ -754,7 +755,7 @@ readonly class TagService extends EntityService
     private static function validateName(string $name): void
     {
         $length = mb_strlen($name, 'UTF-8');
-        if ($length < 1 || $length > 100 || str_contains($name, ',')) {
+        if ($length < 1 || $length > TagInputLimits::MAX_TAG_LENGTH || str_contains($name, ',')) {
             throw new InvalidArgumentException('Name must be 1–100 characters and must not contain a comma.');
         }
     }

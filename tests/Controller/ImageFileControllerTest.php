@@ -13,6 +13,7 @@ use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\DB\ImageEntityService;
+use SmolCms\Service\Tag\TagService;
 use SmolCms\TestUtils\Attributes\Autowire;
 use SmolCms\TestUtils\FunctionalTestCase;
 use SmolCms\TestUtils\ImageTestUtils;
@@ -27,6 +28,9 @@ class ImageFileControllerTest extends FunctionalTestCase
 
     #[Autowire]
     private ImageEntityService $imageEntityService;
+
+    #[Autowire]
+    private TagService $tagService;
 
     protected function setUp(): void
     {
@@ -209,6 +213,24 @@ class ImageFileControllerTest extends FunctionalTestCase
         $this->loginUserWithAccessLevel('mod-user', 'Mod User', AccessLevel::MOD);
         $modResponse = $this->simulateDownloadRequest($downloadFilename);
         $this->assertSame(HttpStatus::OK, $modResponse->getStatus());
+    }
+
+    public function testSampleAction_PendingTagmeImageIsVisibleToRegularGameUsers(): void
+    {
+        $this->loginUser('tagme-file-user', 'Tagme File User');
+        $sampleFilename = ImageTestUtils::randomChecksum() . '.webp';
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::PENDING_REVIEW,
+            sampleFilename: $sampleFilename,
+        );
+        $this->tagService->attachTagToImage($image->getId(), 'tagme');
+        ImageTestUtils::writeImageFile(IMAGE_SAMPLE_DIR, $sampleFilename);
+
+        $response = $this->simulateSampleRequest($sampleFilename);
+
+        self::assertSame(HttpStatus::OK, $response->getStatus());
     }
 
     private function simulateSampleRequest(?string $name): Response

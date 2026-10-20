@@ -311,6 +311,55 @@ class ImageReviewControllerTest extends FunctionalTestCase
         $this->assertNotNull($this->imageEntityService->findOneById($otherEntity->getId()));
     }
 
+    public function testRejectAction_KeepsContentAddressedFilesReferencedByAnotherImage(): void
+    {
+        $this->loginUserWithAccessLevel('mod-shared-file-user', 'Shared File Mod', AccessLevel::MOD);
+        $checksum = ImageTestUtils::randomChecksum();
+        $thumbFilename = ImageTestUtils::randomChecksum() . '.avif';
+        $sampleFilename = ImageTestUtils::randomChecksum() . '.webp';
+        $downloadFilename = ImageTestUtils::randomChecksum() . '.jpeg';
+        $rejectedEntity = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::PENDING_REVIEW,
+            checksum: $checksum,
+            thumbFilename: $thumbFilename,
+            sampleFilename: $sampleFilename,
+            downloadFilename: $downloadFilename,
+        );
+        $survivingEntity = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::PENDING_REVIEW,
+            checksum: $checksum,
+            thumbFilename: $thumbFilename,
+            sampleFilename: $sampleFilename,
+            downloadFilename: $downloadFilename,
+        );
+        $paths = [
+            ImageTestUtils::imageFilePath(IMAGE_STORAGE_DIR, "$checksum.jpeg"),
+            ImageTestUtils::imageFilePath(IMAGE_THUMB_DIR, $thumbFilename),
+            ImageTestUtils::imageFilePath(IMAGE_SAMPLE_DIR, $sampleFilename),
+            ImageTestUtils::imageFilePath(IMAGE_DOWNLOAD_DIR, $downloadFilename),
+        ];
+        foreach ($paths as $path) {
+            $pathDir = dirname($path);
+            if (!is_dir($pathDir)) {
+                mkdir($pathDir, 0777, true);
+            }
+            file_put_contents($path, 'shared-content');
+        }
+
+        $response = $this->simulateReviewPostRequest('/api/review/reject', (string)$rejectedEntity->getId());
+
+        self::assertSame(HttpStatus::NO_CONTENT, $response->getStatus());
+        self::assertNull($this->imageEntityService->findOneById($rejectedEntity->getId()));
+        self::assertNotNull($this->imageEntityService->findOneById($survivingEntity->getId()));
+        foreach ($paths as $path) {
+            self::assertFileExists($path);
+        }
+    }
+
     public function testRejectAction_UnknownId_ReturnsNotFound(): void
     {
         $this->loginUserWithAccessLevel('mod-user', 'Mod User', AccessLevel::MOD);

@@ -17,6 +17,7 @@ use SmolCms\Data\Persistence\UserEntity;
 use SmolCms\Service\DB\ImageEntityService;
 use SmolCms\Service\DB\UserService;
 use SmolCms\Service\File\FileSystemAccessService;
+use SmolCms\Service\Image\ImageDimensions;
 use SmolCms\Service\Image\ImagePathLayout;
 use SmolCms\Service\Image\ImageProcessingService;
 use SmolCms\Service\Image\ImageStorageService;
@@ -345,7 +346,7 @@ class ImageProcessingServiceTest extends FunctionalTestCase
         self::assertSame(self::encodeImage($decodedOriginal, ImageType::AVIF, 75), $downloadContent);
     }
 
-    public function testProcessBatch_duplicatePendingImages_deletesOriginalAfterBothAreProcessed(): void
+    public function testProcessBatch_duplicatePendingImagesKeepsSharedOriginalAfterBothAreProcessed(): void
     {
         $wizard = $this->createUser(AccessLevel::WIZARD);
         $image = self::createTestImage(24, 16);
@@ -357,7 +358,7 @@ class ImageProcessingServiceTest extends FunctionalTestCase
 
         self::assertSame(2, $this->testee->processBatch(10));
 
-        self::assertFileDoesNotExist($this->originalPath($first));
+        self::assertFileExists($this->originalPath($first));
         self::assertSame(ImageStatus::ACCEPTED, $this->imageEntityService->findOneById($first->getId())->getStatus());
         self::assertSame(ImageStatus::ACCEPTED, $this->imageEntityService->findOneById($second->getId())->getStatus());
     }
@@ -444,6 +445,24 @@ class ImageProcessingServiceTest extends FunctionalTestCase
         $goodReloaded = $this->imageEntityService->findOneById($goodEntity->getId());
         self::assertNotNull($goodReloaded);
         self::assertSame(ImageStatus::ACCEPTED, $goodReloaded->getStatus());
+    }
+
+    public function testProcessBatch_oversizedImageStaysPendingWithoutDecoding(): void
+    {
+        $wizard = $this->createUser(AccessLevel::WIZARD);
+        $oversizedImage = self::createTestImage(ImageDimensions::MAX_DIMENSION + 1, 1);
+        $originalContent = self::encodeImage($oversizedImage, ImageType::PNG);
+        $entity = $this->createPendingImageFromContent($originalContent, ImageType::PNG, $wizard->getId());
+
+        self::assertSame(0, $this->testee->processBatch(10));
+
+        $reloaded = $this->imageEntityService->findOneById($entity->getId());
+        self::assertNotNull($reloaded);
+        self::assertSame(ImageStatus::PENDING, $reloaded->getStatus());
+        self::assertNull($reloaded->getThumbFilename());
+        self::assertNull($reloaded->getSampleFilename());
+        self::assertNull($reloaded->getDownloadFilename());
+        self::assertFileExists($this->originalPath($entity));
     }
 
     public function testProcessBatch_missingOriginalFile_staysPendingWithoutException(): void

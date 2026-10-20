@@ -9,6 +9,7 @@ use SmolCms\Data\Constant\AuditActionType;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Constant\ImageStatus;
+use SmolCms\Data\Constant\TagInputLimits;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Session\SessionService;
@@ -97,9 +98,63 @@ class ImageTagControllerTest extends FunctionalTestCase
             $this->simulateImageTagsPost('/api/image/tags', ['imageId' => 1, 'tags' => ' , '])->getStatus(),
         );
         self::assertSame(
+            HttpStatus::BAD_REQUEST,
+            $this->simulateImageTagsPost('/api/image/tags', [
+                'imageId' => 1,
+                'tags' => str_repeat('x', TagInputLimits::MAX_TAG_LIST_LENGTH + 1),
+            ])->getStatus(),
+        );
+        self::assertSame(
+            HttpStatus::BAD_REQUEST,
+            $this->simulateImageTagsPost('/api/image/tags', [
+                'imageId' => 1,
+                'tags' => implode(',', array_fill(0, TagInputLimits::MAX_TAG_COUNT + 1, 'tag')),
+            ])->getStatus(),
+        );
+        self::assertSame(
             HttpStatus::NOT_FOUND,
             $this->simulateImageTagsPost('/api/image/tags', ['imageId' => 999999, 'tags' => 'valid'])->getStatus(),
         );
+    }
+
+    public function testPendingImagesAreHiddenUnlessTheyAreInTheTagmeGame(): void
+    {
+        $loginName = 'image-tag-pending-' . bin2hex(random_bytes(5));
+        $this->loginUser($loginName, 'Image Tag Pending');
+        $userId = $this->sessionService->getUserData()->id;
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $userId,
+            status: ImageStatus::PENDING_REVIEW,
+        );
+
+        self::assertSame(
+            HttpStatus::NOT_FOUND,
+            $this->simulateImageTagsPost('/api/image/tags', ['imageId' => $image->getId(), 'tags' => 'tag'])->getStatus(),
+        );
+        self::assertSame(
+            HttpStatus::NOT_FOUND,
+            $this->simulateImageTagsPost('/api/image/tags/remove', ['imageId' => $image->getId(), 'tag' => 'tag'])->getStatus(),
+        );
+
+        $gameTag = 'game-' . bin2hex(random_bytes(4));
+        $this->tagService->createTag($gameTag);
+        $this->tagService->attachTagToImage($image->getId(), 'tagme');
+
+        $addResponse = $this->simulateImageTagsPost('/api/image/tags', [
+            'imageId' => $image->getId(),
+            'tags' => $gameTag,
+        ]);
+        self::assertSame(HttpStatus::OK, $addResponse->getStatus());
+        $tags = $this->tagService->getTagsForImage($image->getId());
+        self::assertContains($gameTag, $tags);
+        self::assertContains('tagme', $tags);
+
+        $removeResponse = $this->simulateImageTagsPost('/api/image/tags/remove', [
+            'imageId' => $image->getId(),
+            'tag' => $gameTag,
+        ]);
+        self::assertSame(HttpStatus::NO_CONTENT, $removeResponse->getStatus());
     }
 
     public function testRemoveActionEnforcesTagmeMinimumAuditsRemovalAndMapsMissingRows(): void
@@ -150,6 +205,13 @@ class ImageTagControllerTest extends FunctionalTestCase
         self::assertSame(
             HttpStatus::BAD_REQUEST,
             $this->simulateImageTagsPost('/api/image/tags/remove', ['imageId' => $image->getId()])->getStatus(),
+        );
+        self::assertSame(
+            HttpStatus::BAD_REQUEST,
+            $this->simulateImageTagsPost('/api/image/tags/remove', [
+                'imageId' => $image->getId(),
+                'tag' => str_repeat('x', TagInputLimits::MAX_TAG_LENGTH + 1),
+            ])->getStatus(),
         );
 
         $blockedImage = ImageTestUtils::createImageEntity($this->imageEntityService, $userId);

@@ -32,8 +32,9 @@ class TagmeControllerTest extends FunctionalTestCase
     #[Autowire]
     private TagService $tagService;
 
-    public function testRandomTagmeImageRequiresAuthenticationAndReturnsExactAcceptedImageDetail(): void
+    public function testRandomTagmeImageRequiresAuthenticationAndReturnsAnEligibleImageDetail(): void
     {
+        $this->clearTagmeImages();
         self::assertSame(HttpStatus::UNAUTHORIZED, $this->simulateRandomRequest()->getStatus());
 
         $this->loginUser('tagme-user-' . bin2hex(random_bytes(5)), 'Tagme User');
@@ -62,27 +63,41 @@ class TagmeControllerTest extends FunctionalTestCase
         $response = $this->simulateRandomRequest();
 
         self::assertSame(HttpStatus::OK, $response->getStatus());
-        self::assertSame(
-            ['image' => $this->imageQueryService->getImageDetail($acceptedTagged->getId())],
-            json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR),
-        );
+        $returnedImage = json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR)['image'];
+        self::assertContains($returnedImage['id'], [$acceptedTagged->getId(), $pendingTagged->getId()]);
+        self::assertSame($this->imageQueryService->getImageDetail($returnedImage['id']), $returnedImage);
     }
 
-    public function testRandomTagmeImageReturnsNotFoundWhenOnlyPendingImagesHaveTagme(): void
+    public function testRandomTagmeImageReturnsPendingTagmeImageForTheGame(): void
     {
+        $this->clearTagmeImages();
         $this->loginUser('tagme-empty-user-' . bin2hex(random_bytes(5)), 'Tagme Empty User');
         $userId = $this->sessionService->getUserData()->id;
-        foreach ($this->imageEntityService->findAcceptedPage(1000, 0) as $acceptedImage) {
-            if (in_array('tagme', $this->tagService->getTagsForImage($acceptedImage->getId()), true)) {
-                $this->tagService->detachTagFromImage($acceptedImage->getId(), 'tagme');
-            }
-        }
         $pendingTagged = ImageTestUtils::createImageEntity(
             $this->imageEntityService,
             $userId,
             status: ImageStatus::PENDING_REVIEW,
         );
         $this->tagService->attachTagToImage($pendingTagged->getId(), 'tagme');
+
+        $response = $this->simulateRandomRequest();
+
+        self::assertSame(HttpStatus::OK, $response->getStatus());
+        self::assertSame(
+            ['image' => $this->imageQueryService->getImageDetail($pendingTagged->getId())],
+            json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR),
+        );
+    }
+
+    public function testRandomTagmeImageReturnsNotFoundWhenNoEligibleImageHasTagme(): void
+    {
+        $this->clearTagmeImages();
+        $this->loginUser('tagme-no-image-user-' . bin2hex(random_bytes(5)), 'Tagme No Image User');
+        ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            $this->sessionService->getUserData()->id,
+            status: ImageStatus::PENDING_REVIEW,
+        );
 
         self::assertSame(HttpStatus::NOT_FOUND, $this->simulateRandomRequest()->getStatus());
     }
@@ -93,5 +108,16 @@ class TagmeControllerTest extends FunctionalTestCase
             url: new Url(protocol: 'https', host: 'localhost', path: '/api/tagme/random'),
             method: HttpMethod::GET,
         ));
+    }
+
+    private function clearTagmeImages(): void
+    {
+        foreach (ImageStatus::cases() as $status) {
+            foreach ($this->imageEntityService->findByStatus($status) as $image) {
+                if ($image->getId() !== null) {
+                    $this->tagService->detachTagFromImage($image->getId(), 'tagme');
+                }
+            }
+        }
     }
 }

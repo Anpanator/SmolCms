@@ -6,6 +6,7 @@ namespace SmolCms\Service\DB;
 use InvalidArgumentException;
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Persistence\UserEntity;
+use SmolCms\Exception\UserUpdateForbiddenException;
 use SmolCms\Service\Tag\TagService;
 
 readonly class UserService extends EntityService
@@ -66,13 +67,25 @@ readonly class UserService extends EntityService
         int $id,
         string $displayName,
         AccessLevel $accessLevel,
+        int $actorId,
         ?string $loginName = null,
     ): ?UserEntity
     {
-        return $this->withinTransaction(function () use ($id, $displayName, $accessLevel, $loginName): ?UserEntity {
+        return $this->withinTransaction(function () use ($id, $displayName, $accessLevel, $actorId, $loginName): ?UserEntity {
+            $actor = $this->findOneById($actorId);
+            if ($actor === null) {
+                throw new UserUpdateForbiddenException('The user making this update no longer exists.');
+            }
+
             $user = $this->findOneById($id);
             if ($user === null) {
                 return null;
+            }
+
+            if ($id === $actorId
+                || $user->getAccessLevel()->value >= $actor->getAccessLevel()->value
+                || $accessLevel->value >= $actor->getAccessLevel()->value) {
+                throw new UserUpdateForbiddenException('The user is not allowed to update this account or access level.');
             }
 
             if ($loginName !== null) {

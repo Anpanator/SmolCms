@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace SmolCms\Service\DB;
 
 use PDO;
+use SmolCms\Data\Constant\ImageFileVariant;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Persistence\ImageEntity;
 use SmolCms\Service\Core\CaseConverter;
@@ -95,7 +96,7 @@ readonly class ImageEntityService extends EntityService
         return $this->countResults($qc);
     }
 
-    public function findRandomAcceptedImageWithTagName(string $tagName): ?ImageEntity
+    public function findRandomTagmeImage(): ?ImageEntity
     {
         $driver = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
         $tagNameCondition = $driver === 'sqlite'
@@ -105,7 +106,7 @@ readonly class ImageEntityService extends EntityService
 
         $criteria = new QueryCriteria();
         $criteria->select(ImageEntity::class)
-            ->andWhere('status = :accepted_status')
+            ->andWhere('(status = :accepted_status OR status = :pending_review_status)')
             ->andWhere(
                 'id IN (SELECT it.image_id FROM image_tag it '
                 . 'INNER JOIN tag t ON t.id = it.tag_id '
@@ -113,7 +114,8 @@ readonly class ImageEntityService extends EntityService
             )
             ->withParameters([
                 'accepted_status' => ImageStatus::ACCEPTED->value,
-                'tag_name' => $tagName,
+                'pending_review_status' => ImageStatus::PENDING_REVIEW->value,
+                'tag_name' => 'tagme',
             ])
             ->orderBy($randomOrder)
             ->maxResults(1);
@@ -141,20 +143,54 @@ readonly class ImageEntityService extends EntityService
         return $result ?? [];
     }
 
-    public function hasPendingOriginal(string $checksum, string $originalExtension): bool
+    public function hasOtherImageReference(ImageEntity $image, ImageFileVariant $variant): bool
     {
-        $qc = new QueryCriteria();
-        $qc->select(ImageEntity::class)
-            ->andWhere('checksum = :checksum')
-            ->andWhere('original_extension = :originalExtension')
-            ->andWhere('status = :status')
-            ->withParameters([
-                'checksum' => $checksum,
-                'originalExtension' => $originalExtension,
-                'status' => ImageStatus::PENDING->value,
-            ])
+        $imageId = $image->getId();
+        if ($imageId === null) {
+            return false;
+        }
+
+        $criteria = new QueryCriteria();
+        $criteria->select(ImageEntity::class)
+            ->andWhere('id != :image_id')
             ->maxResults(1);
-        return ($this->execute($qc) ?? []) !== [];
+        $parameters = ['image_id' => $imageId];
+
+        switch ($variant) {
+            case ImageFileVariant::ORIGINAL:
+                $criteria->andWhere('checksum = :checksum')
+                    ->andWhere('original_extension = :original_extension');
+                $parameters['checksum'] = $image->getChecksum();
+                $parameters['original_extension'] = $image->getOriginalExtension();
+                break;
+            case ImageFileVariant::THUMB:
+                $filename = $image->getThumbFilename();
+                if ($filename === null) {
+                    return false;
+                }
+                $criteria->andWhere('thumb_filename = :filename');
+                $parameters['filename'] = $filename;
+                break;
+            case ImageFileVariant::SAMPLE:
+                $filename = $image->getSampleFilename();
+                if ($filename === null) {
+                    return false;
+                }
+                $criteria->andWhere('sample_filename = :filename');
+                $parameters['filename'] = $filename;
+                break;
+            case ImageFileVariant::DOWNLOAD:
+                $filename = $image->getDownloadFilename();
+                if ($filename === null) {
+                    return false;
+                }
+                $criteria->andWhere('download_filename = :filename');
+                $parameters['filename'] = $filename;
+                break;
+        }
+
+        $criteria->withParameters($parameters);
+        return ($this->execute($criteria) ?? []) !== [];
     }
 
     public function deleteById(int $id): void

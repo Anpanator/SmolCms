@@ -9,6 +9,7 @@ use GdImage;
 use InvalidArgumentException;
 use RuntimeException;
 use SmolCms\Data\Constant\AccessLevel;
+use SmolCms\Data\Constant\ImageFileVariant;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Constant\LogLevel;
 use SmolCms\Data\Image\ImageType;
@@ -119,6 +120,12 @@ class ImageProcessingService
 
     private function decodeOriginal(string $content, ImageEntity $entity): GdImage
     {
+        if (ImageDimensions::fromString($content) === null) {
+            throw new RuntimeException(
+                "Stored original of image {$entity->getId()} has invalid or over-limit dimensions."
+            );
+        }
+
         set_error_handler(
             static function (int $severity, string $message, string $file, int $line): never {
                 throw new ErrorException($message, 0, $severity, $file, $line);
@@ -152,7 +159,7 @@ class ImageProcessingService
     private function deleteOriginalAfterProcessing(ImageEntity $entity): void
     {
         try {
-            if ($this->imageEntityService->hasPendingOriginal($entity->getChecksum(), $entity->getOriginalExtension())) {
+            if ($this->imageEntityService->hasOtherImageReference($entity, ImageFileVariant::ORIGINAL)) {
                 return;
             }
 

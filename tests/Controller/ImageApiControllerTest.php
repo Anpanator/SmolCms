@@ -10,22 +10,30 @@ use SmolCms\Data\Constant\HttpContentType;
 use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
+use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\ImageEntityService;
+use SmolCms\Service\Tag\TagService;
 use SmolCms\TestUtils\Attributes\Autowire;
 use SmolCms\TestUtils\FunctionalTestCase;
 use SmolCms\TestUtils\ImageTestUtils;
+use SmolCms\TestUtils\LoginWithAccessLevel;
 
 class ImageApiControllerTest extends FunctionalTestCase
 {
+    use LoginWithAccessLevel;
+
     #[Autowire]
     private ImageEntityService $imageEntityService;
 
     #[Autowire]
     private SessionService $sessionService;
+
+    #[Autowire]
+    private TagService $tagService;
 
     protected function setUp(): void
     {
@@ -163,6 +171,35 @@ class ImageApiControllerTest extends FunctionalTestCase
 
         $this->assertSame(HttpStatus::NOT_FOUND, $response->getStatus());
         $this->assertNull($response->getContent());
+    }
+
+    public function testGetImageDetailAction_HidesPendingImagesExceptTagmeGameImages(): void
+    {
+        $this->loginUser('image-detail-queue-' . bin2hex(random_bytes(4)), 'Queue Viewer');
+        $pending = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $this->sessionService->getUserData()->id,
+            status: ImageStatus::PENDING_REVIEW,
+        );
+
+        self::assertSame(HttpStatus::NOT_FOUND, $this->simulateDetailRequest((string)$pending->getId())->getStatus());
+
+        $this->tagService->attachTagToImage($pending->getId(), 'tagme');
+        $response = $this->simulateDetailRequest((string)$pending->getId());
+        self::assertSame(HttpStatus::OK, $response->getStatus());
+        self::assertSame($pending->getId(), json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR)['image']['id']);
+
+        $this->loginUserWithAccessLevel(
+            'image-detail-mod-' . bin2hex(random_bytes(4)),
+            'Queue Moderator',
+            AccessLevel::MOD,
+        );
+        $hiddenPending = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::PENDING_REVIEW,
+        );
+        self::assertSame(HttpStatus::OK, $this->simulateDetailRequest((string)$hiddenPending->getId())->getStatus());
     }
 
     #[DataProvider('malformedIdProvider')]

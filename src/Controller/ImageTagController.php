@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\AuditActionType;
 use SmolCms\Data\Constant\HttpStatus;
+use SmolCms\Data\Constant\TagInputLimits;
 use SmolCms\Data\Request\ImageTagRemoveRequest;
 use SmolCms\Data\Request\ImageTagsRequest;
 use SmolCms\Data\Request\Request;
@@ -17,14 +18,14 @@ use SmolCms\Exception\TagmeRemovalBlockedException;
 use SmolCms\Service\Core\Attribute\Authenticated;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\AuditLogService;
-use SmolCms\Service\DB\ImageEntityService;
+use SmolCms\Service\Image\ImageAccessPolicy;
 use SmolCms\Service\Tag\TagService;
 
 readonly class ImageTagController
 {
     public function __construct(
         private TagService $tagService,
-        private ImageEntityService $imageEntityService,
+        private ImageAccessPolicy $imageAccessPolicy,
         private AuditLogService $auditLogService,
         private SessionService $sessionService,
     )
@@ -39,15 +40,15 @@ readonly class ImageTagController
         if ($tagNames === null) {
             return new Response(HttpStatus::BAD_REQUEST);
         }
-        if ($this->imageEntityService->findOneById($imageId) === null) {
-            return new Response(HttpStatus::NOT_FOUND);
-        }
-
-        $result = $this->tagService->addTagsToImageWithChanges($imageId, $tagNames);
         $user = $this->sessionService->getUserData();
         if ($user === null) {
             return new Response(HttpStatus::UNAUTHORIZED);
         }
+        if ($this->imageAccessPolicy->findAccessibleImage($imageId, $user->accessLevel) === null) {
+            return new Response(HttpStatus::NOT_FOUND);
+        }
+
+        $result = $this->tagService->addTagsToImageWithChanges($imageId, $tagNames);
         foreach ($result['newlyAttached'] as $tagName) {
             $this->auditLogService->record(
                 $user->id,
@@ -67,7 +68,11 @@ readonly class ImageTagController
     {
         $imageId = $request->imageId ?? 0;
         $tagName = $request->tag ?? '';
-        if ($this->imageEntityService->findOneById($imageId) === null) {
+        $user = $this->sessionService->getUserData();
+        if ($user === null) {
+            return new Response(HttpStatus::UNAUTHORIZED);
+        }
+        if ($this->imageAccessPolicy->findAccessibleImage($imageId, $user->accessLevel) === null) {
             return new Response(HttpStatus::NOT_FOUND);
         }
 
@@ -83,10 +88,6 @@ readonly class ImageTagController
             return new Response(HttpStatus::NOT_FOUND);
         }
 
-        $user = $this->sessionService->getUserData();
-        if ($user === null) {
-            return new Response(HttpStatus::UNAUTHORIZED);
-        }
         $this->auditLogService->record(
             $user->id,
             AuditActionType::TAG_REMOVED,
@@ -99,6 +100,11 @@ readonly class ImageTagController
     /** @return list<string>|null */
     private static function parseTagNames(string $tags): ?array
     {
+        if (mb_strlen($tags, 'UTF-8') > TagInputLimits::MAX_TAG_LIST_LENGTH
+            || substr_count($tags, ',') + 1 > TagInputLimits::MAX_TAG_COUNT) {
+            return null;
+        }
+
         $tagNames = [];
         foreach (explode(',', $tags) as $tagName) {
             $tagName = trim($tagName);

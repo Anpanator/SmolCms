@@ -25,7 +25,7 @@ readonly class TagmeController
     #[Authenticated(AccessLevel::NOVICE)]
     public function getRandomAction(Request $request): Response
     {
-        $image = $this->imageEntityService->findRandomAcceptedImageWithTagName('tagme');
+        $image = $this->imageEntityService->findRandomTagmeImage();
         if ($image === null || $image->getId() === null) {
             return new Response(HttpStatus::NOT_FOUND);
         }
