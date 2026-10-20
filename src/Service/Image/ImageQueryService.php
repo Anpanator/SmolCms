@@ -27,12 +27,6 @@ readonly class ImageQueryService
     {
     }
 
-    /** @return list<array{id: int, thumbSrc: ?string}> */
-    public function getAcceptedImageSummaries(): array
-    {
-        return $this->getAcceptedImagePage(1)['images'];
-    }
-
     /**
      * Accepted-image page and tag cloud. The subquery matches every requested tag,
      * while the cloud is calculated only over the images returned on this page.

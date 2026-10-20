@@ -48,7 +48,7 @@ Previously untested services included `AuditLogService`, `TagSuggestionService`,
 | UT-3 | `ImageQueryService` had no unit suite; added query, filtering, and summary coverage.
 | UT-4 | `ImageReviewService` had no unit suite; added review-transition coverage.
 | UT-5 | `UserService` search cases were missing; added tests for search inputs and edge cases.
-| UT-6 | `getAcceptedImageSummaries()` has no production caller; reported as a dead-code candidate only (not removed).
+| UT-6 | `getAcceptedImageSummaries()` had no production caller and was removed as dead code in this cycle.
 | UT-7 | Session cookie refresh was untested; added a cookie-emitter seam and refresh tests.
 | UT-8 | JSON request-body parsing was difficult to exercise; added a body-reader seam and malformed/non-array body tests.
 | UT-9 | File-system path-safety branches lacked coverage; added realpath/unsafe-path tests.
