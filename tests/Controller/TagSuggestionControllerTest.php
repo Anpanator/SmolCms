@@ -139,27 +139,38 @@ class TagSuggestionControllerTest extends FunctionalTestCase
         self::assertSame(HttpStatus::BAD_REQUEST, $missingTags->getStatus());
     }
 
-    public function testSuggestionsHidePendingImagesUnlessTheyAreInTheTagmeGame(): void
+    public function testSuggestionsAllowOwnedAndTagmePendingImages(): void
     {
         $loginName = 'suggest-pending-' . bin2hex(random_bytes(4));
         $this->loginUserWithAccessLevel($loginName, 'Suggest Pending', AccessLevel::FELLOW);
         $userId = $this->sessionService->getUserData()->id;
-        $image = ImageTestUtils::createImageEntity(
+        $otherUserId = $userId === 1 ? 2 : 1;
+        $foreignImage = ImageTestUtils::createImageEntity(
             $this->imageEntityService,
-            $userId,
+            $otherUserId,
             status: ImageStatus::PENDING_REVIEW,
         );
         $tags = 'pending-suggest-' . bin2hex(random_bytes(4));
 
-        self::assertSame(HttpStatus::NOT_FOUND, $this->simulateSuggestionPost('/api/tag-suggestions', [
-            'imageId' => $image->getId(),
+        self::assertSame(HttpStatus::FORBIDDEN, $this->simulateSuggestionPost('/api/tag-suggestions', [
+            'imageId' => $foreignImage->getId(),
             'tags' => $tags,
         ])->getStatus());
 
-        $this->tagService->attachTagToImage($image->getId(), 'tagme');
+        $this->tagService->attachTagToImage($foreignImage->getId(), 'tagme');
         self::assertSame(HttpStatus::CREATED, $this->simulateSuggestionPost('/api/tag-suggestions', [
-            'imageId' => $image->getId(),
+            'imageId' => $foreignImage->getId(),
             'tags' => $tags,
+        ])->getStatus());
+
+        $ownImage = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            $userId,
+            status: ImageStatus::PENDING_REVIEW,
+        );
+        self::assertSame(HttpStatus::CREATED, $this->simulateSuggestionPost('/api/tag-suggestions', [
+            'imageId' => $ownImage->getId(),
+            'tags' => 'owned-pending-suggest-' . bin2hex(random_bytes(4)),
         ])->getStatus());
     }
 

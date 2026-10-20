@@ -447,6 +447,10 @@ h3 {
     transition: transform 0.12s ease-in, box-shadow 0.12s ease-in;
 }
 
+.tile-unapproved {
+    border: 2px solid #e68a00;
+}
+
 .tile:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-strong);
@@ -757,6 +761,19 @@ h3 {
     margin: 0;
 }
 
+.image-meta-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.image-meta-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin: 0;
+}
+
 .image-meta-separator {
     border: 0;
     border-top: 1px solid var(--color-border);
@@ -773,6 +790,16 @@ h3 {
 .image-meta-value {
     margin: 0;
     overflow-wrap: anywhere;
+}
+
+.image-pending-warning {
+    margin: var(--space-3) 0;
+    padding: var(--space-2) var(--space-3);
+    background: color-mix(in srgb, var(--color-danger) 10%, white);
+    border: 1px solid var(--color-danger);
+    border-radius: var(--radius);
+    color: var(--color-danger);
+    font-size: 0.9rem;
 }
 
 .image-download {
@@ -1243,6 +1270,33 @@ h3 {
 .not-found-page .not-found-text {
     text-align: center;
     color: var(--color-muted);
+}
+
+.profile-recent-uploads {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-top: var(--space-6);
+}
+
+.profile-recent-uploads-title {
+    font-size: 1.2rem;
+}
+
+.profile-recent-uploads-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--space-2);
+}
+
+.profile-recent-uploads-grid .tile {
+    min-width: 0;
+}
+
+.profile-recent-uploads-status {
+    grid-column: 1 / -1;
+    color: var(--color-muted);
+    text-align: center;
 }
 
 .notice {

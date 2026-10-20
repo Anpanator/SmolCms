@@ -12,12 +12,16 @@ use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Attribute\Authenticated;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\TagApprovalService;
+use SmolCms\Service\Image\ImageQueryService;
 
 readonly class ProfileController
 {
+    private const int RECENT_UPLOADS_LIMIT = 15;
+
     public function __construct(
         private SessionService $sessionService,
         private TagApprovalService $tagApprovalService,
+        private ImageQueryService $imageQueryService,
     )
     {
     }
@@ -31,6 +35,7 @@ readonly class ProfileController
         }
         return new JsonResponse([
             'approvedTagSuggestions' => $this->tagApprovalService->countForUser($user->id),
+            'recentUploads' => $this->imageQueryService->getRecentUploadsForUser($user->id, self::RECENT_UPLOADS_LIMIT),
         ]);
     }
 }

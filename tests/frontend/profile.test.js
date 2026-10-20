@@ -5,7 +5,7 @@ import {createProfileView} from '../../public/js/views/profile.js';
 
 async function createLoggedInSession(
     user = testUser(),
-    profileResponse = {status: 200, body: {approvedTagSuggestions: 3}},
+    profileResponse = {status: 200, body: {approvedTagSuggestions: 3, recentUploads: []}},
 ) {
     const fetchMock = mockFetch((url) => {
         if (url === '/api/session') {
@@ -70,6 +70,56 @@ export async function testProfileDisplaysApprovedTagSuggestionCount() {
     }
 }
 
+export async function testProfileRendersAtMostFifteenRecentUploadsInFiveColumnGrid() {
+    const recentUploads = Array.from({length: 18}, (_, index) => ({
+        id: 100 + index,
+        status: index === 4 ? 'pending_review' : 'accepted',
+        thumbSrc: `/public/img/thumb/${index}.avif`,
+        uploadDate: `2026-10-01 00:${String(index).padStart(2, '0')}:00`,
+    }));
+    const {session, restore} = await createLoggedInSession(testUser(), {
+        status: 200,
+        body: {approvedTagSuggestions: 0, recentUploads},
+    });
+    try {
+        const view = createProfileView({session, navigate: () => {}});
+        await settle();
+
+        const section = view.querySelector('.profile-recent-uploads');
+        const grid = section?.querySelector('.profile-recent-uploads-grid');
+        const tiles = Array.from(grid?.querySelectorAll('a') ?? []);
+        assertEqual(section?.querySelector('h2')?.textContent, 'Recent Uploads');
+        assertTrue(grid?.classList.contains('profile-recent-uploads-grid'), 'recent uploads should use the five-column grid class');
+        assertEqual(tiles.length, 15, 'the profile should render no more than fifteen uploads');
+        assertEqual(tiles[0]?.getAttribute('href'), '/image?id=100');
+        assertEqual(tiles[14]?.getAttribute('href'), '/image?id=114');
+        assertTrue(tiles[4]?.classList.contains('tile-unapproved'), 'pending-review uploads should use the orange-border class');
+        assertTrue(!tiles[0]?.classList.contains('tile-unapproved'), 'accepted uploads should keep the normal tile style');
+    } finally {
+        restore();
+    }
+}
+
+export async function testProfileShowsEmptyRecentUploadsState() {
+    const {session, restore} = await createLoggedInSession(testUser(), {
+        status: 200,
+        body: {approvedTagSuggestions: 0, recentUploads: []},
+    });
+    try {
+        const view = createProfileView({session, navigate: () => {}});
+        await settle();
+
+        assertEqual(
+            view.querySelector('.profile-recent-uploads-status')?.textContent,
+            'No uploads yet.',
+            'profiles without uploads should show an empty state',
+        );
+        assertEqual(view.querySelectorAll('.profile-recent-uploads-grid > a').length, 0);
+    } finally {
+        restore();
+    }
+}
+
 export async function testProfileRendersWhenApprovedTagSuggestionFetchFails() {
     const {session, restore} = await createLoggedInSession(testUser(), {status: 500, body: null});
     try {
@@ -81,6 +131,10 @@ export async function testProfileRendersWhenApprovedTagSuggestionFetchFails() {
             view.querySelector('input[name="approvedTagSuggestions"]')?.value,
             'Unavailable',
             'failed count requests should display an unavailable state',
+        );
+        assertEqual(
+            view.querySelector('.profile-recent-uploads-status')?.textContent,
+            'Recent uploads are unavailable.',
         );
     } finally {
         restore();
@@ -178,6 +232,7 @@ export async function testAnonymousProfileShowsLoginNotice() {
         assertTrue(view.querySelector('input[name="displayName"]') !== null, 'form should still render');
         assertEqual(view.querySelector('input[name="accessLevel"]'), null, 'anonymous users have no access level to display');
         assertEqual(view.querySelector('input[name="approvedTagSuggestions"]'), null, 'anonymous users have no count to display');
+        assertEqual(view.querySelector('.profile-recent-uploads'), null, 'anonymous users have no recent uploads section');
         assertEqual(fetchMock.calls.length, 1, 'anonymous profiles should not fetch the approved count');
     } finally {
         restore();

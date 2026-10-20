@@ -39,8 +39,12 @@ readonly class TagSuggestionController
         if ($user === null) {
             return new Response(HttpStatus::UNAUTHORIZED);
         }
-        if ($this->imageAccessPolicy->findAccessibleImage($imageId, $user->accessLevel) === null) {
+        $image = $this->imageAccessPolicy->findImage($imageId);
+        if ($image === null) {
             return new Response(HttpStatus::NOT_FOUND);
+        }
+        if (!$this->imageAccessPolicy->canAccess($image, $user->accessLevel, $user->id)) {
+            return new Response(HttpStatus::FORBIDDEN);
         }
 
         try {

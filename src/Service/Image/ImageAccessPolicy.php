@@ -19,16 +19,21 @@ final readonly class ImageAccessPolicy
     {
     }
 
-    public function findAccessibleImage(int $id, AccessLevel $accessLevel): ?ImageEntity
+    public function findAccessibleImage(int $id, AccessLevel $accessLevel, ?int $userId = null): ?ImageEntity
     {
-        $image = $this->imageEntityService->findOneById($id);
-        if ($image === null || !$this->canAccess($image, $accessLevel)) {
+        $image = $this->findImage($id);
+        if ($image === null || !$this->canAccess($image, $accessLevel, $userId)) {
             return null;
         }
         return $image;
     }
 
-    public function canAccess(ImageEntity $image, AccessLevel $accessLevel): bool
+    public function findImage(int $id): ?ImageEntity
+    {
+        return $this->imageEntityService->findOneById($id);
+    }
+
+    public function canAccess(ImageEntity $image, AccessLevel $accessLevel, ?int $userId = null): bool
     {
         if ($accessLevel->value >= AccessLevel::MOD->value
             || $image->getStatus() === ImageStatus::ACCEPTED) {
@@ -36,8 +41,11 @@ final readonly class ImageAccessPolicy
         }
 
         $imageId = $image->getId();
-        return $image->getStatus() === ImageStatus::PENDING_REVIEW
-            && $imageId !== null
-            && in_array('tagme', $this->tagService->getTagsForImage($imageId), true);
+        if ($image->getStatus() !== ImageStatus::PENDING_REVIEW || $imageId === null) {
+            return false;
+        }
+
+        return $image->getUserId() === $userId
+            || in_array('tagme', $this->tagService->getTagsForImage($imageId), true);
     }
 }

@@ -128,23 +128,24 @@ class ImageTagControllerTest extends FunctionalTestCase
         self::assertSame(HttpStatus::BAD_REQUEST, $removeResponse->getStatus());
     }
 
-    public function testPendingImagesAreHiddenUnlessTheyAreInTheTagmeGame(): void
+    public function testPendingReviewImagesAreForbiddenUnlessTaggedTagmeOrOwned(): void
     {
         $loginName = 'image-tag-pending-' . bin2hex(random_bytes(5));
         $this->loginUser($loginName, 'Image Tag Pending');
         $userId = $this->sessionService->getUserData()->id;
+        $otherUserId = $userId === 1 ? 2 : 1;
         $image = ImageTestUtils::createImageEntity(
             $this->imageEntityService,
-            userId: $userId,
+            userId: $otherUserId,
             status: ImageStatus::PENDING_REVIEW,
         );
 
         self::assertSame(
-            HttpStatus::NOT_FOUND,
+            HttpStatus::FORBIDDEN,
             $this->simulateImageTagsPost('/api/image/tags', ['imageId' => $image->getId(), 'tags' => 'tag'])->getStatus(),
         );
         self::assertSame(
-            HttpStatus::NOT_FOUND,
+            HttpStatus::FORBIDDEN,
             $this->simulateImageTagsPost('/api/image/tags/remove', ['imageId' => $image->getId(), 'tag' => 'tag'])->getStatus(),
         );
 
@@ -166,6 +167,34 @@ class ImageTagControllerTest extends FunctionalTestCase
             'tag' => $gameTag,
         ]);
         self::assertSame(HttpStatus::NO_CONTENT, $removeResponse->getStatus());
+    }
+
+    public function testUploaderCanAddAndRemoveTagsOnOwnPendingReviewImage(): void
+    {
+        $this->loginUser('image-tag-owner-' . bin2hex(random_bytes(5)), 'Image Tag Owner');
+        $user = $this->sessionService->getUserData();
+        self::assertNotNull($user);
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $user->id,
+            status: ImageStatus::PENDING_REVIEW,
+        );
+        $tagName = 'pending-owner-' . bin2hex(random_bytes(4));
+        $this->tagService->createTag($tagName);
+
+        $added = $this->simulateImageTagsPost('/api/image/tags', [
+            'imageId' => $image->getId(),
+            'tags' => $tagName,
+        ]);
+        self::assertSame(HttpStatus::OK, $added->getStatus());
+        self::assertSame([$tagName], $this->tagService->getTagsForImage($image->getId()));
+
+        $removed = $this->simulateImageTagsPost('/api/image/tags/remove', [
+            'imageId' => $image->getId(),
+            'tag' => $tagName,
+        ]);
+        self::assertSame(HttpStatus::NO_CONTENT, $removed->getStatus());
+        self::assertSame([], $this->tagService->getTagsForImage($image->getId()));
     }
 
     public function testRemoveActionEnforcesTagmeMinimumAuditsRemovalAndMapsMissingRows(): void

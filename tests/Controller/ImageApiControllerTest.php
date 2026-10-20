@@ -79,19 +79,21 @@ class ImageApiControllerTest extends FunctionalTestCase
         );
         $this->tagService->attachTagToImage($olderAccepted->getId(), $markerTag);
         $this->tagService->attachTagToImage($newerAccepted->getId(), $markerTag);
-        ImageTestUtils::createImageEntity(
+        $pendingReview = ImageTestUtils::createImageEntity(
             $this->imageEntityService,
             userId: 1,
             status: ImageStatus::PENDING_REVIEW,
             uploadDate: new DateTime('2026-10-19 12:00:00'),
             thumbFilename: ImageTestUtils::randomChecksum() . '.avif',
         );
-        ImageTestUtils::createImageEntity(
+        $pending = ImageTestUtils::createImageEntity(
             $this->imageEntityService,
             userId: 1,
             status: ImageStatus::PENDING,
             uploadDate: new DateTime('2026-10-19 13:00:00'),
         );
+        $this->tagService->attachTagToImage($pendingReview->getId(), $markerTag);
+        $this->tagService->attachTagToImage($pending->getId(), $markerTag);
 
         $response = $this->simulateListRequest(['tags' => $markerTag]);
 
@@ -101,8 +103,8 @@ class ImageApiControllerTest extends FunctionalTestCase
         $this->assertSame(
             [
                 'images' => [
-                    ['id' => $newerAccepted->getId(), 'thumbSrc' => '/public/img/thumb/' . substr($newerAccepted->getThumbFilename(), 0, 2) . '/' . $newerAccepted->getThumbFilename()],
-                    ['id' => $olderAccepted->getId(), 'thumbSrc' => '/public/img/thumb/' . substr($olderAccepted->getThumbFilename(), 0, 2) . '/' . $olderAccepted->getThumbFilename()],
+                    ['id' => $newerAccepted->getId(), 'thumbSrc' => '/public/img/thumb/' . substr($newerAccepted->getThumbFilename(), 0, 2) . '/' . $newerAccepted->getThumbFilename(), 'status' => 'accepted'],
+                    ['id' => $olderAccepted->getId(), 'thumbSrc' => '/public/img/thumb/' . substr($olderAccepted->getThumbFilename(), 0, 2) . '/' . $olderAccepted->getThumbFilename(), 'status' => 'accepted'],
                 ],
                 'page' => 1,
                 'perPage' => 25,
@@ -138,6 +140,7 @@ class ImageApiControllerTest extends FunctionalTestCase
                 'images' => [[
                     'id' => $image->getId(),
                     'thumbSrc' => '/public/img/thumb/' . substr($thumbFilename, 0, 2) . '/' . $thumbFilename,
+                    'status' => 'accepted',
                 ]],
                 'page' => 1,
                 'perPage' => 25,
@@ -145,6 +148,90 @@ class ImageApiControllerTest extends FunctionalTestCase
                 'tags' => [['name' => $markerTag, 'imageCount' => 1]],
             ],
             json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR),
+        );
+    }
+
+    public function testGetImageListAction_RegularUserSeesOwnPendingReviewImagesOnly(): void
+    {
+        $this->loginUser('image-list-owner-' . bin2hex(random_bytes(4)), 'Image List Owner');
+        $user = $this->sessionService->getUserData();
+        self::assertNotNull($user);
+        $otherUserId = $user->id === 1 ? 2 : 1;
+        $markerTag = 'image-list-owner-' . bin2hex(random_bytes(5));
+        $this->tagService->createTag($markerTag);
+
+        $accepted = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $otherUserId,
+            status: ImageStatus::ACCEPTED,
+            uploadDate: new DateTime('2026-10-19 10:00:00'),
+        );
+        $ownPending = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $user->id,
+            status: ImageStatus::PENDING_REVIEW,
+            uploadDate: new DateTime('2026-10-19 12:00:00'),
+        );
+        $otherPending = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $otherUserId,
+            status: ImageStatus::PENDING_REVIEW,
+            uploadDate: new DateTime('2026-10-19 13:00:00'),
+        );
+        foreach ([$accepted, $ownPending, $otherPending] as $image) {
+            $this->tagService->attachTagToImage($image->getId(), $markerTag);
+        }
+
+        $response = $this->simulateListRequest(['tags' => $markerTag]);
+
+        self::assertSame(HttpStatus::OK, $response->getStatus());
+        $body = json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR);
+        self::assertSame(2, $body['total']);
+        self::assertSame(
+            [
+                ['id' => $ownPending->getId(), 'thumbSrc' => null, 'status' => 'pending_review'],
+                ['id' => $accepted->getId(), 'thumbSrc' => null, 'status' => 'accepted'],
+            ],
+            $body['images'],
+        );
+    }
+
+    public function testGetImageListAction_ModeratorSeesAllPendingReviewImages(): void
+    {
+        $this->loginUserWithAccessLevel(
+            'image-list-mod-' . bin2hex(random_bytes(4)),
+            'Image List Moderator',
+            AccessLevel::MOD,
+        );
+        $markerTag = 'image-list-mod-' . bin2hex(random_bytes(5));
+        $this->tagService->createTag($markerTag);
+        $olderPending = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::PENDING_REVIEW,
+            uploadDate: new DateTime('2026-10-19 10:00:00'),
+        );
+        $newerPending = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 2,
+            status: ImageStatus::PENDING_REVIEW,
+            uploadDate: new DateTime('2026-10-19 11:00:00'),
+        );
+        foreach ([$olderPending, $newerPending] as $image) {
+            $this->tagService->attachTagToImage($image->getId(), $markerTag);
+        }
+
+        $response = $this->simulateListRequest(['tags' => $markerTag]);
+
+        self::assertSame(HttpStatus::OK, $response->getStatus());
+        $body = json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR);
+        self::assertSame(2, $body['total']);
+        self::assertSame(
+            [
+                ['id' => $newerPending->getId(), 'thumbSrc' => null, 'status' => 'pending_review'],
+                ['id' => $olderPending->getId(), 'thumbSrc' => null, 'status' => 'pending_review'],
+            ],
+            $body['images'],
         );
     }
 
@@ -186,6 +273,7 @@ class ImageApiControllerTest extends FunctionalTestCase
         $this->assertSame(
             [
                 'image' => [
+                    'status' => 'accepted',
                     'id' => $entity->getId(),
                     'uploadDate' => '2026-10-19 10:30:00',
                     'uploader' => 'Upload User',
@@ -212,21 +300,32 @@ class ImageApiControllerTest extends FunctionalTestCase
         $this->assertNull($response->getContent());
     }
 
-    public function testGetImageDetailAction_HidesPendingImagesExceptTagmeGameImages(): void
+    public function testGetImageDetailAction_PendingReviewImagesAreVisibleToUploaderTagmeViewersAndMods(): void
     {
         $this->loginUser('image-detail-queue-' . bin2hex(random_bytes(4)), 'Queue Viewer');
-        $pending = ImageTestUtils::createImageEntity(
+        $viewer = $this->sessionService->getUserData();
+        self::assertNotNull($viewer);
+        $otherUserId = $viewer->id === 1 ? 2 : 1;
+        $foreignPending = ImageTestUtils::createImageEntity(
             $this->imageEntityService,
-            userId: $this->sessionService->getUserData()->id,
+            userId: $otherUserId,
+            status: ImageStatus::PENDING_REVIEW,
+        );
+        $ownPending = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $viewer->id,
             status: ImageStatus::PENDING_REVIEW,
         );
 
-        self::assertSame(HttpStatus::NOT_FOUND, $this->simulateDetailRequest((string)$pending->getId())->getStatus());
+        self::assertSame(HttpStatus::FORBIDDEN, $this->simulateDetailRequest((string)$foreignPending->getId())->getStatus());
+        $ownResponse = $this->simulateDetailRequest((string)$ownPending->getId());
+        self::assertSame(HttpStatus::OK, $ownResponse->getStatus());
+        self::assertSame('pending_review', json_decode((string)$ownResponse->getContent(), true, JSON_THROW_ON_ERROR)['image']['status']);
 
-        $this->tagService->attachTagToImage($pending->getId(), 'tagme');
-        $response = $this->simulateDetailRequest((string)$pending->getId());
+        $this->tagService->attachTagToImage($foreignPending->getId(), 'tagme');
+        $response = $this->simulateDetailRequest((string)$foreignPending->getId());
         self::assertSame(HttpStatus::OK, $response->getStatus());
-        self::assertSame($pending->getId(), json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR)['image']['id']);
+        self::assertSame($foreignPending->getId(), json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR)['image']['id']);
 
         $this->loginUserWithAccessLevel(
             'image-detail-mod-' . bin2hex(random_bytes(4)),
@@ -235,7 +334,7 @@ class ImageApiControllerTest extends FunctionalTestCase
         );
         $hiddenPending = ImageTestUtils::createImageEntity(
             $this->imageEntityService,
-            userId: 1,
+            userId: $otherUserId,
             status: ImageStatus::PENDING_REVIEW,
         );
         self::assertSame(HttpStatus::OK, $this->simulateDetailRequest((string)$hiddenPending->getId())->getStatus());

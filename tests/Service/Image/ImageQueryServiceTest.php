@@ -32,7 +32,7 @@ class ImageQueryServiceTest extends FunctionalTestCase
     #[Autowire]
     private TagService $tagService;
 
-    public function testAcceptedImagePageMapsImageSummariesAndPageTagCloud(): void
+    public function testImagePageMapsImageSummariesAndPageTagCloud(): void
     {
         $tagName = 'query-page-' . bin2hex(random_bytes(4));
         $older = ImageTestUtils::createImageEntity(
@@ -59,12 +59,12 @@ class ImageQueryServiceTest extends FunctionalTestCase
             $this->tagService->attachTagToImage($image->getId(), $tagName);
         }
 
-        $result = $this->imageQueryService->getAcceptedImagePage(1, [$tagName, strtoupper($tagName), '']);
+        $result = $this->imageQueryService->getImagePage(1, [$tagName, strtoupper($tagName), '']);
 
         self::assertSame(
             [
-                ['id' => $newer->getId(), 'thumbSrc' => '/public/img/thumb/' . ImagePathLayout::relativePathForFileName($newerThumb)],
-                ['id' => $older->getId(), 'thumbSrc' => null],
+                ['id' => $newer->getId(), 'thumbSrc' => '/public/img/thumb/' . ImagePathLayout::relativePathForFileName($newerThumb), 'status' => 'accepted'],
+                ['id' => $older->getId(), 'thumbSrc' => null, 'status' => 'accepted'],
             ],
             $result['images'],
         );
@@ -94,6 +94,7 @@ class ImageQueryServiceTest extends FunctionalTestCase
 
         self::assertSame(
             [
+                'status' => 'accepted',
                 'id' => $image->getId(),
                 'uploadDate' => '2026-10-03 14:15:16',
                 'uploader' => 'Image Detail Uploader',

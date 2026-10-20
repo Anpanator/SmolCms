@@ -12,6 +12,7 @@ use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
+use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\ImageEntityService;
 use SmolCms\Service\Tag\TagService;
 use SmolCms\TestUtils\Attributes\Autowire;
@@ -31,6 +32,9 @@ class ImageFileControllerTest extends FunctionalTestCase
 
     #[Autowire]
     private TagService $tagService;
+
+    #[Autowire]
+    private SessionService $sessionService;
 
     protected function setUp(): void
     {
@@ -199,22 +203,22 @@ class ImageFileControllerTest extends FunctionalTestCase
         $this->assertNull($response->getContent());
     }
 
-    public function testSampleAction_PendingReviewImage_NoviceDeniedModeratorAllowed(): void
+    public function testSampleAction_PendingReviewImage_NonUploaderForbiddenModeratorAllowed(): void
     {
+        $this->loginUser('novice-user', 'Novice User');
+        $viewer = $this->sessionService->getUserData();
+        self::assertNotNull($viewer);
         $sampleFilename = ImageTestUtils::randomChecksum() . '.webp';
         ImageTestUtils::createImageEntity(
             $this->imageEntityService,
-            userId: 1,
+            userId: $viewer->id === 1 ? 2 : 1,
             status: ImageStatus::PENDING_REVIEW,
             sampleFilename: $sampleFilename,
         );
         ImageTestUtils::writeImageFile(IMAGE_SAMPLE_DIR, $sampleFilename);
 
-        // NOVICE users may only view ACCEPTED images; non-accepted images answer 404
-        // so their existence is not disclosed.
-        $this->loginUser('novice-user', 'Novice User');
         $noviceResponse = $this->simulateSampleRequest($sampleFilename);
-        $this->assertSame(HttpStatus::NOT_FOUND, $noviceResponse->getStatus());
+        $this->assertSame(HttpStatus::FORBIDDEN, $noviceResponse->getStatus());
 
         // MOD+ reviewers may preview queued images.
         $this->loginUserWithAccessLevel('mod-user', 'Mod User', AccessLevel::MOD);
@@ -222,20 +226,22 @@ class ImageFileControllerTest extends FunctionalTestCase
         $this->assertSame(HttpStatus::OK, $modResponse->getStatus());
     }
 
-    public function testDownloadAction_PendingReviewImage_NoviceDeniedModeratorAllowed(): void
+    public function testDownloadAction_PendingReviewImage_NonUploaderForbiddenModeratorAllowed(): void
     {
+        $this->loginUser('novice-user', 'Novice User');
+        $viewer = $this->sessionService->getUserData();
+        self::assertNotNull($viewer);
         $downloadFilename = ImageTestUtils::randomChecksum() . '.webp';
         ImageTestUtils::createImageEntity(
             $this->imageEntityService,
-            userId: 1,
+            userId: $viewer->id === 1 ? 2 : 1,
             status: ImageStatus::PENDING_REVIEW,
             downloadFilename: $downloadFilename,
         );
         ImageTestUtils::writeImageFile(IMAGE_DOWNLOAD_DIR, $downloadFilename);
 
-        $this->loginUser('novice-user', 'Novice User');
         $noviceResponse = $this->simulateDownloadRequest($downloadFilename);
-        $this->assertSame(HttpStatus::NOT_FOUND, $noviceResponse->getStatus());
+        $this->assertSame(HttpStatus::FORBIDDEN, $noviceResponse->getStatus());
 
         $this->loginUserWithAccessLevel('mod-user', 'Mod User', AccessLevel::MOD);
         $modResponse = $this->simulateDownloadRequest($downloadFilename);
@@ -245,10 +251,12 @@ class ImageFileControllerTest extends FunctionalTestCase
     public function testSampleAction_PendingTagmeImageIsVisibleToRegularGameUsers(): void
     {
         $this->loginUser('tagme-file-user', 'Tagme File User');
+        $viewer = $this->sessionService->getUserData();
+        self::assertNotNull($viewer);
         $sampleFilename = ImageTestUtils::randomChecksum() . '.webp';
         $image = ImageTestUtils::createImageEntity(
             $this->imageEntityService,
-            userId: 1,
+            userId: $viewer->id === 1 ? 2 : 1,
             status: ImageStatus::PENDING_REVIEW,
             sampleFilename: $sampleFilename,
         );
@@ -258,6 +266,28 @@ class ImageFileControllerTest extends FunctionalTestCase
         $response = $this->simulateSampleRequest($sampleFilename);
 
         self::assertSame(HttpStatus::OK, $response->getStatus());
+    }
+
+    public function testUploaderCanFetchOwnPendingReviewSampleAndDownload(): void
+    {
+        $this->loginUser('pending-file-owner-' . bin2hex(random_bytes(4)), 'Pending File Owner');
+        $owner = $this->sessionService->getUserData();
+        self::assertNotNull($owner);
+
+        $sampleFilename = ImageTestUtils::randomChecksum() . '.webp';
+        $downloadFilename = ImageTestUtils::randomChecksum() . '.jpeg';
+        ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $owner->id,
+            status: ImageStatus::PENDING_REVIEW,
+            sampleFilename: $sampleFilename,
+            downloadFilename: $downloadFilename,
+        );
+        ImageTestUtils::writeImageFile(IMAGE_SAMPLE_DIR, $sampleFilename);
+        ImageTestUtils::writeImageFile(IMAGE_DOWNLOAD_DIR, $downloadFilename);
+
+        self::assertSame(HttpStatus::OK, $this->simulateSampleRequest($sampleFilename)->getStatus());
+        self::assertSame(HttpStatus::OK, $this->simulateDownloadRequest($downloadFilename)->getStatus());
     }
 
     private function simulateSampleRequest(?string $name): Response
