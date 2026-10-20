@@ -121,6 +121,24 @@ class TagSuggestionControllerTest extends FunctionalTestCase
         );
     }
 
+    public function testCreateSuggestionsRejectsMissingFieldsAndEmptyBody(): void
+    {
+        $this->loginUserWithAccessLevel(
+            'suggest-required-fields-' . bin2hex(random_bytes(4)),
+            'Suggest Required Fields',
+            AccessLevel::FELLOW,
+        );
+
+        $emptyBody = $this->simulateSuggestionPost('/api/tag-suggestions', null);
+        self::assertSame(HttpStatus::BAD_REQUEST, $emptyBody->getStatus());
+
+        $missingImageId = $this->simulateSuggestionPost('/api/tag-suggestions', ['tags' => 'valid-tag']);
+        self::assertSame(HttpStatus::BAD_REQUEST, $missingImageId->getStatus());
+
+        $missingTags = $this->simulateSuggestionPost('/api/tag-suggestions', ['imageId' => 1]);
+        self::assertSame(HttpStatus::BAD_REQUEST, $missingTags->getStatus());
+    }
+
     public function testSuggestionsHidePendingImagesUnlessTheyAreInTheTagmeGame(): void
     {
         $loginName = 'suggest-pending-' . bin2hex(random_bytes(4));
@@ -237,6 +255,7 @@ class TagSuggestionControllerTest extends FunctionalTestCase
 
         self::assertSame(HttpStatus::BAD_REQUEST, $this->simulateSuggestionAction('/api/tag-suggestions/approve', 'x')->getStatus());
         self::assertSame(HttpStatus::NOT_FOUND, $this->simulateSuggestionAction('/api/tag-suggestions/approve', '999999')->getStatus());
+        self::assertSame(HttpStatus::BAD_REQUEST, $this->simulateSuggestionAction('/api/tag-suggestions/approve', null)->getStatus());
     }
 
     public function testRejectRequiresModAndDeletesSuggestionWithoutCreatingApproval(): void
@@ -270,9 +289,10 @@ class TagSuggestionControllerTest extends FunctionalTestCase
         self::assertSame(0, $this->tagApprovalService->countForUser($suggesterId));
         self::assertSame(HttpStatus::NOT_FOUND, $this->simulateSuggestionAction('/api/tag-suggestions/reject', '999999')->getStatus());
         self::assertSame(HttpStatus::BAD_REQUEST, $this->simulateSuggestionAction('/api/tag-suggestions/reject', 'bad')->getStatus());
+        self::assertSame(HttpStatus::BAD_REQUEST, $this->simulateSuggestionAction('/api/tag-suggestions/reject', null)->getStatus());
     }
 
-    private function simulateSuggestionPost(string $path, array $postParams): Response
+    private function simulateSuggestionPost(string $path, ?array $postParams): Response
     {
         return $this->simulateRequest(new Request(
             url: new Url(protocol: 'https', host: 'localhost', path: $path),
@@ -281,7 +301,7 @@ class TagSuggestionControllerTest extends FunctionalTestCase
         ));
     }
 
-    private function simulateSuggestionAction(string $path, string $id, bool $logIn = true): Response
+    private function simulateSuggestionAction(string $path, ?string $id, bool $logIn = true): Response
     {
         if (!$logIn) {
             // Start a fresh unauthenticated session for this request.
@@ -292,7 +312,7 @@ class TagSuggestionControllerTest extends FunctionalTestCase
         return $this->simulateRequest(new Request(
             url: new Url(protocol: 'https', host: 'localhost', path: $path),
             method: HttpMethod::POST,
-            getParams: ['id' => $id],
+            getParams: $id === null ? null : ['id' => $id],
         ));
     }
 

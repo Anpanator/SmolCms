@@ -11,6 +11,7 @@ use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Constant\RouteEnum;
 use SmolCms\Data\Request\Request;
+use SmolCms\Data\Response\Response;
 use SmolCms\TestUtils\FunctionalTestCase;
 
 class IndexControllerTest extends FunctionalTestCase
@@ -23,6 +24,8 @@ class IndexControllerTest extends FunctionalTestCase
             'register' => [RouteEnum::REGISTER],
             'settings' => [RouteEnum::SETTINGS],
             'upload image' => [RouteEnum::UPLOAD_IMAGE],
+            'image display' => [RouteEnum::IMAGE_DISPLAY],
+            'image review' => [RouteEnum::IMAGE_REVIEW],
             'tags' => [RouteEnum::TAGS_PAGE],
             'tag queue' => [RouteEnum::TAG_QUEUE],
             'tagme queue' => [RouteEnum::TAGME_QUEUE],
@@ -41,12 +44,30 @@ class IndexControllerTest extends FunctionalTestCase
 
         $response = $this->simulateRequest($request);
 
-        $this->assertEquals(HttpStatus::OK, $response->getStatus());
+        $this->assertHtmlShellResponse($response);
+    }
+
+    #[DataProvider('dataProvider_shellRoutes')]
+    public function testGetAction_ServesHtmlShellForLoggedInUser(RouteEnum $routeEnum): void
+    {
+        $this->loginUser('shell-route-user', 'Shell Route User');
+        $request = new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: $routeEnum->value),
+            method: HttpMethod::GET,
+        );
+
+        $response = $this->simulateRequest($request);
+
+        $this->assertHtmlShellResponse($response);
+    }
+
+    private function assertHtmlShellResponse(Response $response): void
+    {
+        $this->assertSame(HttpStatus::OK, $response->getStatus());
         $this->assertSame(
             HttpContentType::HTML_UTF_8->value,
             $response->getHeaders()[HttpHeader::CONTENT_TYPE->value],
         );
-
         $content = (string)$response->getContent();
         $this->assertStringContainsString('<!DOCTYPE html>', $content);
         $this->assertStringContainsString('<title>SmolCms</title>', $content);

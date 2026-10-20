@@ -163,6 +163,13 @@ class ImageTagApiControllerTest extends FunctionalTestCase
         self::assertNull($response->getContent());
     }
 
+    public function testImageListRejectsArrayValuedTagsFilter(): void
+    {
+        $response = $this->simulateImageList(['tags' => ['not', 'a-string']]);
+
+        self::assertSame(HttpStatus::BAD_REQUEST, $response->getStatus());
+    }
+
     public function testImageDetailIncludesAlphabeticalTagNames(): void
     {
         $this->loginUserWithAccessLevel('image-tags-viewer', 'Image Tags Viewer', AccessLevel::NOVICE);

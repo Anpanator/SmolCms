@@ -68,6 +68,27 @@ class TagApiControllerTest extends FunctionalTestCase
                 json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR)
             );
         }
+
+        $invalidQuery = $this->simulateApiRequest(HttpMethod::GET, '/api/tags/suggest', [
+            'q' => ['not', 'text'],
+        ]);
+        self::assertSame(HttpStatus::BAD_REQUEST, $invalidQuery->getStatus());
+    }
+
+    public function testSuggestionsRemainPublicForLoggedInUserAndReturnExpectedShape(): void
+    {
+        $prefix = 'logged-in-suggest-' . bin2hex(random_bytes(5));
+        $tagName = $prefix . '-target';
+        $this->tagService->createTag($tagName);
+        $this->loginUser('tag-api-suggest-user-' . bin2hex(random_bytes(4)), 'Tag Suggest User');
+
+        $response = $this->simulateApiRequest(HttpMethod::GET, '/api/tags/suggest', ['q' => $prefix]);
+
+        self::assertSame(HttpStatus::OK, $response->getStatus());
+        self::assertSame(
+            ['tags' => [$tagName]],
+            json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR),
+        );
     }
 
     public function testSuggestionsUsePrefixMatchUsageOrderingAndFifteenItemLimit(): void

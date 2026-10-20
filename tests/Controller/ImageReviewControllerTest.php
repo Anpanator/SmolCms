@@ -40,6 +40,14 @@ class ImageReviewControllerTest extends FunctionalTestCase
     protected function tearDown(): void
     {
         parent::tearDown();
+        foreach (ImageStatus::cases() as $status) {
+            foreach ($this->imageEntityService->findByStatus($status) as $image) {
+                $imageId = $image->getId();
+                if ($imageId !== null) {
+                    $this->imageEntityService->deleteById($imageId);
+                }
+            }
+        }
         ImageTestUtils::cleanImageDirs();
     }
 

@@ -78,6 +78,40 @@ class AuthControllerTest extends FunctionalTestCase
         $this->assertSame($user->getAccessLevel(), $sessionUserData->accessLevel);
     }
 
+    public function testPostAction_PublicLoginSucceedsWithAnExistingSession(): void
+    {
+        $loginName = 'already-authenticated-' . bin2hex(random_bytes(4));
+        $this->loginUser($loginName, 'Already Authenticated');
+        $sessionUserData = $this->sessionService->getUserData();
+        self::assertNotNull($sessionUserData);
+
+        // End the helper's simulated request while retaining its session for the next request.
+        session_write_close();
+        $request = new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: '/login'),
+            method: HttpMethod::POST,
+            postParams: [
+                'loginName' => $loginName,
+                'password' => 'secure-password-123',
+            ],
+        );
+
+        $response = $this->simulateRequest($request);
+
+        self::assertSame(HttpStatus::OK, $response->getStatus());
+        self::assertSame(HttpContentType::JSON->value, $response->getHeaders()[HttpHeader::CONTENT_TYPE->value]);
+        self::assertSame(
+            [
+                'user' => [
+                    'id' => $sessionUserData->id,
+                    'displayName' => 'Already Authenticated',
+                    'accessLevel' => AccessLevel::NOVICE->value,
+                ],
+            ],
+            json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR),
+        );
+    }
+
     public function testPostAction_NoErrorOnEmptyPostParams(): void
     {
         $request = new Request(

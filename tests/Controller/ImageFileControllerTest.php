@@ -155,6 +155,33 @@ class ImageFileControllerTest extends FunctionalTestCase
         $this->assertNull($response->getContent());
     }
 
+    public function testDownloadAction_UnknownValidChecksum_ReturnsNotFound(): void
+    {
+        $this->loginUser('download-file-user', 'Download File User');
+
+        $response = $this->simulateDownloadRequest(ImageTestUtils::randomChecksum() . '.webp');
+
+        $this->assertSame(HttpStatus::NOT_FOUND, $response->getStatus());
+        $this->assertNull($response->getContent());
+    }
+
+    public function testDownloadAction_MissingFile_ReturnsNotFound(): void
+    {
+        $this->loginUser('download-file-user', 'Download File User');
+        $downloadFilename = ImageTestUtils::randomChecksum() . '.webp';
+        ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+            downloadFilename: $downloadFilename,
+        );
+
+        $response = $this->simulateDownloadRequest($downloadFilename);
+
+        $this->assertSame(HttpStatus::NOT_FOUND, $response->getStatus());
+        $this->assertNull($response->getContent());
+    }
+
     public function testSampleAction_MissingFile_ReturnsNotFound(): void
     {
         $this->loginUser('file-user', 'File User');

@@ -117,6 +117,17 @@ class ImageTagControllerTest extends FunctionalTestCase
         );
     }
 
+    public function testTagActionsRejectMissingImageId(): void
+    {
+        $this->loginUser('image-tag-missing-image-id-' . bin2hex(random_bytes(5)), 'Image Tag Missing Image ID');
+
+        $addResponse = $this->simulateImageTagsPost('/api/image/tags', ['tags' => 'valid']);
+        self::assertSame(HttpStatus::BAD_REQUEST, $addResponse->getStatus());
+
+        $removeResponse = $this->simulateImageTagsPost('/api/image/tags/remove', ['tag' => 'valid']);
+        self::assertSame(HttpStatus::BAD_REQUEST, $removeResponse->getStatus());
+    }
+
     public function testPendingImagesAreHiddenUnlessTheyAreInTheTagmeGame(): void
     {
         $loginName = 'image-tag-pending-' . bin2hex(random_bytes(5));

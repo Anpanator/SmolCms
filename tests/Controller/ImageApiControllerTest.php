@@ -61,6 +61,8 @@ class ImageApiControllerTest extends FunctionalTestCase
 
     public function testGetImageListAction_PublicAndListsOnlyAcceptedImagesNewestFirst(): void
     {
+        $markerTag = 'image-list-marker-' . bin2hex(random_bytes(5));
+        $this->tagService->createTag($markerTag);
         $olderAccepted = ImageTestUtils::createImageEntity(
             $this->imageEntityService,
             userId: 1,
@@ -75,6 +77,8 @@ class ImageApiControllerTest extends FunctionalTestCase
             uploadDate: new DateTime('2026-10-19 11:00:00'),
             thumbFilename: ImageTestUtils::randomChecksum() . '.avif',
         );
+        $this->tagService->attachTagToImage($olderAccepted->getId(), $markerTag);
+        $this->tagService->attachTagToImage($newerAccepted->getId(), $markerTag);
         ImageTestUtils::createImageEntity(
             $this->imageEntityService,
             userId: 1,
@@ -89,7 +93,7 @@ class ImageApiControllerTest extends FunctionalTestCase
             uploadDate: new DateTime('2026-10-19 13:00:00'),
         );
 
-        $response = $this->simulateListRequest();
+        $response = $this->simulateListRequest(['tags' => $markerTag]);
 
         $this->assertSame(HttpStatus::OK, $response->getStatus());
         $this->assertSame(HttpContentType::JSON->value, $response->getHeaders()[HttpHeader::CONTENT_TYPE->value]);
@@ -103,9 +107,44 @@ class ImageApiControllerTest extends FunctionalTestCase
                 'page' => 1,
                 'perPage' => 25,
                 'total' => 2,
-                'tags' => [],
+                'tags' => [['name' => $markerTag, 'imageCount' => 2]],
             ],
             $body
+        );
+    }
+
+    public function testGetImageListAction_LoggedInUserCanAccessPublicList(): void
+    {
+        $this->loginUser('image-list-viewer-' . bin2hex(random_bytes(4)), 'Image List Viewer');
+        $user = $this->sessionService->getUserData();
+        self::assertNotNull($user);
+
+        $markerTag = 'logged-in-image-list-' . bin2hex(random_bytes(5));
+        $this->tagService->createTag($markerTag);
+        $thumbFilename = ImageTestUtils::randomChecksum() . '.avif';
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $user->id,
+            status: ImageStatus::ACCEPTED,
+            thumbFilename: $thumbFilename,
+        );
+        $this->tagService->attachTagToImage($image->getId(), $markerTag);
+
+        $response = $this->simulateListRequest(['tags' => $markerTag]);
+
+        self::assertSame(HttpStatus::OK, $response->getStatus());
+        self::assertSame(
+            [
+                'images' => [[
+                    'id' => $image->getId(),
+                    'thumbSrc' => '/public/img/thumb/' . substr($thumbFilename, 0, 2) . '/' . $thumbFilename,
+                ]],
+                'page' => 1,
+                'perPage' => 25,
+                'total' => 1,
+                'tags' => [['name' => $markerTag, 'imageCount' => 1]],
+            ],
+            json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR),
         );
     }
 
@@ -213,11 +252,12 @@ class ImageApiControllerTest extends FunctionalTestCase
         $this->assertNull($response->getContent());
     }
 
-    private function simulateListRequest(): Response
+    private function simulateListRequest(?array $params = null): Response
     {
         $request = new Request(
             url: new Url(protocol: 'https', host: 'localhost', path: '/api/images'),
             method: HttpMethod::GET,
+            getParams: $params,
         );
         return $this->simulateRequest($request);
     }
