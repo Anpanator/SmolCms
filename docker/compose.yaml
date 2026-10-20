@@ -21,7 +21,8 @@ services:
       - no-new-privileges:true
     read_only: true
     tmpfs:
-      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+      # 10 concurrent 100 MiB upload bodies plus FastCGI/proxy/SCGI temp-file headroom.
+      - /tmp:rw,nosuid,nodev,noexec,size=2g,mode=1777
     volumes:
       - type: bind
         source: "${HOME:?HOME must be set}/SmolCms/db"
