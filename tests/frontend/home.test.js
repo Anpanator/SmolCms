@@ -67,12 +67,42 @@ export async function testHomeTagLinksAreDynamicAndClearable() {
         assertEqual(links.length, 2);
         const natureLink = view.querySelector('.tags .tags-link[data-tag-name="nature"]');
         const skyLink = view.querySelector('.tags .tags-link[data-tag-name="sky"]');
-        assertEqual(natureLink.getAttribute('href'), '/?tags=nature');
+        assertEqual(natureLink.getAttribute('href'), '/', 'clicking an active tag should remove that filter');
         assertTrue(natureLink.classList.contains('tags-link--active'), 'the selected tag should be marked active');
         assertEqual(natureLink.getAttribute('aria-current'), 'page');
         assertTrue(!skyLink.classList.contains('tags-link--active'), 'other tags should not be marked active');
+        assertEqual(skyLink.getAttribute('href'), '/?tags=nature%2Csky', 'adding a tag should preserve active filters');
         assertEqual(view.querySelector('.tags-clear')?.getAttribute('href'), '/', 'active filters should be clearable');
         assertEqual(view.querySelector('.search-input')?.value, 'nature');
+    } finally {
+        restore();
+    }
+}
+
+export async function testHomeTagLinksToggleIndividualFilters() {
+    const {view, restore} = await createLoadedView(
+        () => ({
+            status: 200,
+            body: {...IMAGES, tags: [...IMAGES.tags, {name: 'clouds', imageCount: 1}]},
+        }),
+        'tags=nature%2Csky',
+    );
+    try {
+        assertEqual(
+            view.querySelector('.tags-link[data-tag-name="nature"]')?.getAttribute('href'),
+            '/?tags=sky',
+            'clicking an active tag should remove only that tag',
+        );
+        assertEqual(
+            view.querySelector('.tags-link[data-tag-name="sky"]')?.getAttribute('href'),
+            '/?tags=nature',
+            'the other active filter should remain selected',
+        );
+        assertEqual(
+            view.querySelector('.tags-link[data-tag-name="clouds"]')?.getAttribute('href'),
+            '/?tags=nature%2Csky%2Cclouds',
+            'clicking an inactive tag should add it to the active filters',
+        );
     } finally {
         restore();
     }

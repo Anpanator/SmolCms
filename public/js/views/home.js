@@ -20,12 +20,18 @@ export function createTagList(tags = [], activeTags = []) {
         className: 'tags',
         children: normalizeTagEntries(tags).map((tag) => {
             const isActive = active.has(tag.name);
+            const nextActive = new Set(active);
+            if (isActive) {
+                nextActive.delete(tag.name);
+            } else {
+                nextActive.add(tag.name);
+            }
             return el('li', {
                 className: 'tags-item',
                 children: el('a', {
                     className: `tags-link${isActive ? ' tags-link--active' : ''}`,
                     attributes: {
-                        href: buildHomePath(1, tag.name),
+                        href: buildHomePath(1, [...nextActive].join(',')),
                         'data-tag-name': tag.name,
                         ...(isActive ? { 'aria-current': 'page' } : {}),
                     },
