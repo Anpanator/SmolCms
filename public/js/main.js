@@ -13,6 +13,7 @@ import {createLoginView} from './views/login.js';
 import {createNotFoundView} from './views/notFound.js';
 import {createRegisterView} from './views/register.js';
 import {createProfileView} from './views/profile.js';
+import {createUserProfileView} from './views/userProfile.js';
 import {createReviewView} from './views/review.js';
 import {createTagQueueView} from './views/tagQueue.js';
 import {createUploadView} from './views/upload.js';
@@ -27,6 +28,7 @@ export function createRouteMap({session, navigate}) {
         [RoutePath.LOGIN]: (context) => createLoginView({session, ...context}),
         [RoutePath.REGISTER]: (context) => createRegisterView(context),
         [RoutePath.SETTINGS]: (context) => createProfileView({session, ...context}),
+        [RoutePath.USER_PROFILE]: (context) => createUserProfileView({session, ...context}),
         [RoutePath.UPLOAD_IMAGE]: (context) => createUploadView(context),
         [RoutePath.IMAGE_DISPLAY]: (context) => createImageView({session, ...context}),
         [RoutePath.TAGME_QUEUE]: (context) => createTagmeView({session, ...context}),

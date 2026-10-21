@@ -112,6 +112,7 @@ export async function testUserTableRendersAccessNamesAndProtectsHigherLevelRows(
         assertEqual(row.querySelector('.users-id-cell').textContent, '2');
         assertEqual(row.querySelector('.users-login-cell').textContent, 'amy');
         assertEqual(row.querySelector('.users-display-name-cell').textContent, 'Amy Adams');
+        assertEqual(row.querySelector('.users-display-name-cell a')?.getAttribute('href'), '/user?id=2');
         assertEqual(row.querySelector('.users-access-level-cell').textContent, 'Wizard');
         assertEqual(row.querySelector('.users-register-date-cell').textContent, '2026-10-12 09:30:00');
         assertTrue(row.querySelector('.users-edit-button') !== null, 'users at or below the current level can be edited');

@@ -1,5 +1,5 @@
-import {assertDeepEqual, assertTrue} from './assert.js';
-import {RoutePath} from '../../public/js/routes.js';
+import {assertDeepEqual, assertEqual, assertTrue} from './assert.js';
+import {RoutePath, userProfileHref} from '../../public/js/routes.js';
 
 export function testRoutePathsMirrorTheBackendEnum() {
     assertDeepEqual(RoutePath, {
@@ -8,6 +8,7 @@ export function testRoutePathsMirrorTheBackendEnum() {
         LOGOUT: '/logout',
         REGISTER: '/register',
         SETTINGS: '/settings',
+        USER_PROFILE: '/user',
         UPLOAD_IMAGE: '/upload-image',
         IMAGE_DISPLAY: '/image',
         IMAGE_REVIEW: '/review',
@@ -38,6 +39,7 @@ export function testRoutePathsMirrorTheBackendEnum() {
         API_USERS: '/api/users',
         API_USERS_UPDATE: '/api/users/update',
         API_PROFILE: '/api/profile',
+        API_USER_PROFILE: '/api/user/profile',
         API_TAGME_RANDOM: '/api/tagme/random',
     });
 }
@@ -47,6 +49,15 @@ export function testRoutePathsAreImmutableAndUnique() {
     const paths = Object.values(RoutePath);
     assertTrue(paths.every((path) => typeof path === 'string' && path.startsWith('/')));
     assertEqualUnique(paths);
+}
+
+export function testUserProfileHrefRequiresPositiveSafeInteger() {
+    assertEqual(userProfileHref(1), '/user?id=1');
+    assertEqual(userProfileHref(Number.MAX_SAFE_INTEGER), `/user?id=${Number.MAX_SAFE_INTEGER}`);
+
+    for (const invalidId of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1, '1', null]) {
+        assertEqual(userProfileHref(invalidId), null, `${String(invalidId)} should not form a profile URL`);
+    }
 }
 
 function assertEqualUnique(values) {

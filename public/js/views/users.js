@@ -20,6 +20,7 @@ import {
     showMessage,
 } from '../forms.js';
 import {validateDisplayName, validateLoginName} from '../validation.js';
+import {userProfileHref} from '../routes.js';
 
 const USERS_URL = '/api/users';
 const UPDATE_USER_URL = '/api/users/update';
@@ -160,13 +161,24 @@ export function createUsersView({
     }
 
     function createUserRow(user) {
+        const displayName = user?.displayName ?? '';
+        const profileHref = userProfileHref(user?.id);
         const row = el('tr', {
             className: 'internal-admin-table-row users-table-row',
             attributes: {'data-user-id': user?.id ?? ''},
             children: [
                 el('td', {className: 'users-id-cell', children: user?.id ?? ''}),
                 el('td', {className: 'users-login-cell', children: user?.loginName ?? ''}),
-                el('td', {className: 'users-display-name-cell', children: user?.displayName ?? ''}),
+                el('td', {
+                    className: 'users-display-name-cell',
+                    children: profileHref === null
+                        ? displayName
+                        : el('a', {
+                            className: 'user-profile-link',
+                            attributes: {href: profileHref},
+                            children: displayName,
+                        }),
+                }),
                 el('td', {className: 'users-access-level-cell', children: accessLevelName(user?.accessLevel)}),
                 el('td', {className: 'users-register-date-cell', children: user?.registerDate ?? ''}),
             ],

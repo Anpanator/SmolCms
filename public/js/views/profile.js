@@ -114,7 +114,7 @@ function createReadOnlyField(label, name, value) {
     return createControlField({label, name, control: input}).wrapper;
 }
 
-function createRecentUploadsSection() {
+export function createRecentUploadsSection() {
     const grid = el('div', {
         className: 'profile-recent-uploads-grid',
         attributes: {'aria-live': 'polite'},
@@ -132,7 +132,7 @@ function createRecentUploadsSection() {
     };
 }
 
-function renderRecentUploads(grid, recentUploads) {
+export function renderRecentUploads(grid, recentUploads) {
     const uploads = Array.isArray(recentUploads)
         ? recentUploads.filter((image) => Number.isSafeInteger(image?.id)
             && image.id > 0

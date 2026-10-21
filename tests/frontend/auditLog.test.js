@@ -111,6 +111,7 @@ export async function testAuditLogTableShowsUsersAndMapsActionNames() {
         const added = view.querySelector('.audit-log-table-row[data-audit-log-id="80"]');
         assertEqual(added.querySelector('.audit-log-id-cell').textContent, '80');
         assertEqual(added.querySelector('.audit-log-user-cell').textContent, '#3 — alice (Alice Smith)');
+        assertEqual(added.querySelector('.audit-log-user-cell a')?.getAttribute('href'), '/user?id=3');
         assertEqual(added.querySelector('.audit-log-action-cell').textContent, 'Tag added');
         assertEqual(added.querySelector('.audit-log-context-cell').textContent, ENTRIES[0].context);
         assertEqual(added.querySelector('.audit-log-time-cell').textContent, ENTRIES[0].time);

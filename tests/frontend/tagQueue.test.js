@@ -27,6 +27,7 @@ const DETAILS = {
         id: 7,
         uploadDate: '2026-10-19 10:30:00',
         uploader: 'Upload User',
+        uploaderId: 4,
         width: 1920,
         height: 1080,
         format: 'WEBP',
@@ -38,6 +39,7 @@ const DETAILS = {
         id: 3,
         uploadDate: '2026-10-18 09:00:00',
         uploader: 'Other User',
+        uploaderId: 5,
         width: 800,
         height: 600,
         format: 'PNG',
@@ -134,10 +136,13 @@ export async function testQueueRendersTagSuggestionsAndInitialImageViewer() {
         assertTrue(first.textContent.includes('Image #7'));
         assertEqual(first.querySelector('.tag-queue-select')?.getAttribute('data-suggestion-id'), '21');
         assertEqual(first.querySelector('.tag-queue-select')?.getAttribute('aria-pressed'), 'true');
+        assertEqual(first.querySelector('.tag-queue-suggested-by a')?.getAttribute('href'), '/user?id=2');
+        assertEqual(first.querySelector('button a'), null, 'profile links must not be nested inside the selection button');
         assertEqual(view.querySelectorAll('.tag-queue-select[aria-pressed="true"]').length, 1);
 
         assertEqual(view.querySelector('.tag-queue-current-name')?.textContent, 'landscape');
         assertEqual(view.querySelector('.tag-queue-current-byline')?.textContent, 'Suggested by Tagger One');
+        assertEqual(view.querySelector('.tag-queue-current-byline a')?.getAttribute('href'), '/user?id=2');
         assertEqual(view.querySelector('.review-image')?.getAttribute('src'), DETAILS[7].downloadSrc);
         assertTrue(view.querySelector('.review-metadata').textContent.includes('1920 × 1080'));
         assertTrue(view.querySelector('.review-metadata').textContent.includes('1.2 MB'));

@@ -79,6 +79,17 @@ a:focus-visible {
     text-decoration: underline;
 }
 
+.user-profile-link {
+    color: var(--color-accent);
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
+}
+
+.user-profile-link:hover,
+.user-profile-link:focus-visible {
+    color: var(--color-accent-strong);
+}
+
 h1,
 h2,
 h3 {
@@ -1108,6 +1119,9 @@ h3 {
 }
 
 .review-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
     min-width: 0;
 }
 
@@ -1127,6 +1141,10 @@ h3 {
     font: inherit;
     text-align: left;
     cursor: pointer;
+}
+
+.review-item > .review-select {
+    height: auto;
 }
 
 .review-select:hover,
@@ -1297,6 +1315,97 @@ h3 {
     grid-column: 1 / -1;
     color: var(--color-muted);
     text-align: center;
+}
+
+.page.user-profile-page {
+    max-width: 52rem;
+}
+
+.user-profile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.user-profile-title {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+    text-align: left;
+}
+
+.user-profile-actions {
+    flex: 0 0 auto;
+}
+
+.user-profile-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+}
+
+.user-profile-details {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+    padding: var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+}
+
+.user-profile-detail {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+}
+
+.user-profile-detail-term {
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.user-profile-detail-value {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.user-profile-mod-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.user-profile-section-title {
+    font-size: 1.2rem;
+}
+
+.user-profile-mod-actions-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    list-style: none;
+}
+
+.user-profile-mod-action {
+    padding: var(--space-3);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+}
+
+.user-profile-mod-action-heading {
+    font-weight: 600;
+}
+
+.user-profile-mod-action-context {
+    margin-top: var(--space-1);
+    overflow-wrap: anywhere;
 }
 
 .notice {
@@ -1606,5 +1715,9 @@ h3 {
     .review-queue-panel {
         flex: none;
         overflow: visible;
+    }
+
+    .user-profile-details {
+        grid-template-columns: minmax(0, 1fr);
     }
 }

@@ -5,6 +5,7 @@ export const RoutePath = Object.freeze({
     LOGOUT: '/logout',
     REGISTER: '/register',
     SETTINGS: '/settings',
+    USER_PROFILE: '/user',
     UPLOAD_IMAGE: '/upload-image',
     IMAGE_DISPLAY: '/image',
     IMAGE_REVIEW: '/review',
@@ -35,5 +36,13 @@ export const RoutePath = Object.freeze({
     API_USERS: '/api/users',
     API_USERS_UPDATE: '/api/users/update',
     API_PROFILE: '/api/profile',
+    API_USER_PROFILE: '/api/user/profile',
     API_TAGME_RANDOM: '/api/tagme/random',
 });
+
+/** Build the public profile URL for a valid positive user ID. */
+export function userProfileHref(userId) {
+    return Number.isSafeInteger(userId) && userId > 0
+        ? `${RoutePath.USER_PROFILE}?id=${userId}`
+        : null;
+}

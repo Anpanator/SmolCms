@@ -1,13 +1,18 @@
 /** Shared image metadata formatting and presentation. */
 import {el} from './dom.js';
+import {userProfileHref} from './routes.js';
 
 /** Render metadata entries using a page-specific CSS class prefix. */
 export function createImageMetadataItems(image, {className = 'image-meta', includeId = false} = {}) {
     const details = image ?? {};
+    const uploaderHref = userProfileHref(details.uploaderId);
+    const uploader = details.uploader ?? '—';
     const entries = [
         ...(includeId ? [['Image ID', details.id ?? '—']] : []),
         ['Uploaded', details.uploadDate ?? '—'],
-        ['Uploader', details.uploader ?? '—'],
+        ['Uploader', uploaderHref === null
+            ? uploader
+            : el('a', {className: 'user-profile-link', attributes: {href: uploaderHref}, children: uploader})],
         ['Dimensions', formatDimensions(details.width, details.height)],
         ['Format', details.format ?? '—'],
         ['File size', formatFileSize(details.fileSize)],

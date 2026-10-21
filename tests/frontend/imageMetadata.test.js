@@ -19,6 +19,7 @@ export function testImageMetadataItemsSupportClassVariantsAndOptionalId() {
         id: 7,
         uploadDate: '2026-10-19',
         uploader: 'Upload User',
+        uploaderId: 11,
         width: 1920,
         height: 1080,
         format: 'WEBP',
@@ -35,4 +36,11 @@ export function testImageMetadataItemsSupportClassVariantsAndOptionalId() {
     assertEqual(reviewDetails[0].querySelector('.review-meta-term')?.textContent, 'Image ID');
     assertEqual(reviewDetails[0].querySelector('.review-meta-value')?.textContent, '7');
     assertEqual(reviewDetails[1].querySelector('.review-meta-value')?.textContent, '2026-10-19');
+    assertEqual(imageDetails[1].querySelector('.image-meta-value a')?.getAttribute('href'), '/user?id=11');
+    assertEqual(reviewDetails[2].querySelector('.review-meta-value a')?.getAttribute('href'), '/user?id=11');
+    assertEqual(reviewDetails[2].querySelector('.review-meta-value')?.textContent, 'Upload User');
+
+    const invalidUploader = createImageMetadataItems({...image, uploaderId: 0})[1];
+    assertEqual(invalidUploader.querySelector('.image-meta-value a'), null);
+    assertEqual(invalidUploader.querySelector('.image-meta-value')?.textContent, 'Upload User');
 }

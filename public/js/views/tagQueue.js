@@ -8,6 +8,7 @@ import {el} from '../dom.js';
 import {createImageViewer} from '../imageViewer.js';
 import {createModerationQueue} from '../moderationQueue.js';
 import {clearMessage, createMessageBox, messageForStatus, showMessage} from '../forms.js';
+import {userProfileHref} from '../routes.js';
 
 const QUEUE_URL = '/api/tag-suggestions/queue';
 const IMAGE_DETAIL_URL = '/api/image/detail';
@@ -131,22 +132,29 @@ export function createTagQueueView({session, navigate, query}) {
                 'aria-pressed': suggestion.id === selectedSuggestion?.id ? 'true' : 'false',
                 'aria-label': `Select tag suggestion ${tagName}, suggested by ${suggestedBy}${created ? ` on ${created}` : ''}, for image #${imageId}`,
             },
+            children: el('span', {className: 'tag-queue-name', children: tagName}),
+        });
+        const suggestionInfo = el('span', {
+            className: 'tag-queue-info',
             children: [
-                el('span', {className: 'tag-queue-name', children: tagName}),
                 el('span', {
-                    className: 'tag-queue-info',
-                    children: [
-                        el('span', {className: 'tag-queue-suggested-by', children: `Suggested by ${suggestedBy}`}),
-                        el('span', {className: 'tag-queue-created', children: `Created ${created}`}),
-                        el('span', {className: 'tag-queue-image-id', children: `Image #${imageId}`}),
-                    ],
+                    className: 'tag-queue-suggested-by',
+                    children: ['Suggested by ', createSuggestedByName(suggestion.suggestedBy)],
                 }),
+                el('span', {className: 'tag-queue-created', children: `Created ${created}`}),
+                el('span', {className: 'tag-queue-image-id', children: `Image #${imageId}`}),
             ],
+        });
+        suggestionInfo.addEventListener('click', (event) => {
+            if (event.target.closest('a')) {
+                return;
+            }
+            selectById(suggestion.id);
         });
         const item = el('li', {
             className: 'review-item tag-queue-item',
             attributes: {'data-suggestion-id': suggestion.id, 'data-image-id': suggestion.imageId},
-            children: selectButton,
+            children: [selectButton, suggestionInfo],
         });
         selectButton.addEventListener('click', () => selectById(suggestion.id));
         return item;
@@ -192,7 +200,10 @@ export function createTagQueueView({session, navigate, query}) {
         },
         onSelect(suggestion) {
             currentTagName.textContent = suggestion.tagName ?? 'Unknown tag';
-            currentSuggestedBy.textContent = `Suggested by ${suggestion.suggestedBy?.displayName ?? 'Unknown user'}`;
+            currentSuggestedBy.replaceChildren(
+                'Suggested by ',
+                createSuggestedByName(suggestion.suggestedBy),
+            );
             for (const button of queueList.querySelectorAll('.tag-queue-select')) {
                 const selected = button.getAttribute('data-suggestion-id') === String(suggestion.id);
                 button.setAttribute('aria-pressed', selected ? 'true' : 'false');
@@ -233,4 +244,16 @@ export function createTagQueueView({session, navigate, query}) {
     page.addEventListener('keydown', moderationQueue.handleKeyboard);
     moderationQueue.load();
     return page;
+}
+
+function createSuggestedByName(user) {
+    const displayName = user?.displayName ?? 'Unknown user';
+    const profileHref = userProfileHref(user?.id);
+    return profileHref === null
+        ? displayName
+        : el('a', {
+            className: 'user-profile-link',
+            attributes: {href: profileHref},
+            children: displayName,
+        });
 }

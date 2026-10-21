@@ -10,11 +10,11 @@
 import {postJson} from './api.js';
 import {AccessLevel, accessLevelName, hasAccessLevel} from './accessLevel.js';
 import {el} from './dom.js';
-import {RoutePath} from './routes.js';
+import {RoutePath, userProfileHref} from './routes.js';
 
-function navLink(path, label, activePath) {
+function navLink(path, label, activePath, isActive = activePath === path) {
     return el('a', {
-        className: `nav-link${activePath === path ? ' active' : ''}`,
+        className: `nav-link${isActive ? ' active' : ''}`,
         attributes: { href: path },
         children: label,
     });
@@ -106,6 +106,24 @@ export function createHeaderNav({ session, navigate }) {
     }
 
     function buildAccountDropdown(user) {
+        const profileHref = userProfileHref(user.id);
+        const accountLinks = [];
+        if (profileHref !== null) {
+            accountLinks.push(el('li', {
+                className: 'submenu-item',
+                children: navLink(profileHref, 'Profile', activePath, activePath === RoutePath.USER_PROFILE),
+            }));
+        }
+        accountLinks.push(el('li', {
+            className: 'submenu-item',
+            children: navLink(RoutePath.SETTINGS, 'Settings', activePath),
+        }));
+        accountLinks.push(el('li', {
+            className: 'submenu-item submenu-label',
+            children: `Access level: ${accessLevelName(user.accessLevel)}`,
+        }));
+        accountLinks.push(el('li', {className: 'submenu-item', children: buildLogoutButton()}));
+
         return el('li', {
             className: 'nav-item has-submenu',
             children: [
@@ -119,17 +137,7 @@ export function createHeaderNav({ session, navigate }) {
                 }),
                 el('ul', {
                     className: 'submenu',
-                    children: [
-                        el('li', {
-                            className: 'submenu-item',
-                            children: navLink(RoutePath.SETTINGS, 'Profile', activePath),
-                        }),
-                        el('li', {
-                            className: 'submenu-item submenu-label',
-                            children: `Access level: ${accessLevelName(user.accessLevel)}`,
-                        }),
-                        el('li', { className: 'submenu-item', children: buildLogoutButton() }),
-                    ],
+                    children: accountLinks,
                 }),
             ],
         });
