@@ -819,6 +819,22 @@ h3 {
     text-align: center;
 }
 
+.image-download-disabled-wrapper {
+    display: block;
+    width: 100%;
+    margin-top: var(--space-3);
+    cursor: not-allowed;
+}
+
+.button.image-download--disabled:disabled {
+    width: 100%;
+    margin-top: 0;
+    align-self: auto;
+    cursor: not-allowed;
+    opacity: 0.55;
+    pointer-events: none;
+}
+
 /* ------------------------------------------------------------------ */
 /* Tag editing controls                                                 */
 /* ------------------------------------------------------------------ */

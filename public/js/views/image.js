@@ -22,7 +22,7 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
         onSearch: (tags) => navigate(buildHomePath(tags)),
     });
     const status = createMessageBox();
-    const imageDetails = createImageDetails();
+    const imageDetails = createImageDetails({canDownload: Boolean(session.getUser())});
     const tagList = createTagList({
         session,
         navigate,
