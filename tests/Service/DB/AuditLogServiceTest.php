@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace SmolCms\Test\Service\DB;
 
 use DateTime;
+use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PDO;
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\AuditActionType;
+use SmolCms\Data\Persistence\AuditLogEntity;
 use SmolCms\Data\Persistence\UserEntity;
 use SmolCms\Service\DB\AuditLogService;
 use SmolCms\Service\DB\UserService;
@@ -50,6 +53,67 @@ class AuditLogServiceTest extends FunctionalTestCase
         self::assertSame(AuditActionType::TAG_ADDED->value, $entry['actionType']);
         self::assertSame($context, $entry['context']);
         self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $entry['time']);
+    }
+
+    public function testGetRecentEntriesForUserReturnsNewestEntriesFirstAndHonorsLimit(): void
+    {
+        $user = $this->createUser('audit-recent-' . bin2hex(random_bytes(4)), 'Audit Recent User');
+        $actionTypes = [
+            AuditActionType::TAG_ADDED,
+            AuditActionType::TAG_REMOVED,
+            AuditActionType::TAG_DELETED,
+            AuditActionType::TAG_ADDED,
+            AuditActionType::TAG_REMOVED,
+        ];
+        foreach ($actionTypes as $index => $actionType) {
+            $this->auditLogService->saveAsNew(new AuditLogEntity(
+                id: null,
+                userId: $user->getId(),
+                actionType: $actionType,
+                context: 'recent-' . $index,
+                created: new DateTime('2026-10-' . (25 - $index) . ' 12:00:00'),
+            ));
+        }
+
+        $entries = $this->auditLogService->getRecentEntriesForUser($user->getId(), 3);
+
+        self::assertSame(['recent-0', 'recent-1', 'recent-2'], array_column($entries, 'context'));
+        self::assertSame([
+            AuditActionType::TAG_ADDED->value,
+            AuditActionType::TAG_REMOVED->value,
+            AuditActionType::TAG_DELETED->value,
+        ], array_column($entries, 'actionType'));
+        self::assertSame(
+            ['2026-10-25 12:00:00', '2026-10-24 12:00:00', '2026-10-23 12:00:00'],
+            array_column($entries, 'time'),
+        );
+        foreach ($entries as $entry) {
+            self::assertSame(['id', 'actionType', 'context', 'time'], array_keys($entry));
+            self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $entry['time']);
+        }
+    }
+
+    public function testGetRecentEntriesForUserReturnsEmptyWhenUserHasNoEntries(): void
+    {
+        $user = $this->createUser('audit-recent-empty-' . bin2hex(random_bytes(4)), 'Audit Empty User');
+
+        self::assertSame([], $this->auditLogService->getRecentEntriesForUser($user->getId(), 15));
+    }
+
+    public static function invalidRecentEntryLimitProvider(): array
+    {
+        return [
+            'zero' => [0],
+            'negative' => [-1],
+        ];
+    }
+
+    #[DataProvider('invalidRecentEntryLimitProvider')]
+    public function testGetRecentEntriesForUserRejectsNonPositiveLimits(int $limit): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->auditLogService->getRecentEntriesForUser(1, $limit);
     }
 
     public function testSearchEscapesLikeMetacharactersInLoginAndDisplayNames(): void

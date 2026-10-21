@@ -27,6 +27,36 @@ readonly class AuditLogService extends EntityService
     }
 
     /**
+     * @return list<array{id: int, actionType: int, context: string, time: string}>
+     */
+    public function getRecentEntriesForUser(int $userId, int $limit): array
+    {
+        if ($limit < 1) {
+            throw new InvalidArgumentException('Limit must be a positive integer.');
+        }
+
+        $statement = $this->pdo->prepare(
+            'SELECT id, action_type, context, created FROM audit_log '
+            . 'WHERE user_id = :user_id ORDER BY created DESC, id DESC LIMIT :limit'
+        );
+        $statement->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $statement->execute();
+
+        $entries = [];
+        while (($row = $statement->fetch(PDO::FETCH_ASSOC)) !== false) {
+            $entries[] = [
+                'id' => (int)$row['id'],
+                'actionType' => (int)$row['action_type'],
+                'context' => (string)$row['context'],
+                'time' => (new DateTime((string)$row['created']))->format('Y-m-d H:i:s'),
+            ];
+        }
+
+        return $entries;
+    }
+
+    /**
      * @return array{entries: list<array{id: int, user: array{id: int, loginName: string, displayName: string}, actionType: int, context: string, time: string}>, page: int, perPage: int, total: int}
      */
     public function getEntries(int $page, string $q): array

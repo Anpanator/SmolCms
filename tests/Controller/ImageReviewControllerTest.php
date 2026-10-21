@@ -125,6 +125,7 @@ class ImageReviewControllerTest extends FunctionalTestCase
                         'thumbSrc' => '/public/img/thumb/' . substr($older->getThumbFilename(), 0, 2) . '/' . $older->getThumbFilename(),
                         'sampleSrc' => '/api/image/sample?name=' . $older->getSampleFilename(),
                         'uploadDate' => '2026-10-19 09:00:00',
+                        'uploaderId' => $uploaderId,
                         'uploader' => 'Upload User',
                     ],
                     [
@@ -132,6 +133,7 @@ class ImageReviewControllerTest extends FunctionalTestCase
                         'thumbSrc' => '/public/img/thumb/' . substr($newer->getThumbFilename(), 0, 2) . '/' . $newer->getThumbFilename(),
                         'sampleSrc' => '/api/image/sample?name=' . $newer->getSampleFilename(),
                         'uploadDate' => '2026-10-19 11:00:00',
+                        'uploaderId' => $uploaderId,
                         'uploader' => 'Upload User',
                     ],
                 ],

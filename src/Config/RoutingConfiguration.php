@@ -122,6 +122,11 @@ class RoutingConfiguration
                 method: HttpMethod::GET,
                 controller: IndexController::class,
             ),
+            RouteEnum::USER_PROFILE->name => new Route(
+                path: RouteEnum::USER_PROFILE->value,
+                method: HttpMethod::GET,
+                controller: IndexController::class,
+            ),
             RouteEnum::AUDIT_LOG->name => new Route(
                 path: RouteEnum::AUDIT_LOG->value,
                 method: HttpMethod::GET,
@@ -264,6 +269,12 @@ class RoutingConfiguration
                 method: HttpMethod::GET,
                 controller: ProfileController::class,
                 handler: 'getAction',
+            ),
+            RouteEnum::API_USER_PROFILE->name => new Route(
+                path: RouteEnum::API_USER_PROFILE->value,
+                method: HttpMethod::GET,
+                controller: ProfileController::class,
+                handler: 'getUserAction',
             ),
             RouteEnum::API_TAGME_RANDOM->name => new Route(
                 path: RouteEnum::API_TAGME_RANDOM->value,

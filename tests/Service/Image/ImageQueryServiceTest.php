@@ -97,6 +97,7 @@ class ImageQueryServiceTest extends FunctionalTestCase
                 'status' => 'accepted',
                 'id' => $image->getId(),
                 'uploadDate' => '2026-10-03 14:15:16',
+                'uploaderId' => $user->getId(),
                 'uploader' => 'Image Detail Uploader',
                 'width' => 100,
                 'height' => 50,
@@ -114,6 +115,21 @@ class ImageQueryServiceTest extends FunctionalTestCase
         );
         self::assertNull($this->imageQueryService->getImageDetail(PHP_INT_MAX));
         self::assertNull($this->imageQueryService->getThumbSrc($this->imageWithoutThumb()));
+    }
+
+    public function testImageDetailUsesNullUploaderFieldsWhenUploaderIsMissing(): void
+    {
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: PHP_INT_MAX,
+            status: ImageStatus::ACCEPTED,
+        );
+
+        $detail = $this->imageQueryService->getImageDetail($image->getId());
+
+        self::assertNotNull($detail);
+        self::assertNull($detail['uploaderId']);
+        self::assertNull($detail['uploader']);
     }
 
     private function createUser(string $loginName, string $displayName): UserEntity

@@ -57,6 +57,7 @@ class ImageReviewServiceTest extends FunctionalTestCase
                 'thumbSrc' => $this->imageQueryService->getThumbSrc($image),
                 'sampleSrc' => $this->imageQueryService->getSampleSrc($image),
                 'uploadDate' => '2026-10-05 06:07:08',
+                'uploaderId' => $user->getId(),
                 'uploader' => 'Review Queue Uploader',
             ],
             $matchingQueueEntry[0],

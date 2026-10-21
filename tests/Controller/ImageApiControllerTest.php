@@ -276,6 +276,7 @@ class ImageApiControllerTest extends FunctionalTestCase
                     'status' => 'accepted',
                     'id' => $entity->getId(),
                     'uploadDate' => '2026-10-19 10:30:00',
+                    'uploaderId' => $uploader->id,
                     'uploader' => 'Upload User',
                     'width' => 100,
                     'height' => 50,
