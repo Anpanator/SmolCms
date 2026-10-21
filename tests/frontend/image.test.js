@@ -33,6 +33,17 @@ async function createView(handler, query = 'id=7', session = {getUser: () => nul
     return { view, fetchMock, navigateCalls, restore };
 }
 
+function pressKey(target, key, options = {}) {
+    const event = new KeyboardEvent('keydown', {
+        key,
+        bubbles: true,
+        cancelable: true,
+        ...options,
+    });
+    target.dispatchEvent(event);
+    return event;
+}
+
 function metaValue(view, term) {
     const item = [...view.querySelectorAll('.image-meta .image-meta-item')]
         .find((node) => node.querySelector('dt')?.textContent === term);
@@ -42,14 +53,13 @@ function metaValue(view, term) {
 export async function testImageViewRendersSampleImageInLayout() {
     const { view, fetchMock, restore } = await createView(() => detailResponse());
     try {
-        assertTrue(view.matches('.layout'), 'image view should use the .layout grid');
+        assertTrue(view.matches('.layout.image-layout'), 'image view should use the .layout grid');
+        const toolbar = view.querySelector('.image-toolbar');
+        assertTrue(toolbar !== null, 'image view should have a toolbar above its content');
+        assertTrue(toolbar.querySelector('.search-view') !== null, 'tag search should live in the image toolbar');
+        assertTrue(toolbar.querySelector('.image-nav') !== null, 'previous/next controls should share the toolbar');
+        assertEqual(view.querySelector('.sidebar .search-view'), null, 'the image sidebar should not contain tag search');
         assertTrue(view.querySelector('.sidebar .tags') !== null, 'sidebar tag list should exist');
-        assertTrue(view.querySelector('.sidebar .search-view') !== null, 'image sidebar should have tag search');
-        assertTrue(
-            (view.querySelector('.sidebar .search-view').compareDocumentPosition(view.querySelector('.sidebar .tag-editor'))
-                & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
-            'the tag editor should follow the tag search field',
-        );
         assertEqual(view.querySelector('.tag-add-row'), null, 'anonymous users should not see tag controls');
         assertEqual(view.querySelector('.tag-remove-button'), null, 'anonymous users should not see remove controls');
         assertEqual(view.querySelectorAll('.sidebar .tags-item').length, 2, 'detail tags should replace static tags');
@@ -249,11 +259,8 @@ export async function testImageTagAddRequiresButtonAndMergesAppliedTags() {
         const addButton = view.querySelector('.tag-add-submit');
         assertTrue(input !== null, 'logged-in users should see the tag input');
         assertEqual(addButton.textContent, 'Add');
-        assertTrue(
-            (view.querySelector('.search-view').compareDocumentPosition(view.querySelector('.tag-add-row'))
-                & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
-            'the Add tags controls should follow the tag search field',
-        );
+        assertEqual(view.querySelector('.sidebar .search-view'), null, 'tag search should stay outside the sidebar');
+        assertTrue(view.querySelector('.sidebar .tag-add-row') !== null, 'tag editing controls should remain in the sidebar');
 
         addButton.click();
         input.value = 'bird, nature';
@@ -572,14 +579,18 @@ export async function testImageViewControlsAreDisabledWithoutALoadedImage() {
     }
 }
 
-export async function testImageViewNavButtonsSitBelowTheLoadedImage() {
+export async function testImageViewToolbarPlacesNavigationAboveTheLoadedImage() {
     const {view, restore} = await createView(() => detailResponse());
     try {
-        const nav = view.querySelector('.image-nav');
-        assertTrue(nav !== null, 'image navigation should exist');
+        const toolbar = view.querySelector('.image-toolbar');
+        const nav = toolbar?.querySelector('.image-nav');
+        const image = view.querySelector('.content img.image-view-image');
+        assertTrue(toolbar !== null, 'the image toolbar should exist');
+        assertTrue(nav !== null, 'image navigation should share the toolbar with tag search');
+        assertTrue(toolbar.querySelector('.search-view') !== null, 'tag search should share the toolbar with navigation');
         assertTrue(
-            (view.querySelector('.content img.image-view-image').compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
-            'previous/next controls should follow the image',
+            (nav.compareDocumentPosition(image) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+            'previous/next controls should precede the image',
         );
         assertFalse(view.querySelector('.image-nav-previous').disabled, 'previous should be available for a loaded image');
         assertFalse(view.querySelector('.image-nav-next').disabled, 'next should be available for a loaded image');
@@ -684,6 +695,166 @@ export async function testImageViewNavigationLocksWhileNeighbourRequestIsPending
         assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/image?id=12']));
     } finally {
         resolveNeighbour?.({status: 200, body: {id: null}});
+        restore();
+    }
+}
+
+export async function testImageViewArrowKeysNavigateToPreviousAndNextImages() {
+    const {view, fetchMock, navigateCalls, restore} = await createView((url) => {
+        if (url === '/api/image/detail?id=7') {
+            return detailResponse();
+        }
+        if (url === '/api/image/neighbor?id=7&direction=previous') {
+            return {status: 200, body: {id: 3}};
+        }
+        if (url === '/api/image/neighbor?id=7&direction=next') {
+            return {status: 200, body: {id: 12}};
+        }
+        return {status: 200, body: null};
+    });
+    try {
+        assertTrue(pressKey(view, 'ArrowRight', {repeat: true}).defaultPrevented, 'repeated arrows should still suppress scrolling');
+        assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/neighbor')).length, 0,
+            'a repeated arrow should not start navigation');
+        assertTrue(pressKey(view, 'ArrowRight').defaultPrevented, 'right should be handled as next');
+        await settle();
+        assertTrue(pressKey(view, 'ArrowLeft').defaultPrevented, 'left should be handled as previous');
+        await settle();
+
+        assertEqual(
+            JSON.stringify(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/neighbor')).map((call) => call.url)),
+            JSON.stringify([
+                '/api/image/neighbor?id=7&direction=next',
+                '/api/image/neighbor?id=7&direction=previous',
+            ]),
+        );
+        assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/image?id=12', '/image?id=3']));
+    } finally {
+        restore();
+    }
+}
+
+export async function testImageViewHotkeysIgnoreInputsContentEditableAndModifiers() {
+    const {view, fetchMock, restore} = await createView((url) => (
+        url.startsWith('/api/image/neighbor') ? {status: 200, body: {id: 12}} : detailResponse()
+    ));
+    try {
+        const inputEvent = pressKey(view.querySelector('.search-input'), 'ArrowRight');
+        assertFalse(inputEvent.defaultPrevented, 'arrow keys in tag search should keep their normal input behavior');
+        assertFalse(pressKey(view, 'ArrowUp').defaultPrevented, 'up should remain available for page scrolling');
+        assertFalse(pressKey(view, 'ArrowDown').defaultPrevented, 'down should remain available for page scrolling');
+        pressKey(view, 'ArrowLeft', {ctrlKey: true});
+        pressKey(view, 'ArrowRight', {shiftKey: true});
+
+        const editable = document.createElement('div');
+        editable.contentEditable = 'true';
+        view.append(editable);
+        pressKey(editable, 'ArrowRight');
+
+        assertEqual(
+            fetchMock.calls.filter((call) => call.url.startsWith('/api/image/neighbor')).length,
+            0,
+            'typing targets and modified keys should not navigate',
+        );
+    } finally {
+        restore();
+    }
+}
+
+export async function testImageViewDeleteHotkeyUsesConfirmationAndIgnoresKeysWhileModalIsOpen() {
+    const {view, fetchMock, navigateCalls, restore} = await modView((url, options) => {
+        if (url === '/api/image/detail?id=7') {
+            return detailResponse();
+        }
+        if (url === '/api/image/delete?id=7' && options.method === 'POST') {
+            return {status: 204, body: null};
+        }
+        return {status: 200, body: null};
+    });
+    try {
+        assertTrue(pressKey(view, 'Delete', {repeat: true}).defaultPrevented, 'repeated Delete should still be handled');
+        assertEqual(document.querySelector('.modal-backdrop'), null, 'repeating Delete must not open a confirmation');
+        assertTrue(pressKey(view, 'Delete').defaultPrevented, 'Delete should open the confirmation flow');
+        const dialog = document.querySelector('.modal-backdrop');
+        assertTrue(dialog !== null, 'a moderator should get a confirmation dialog');
+        assertTrue(dialog.textContent.includes('Delete image #7?'));
+        assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/delete')).length, 0);
+
+        pressKey(view, 'Delete');
+        assertEqual(document.querySelectorAll('.modal-backdrop').length, 1, 'an open modal must block a second delete hotkey');
+        assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/delete')).length, 0);
+
+        dialog.querySelector('.button--primary').click();
+        await settle();
+        assertTrue(fetchMock.calls.some((call) => call.url === '/api/image/delete?id=7'));
+        assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/']));
+    } finally {
+        document.querySelector('.modal-backdrop .modal-cancel')?.click();
+        restore();
+    }
+}
+
+export async function testImageViewDeleteHotkeyRequiresModeratorAndLoadedImage() {
+    for (const [label, session, response] of [
+        ['anonymous', {getUser: () => null}, detailResponse()],
+        ['moderator without a loaded image', MOD_SESSION, {status: 404, body: null}],
+    ]) {
+        const {view, restore} = await createView(() => response, 'id=7', session);
+        try {
+            pressKey(view, 'Delete');
+            assertEqual(document.querySelector('.modal-backdrop'), null, `${label} should not see a delete dialog`);
+        } finally {
+            restore();
+        }
+    }
+}
+
+export async function testImageViewHotkeysDoNotRepeatWhileNavigationIsPending() {
+    let resolveNeighbour;
+    const {view, fetchMock, navigateCalls, restore} = await modView((url) => {
+        if (url === '/api/image/detail?id=7') {
+            return detailResponse();
+        }
+        if (url === '/api/image/neighbor?id=7&direction=next') {
+            return new Promise((resolve) => {
+                resolveNeighbour = resolve;
+            });
+        }
+        return {status: 200, body: null};
+    });
+    try {
+        assertTrue(pressKey(view, 'ArrowRight').defaultPrevented);
+        const pendingCalls = fetchMock.calls.filter((call) => call.url.startsWith('/api/image/neighbor'));
+        assertEqual(pendingCalls.length, 1);
+        assertTrue(pressKey(view, 'ArrowLeft').defaultPrevented, 'pending arrows should not scroll the page');
+        pressKey(view, 'Delete');
+        assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/neighbor')).length, 1);
+        assertEqual(document.querySelector('.modal-backdrop'), null, 'pending navigation should block delete hotkeys');
+
+        resolveNeighbour({status: 200, body: {id: 12}});
+        await settle();
+        assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/image?id=12']));
+    } finally {
+        resolveNeighbour?.({status: 200, body: {id: null}});
+        restore();
+    }
+}
+
+export async function testImageViewFocusesItsPageForImmediateHotkeys() {
+    const fetchMock = mockFetch(() => detailResponse());
+    const restore = useFetch(fetchMock);
+    const view = createImageView({
+        session: {getUser: () => null},
+        query: new URLSearchParams('id=7'),
+    });
+    const fixture = document.getElementById('test-fixture');
+    fixture.append(view);
+    try {
+        await settle();
+        assertEqual(document.activeElement, view, 'the image view should receive focus on navigation');
+        assertEqual(view.getAttribute('tabindex'), '-1', 'the page should be programmatically focusable');
+    } finally {
+        view.remove();
         restore();
     }
 }

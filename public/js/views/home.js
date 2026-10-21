@@ -60,11 +60,14 @@ export function createHomeView({navigate = () => {}, query = new URLSearchParams
         initialTags: tags,
         onSearch: (searchTags) => navigate(buildHomePath(1, searchTags)),
     });
+    const toolbar = el('div', {
+        className: 'layout-toolbar home-toolbar',
+        children: search.element,
+    });
     const tagView = createTagView([], activeTags);
     const sidebar = el('aside', {
         className: 'sidebar',
         children: [
-            search.element,
             el('h2', { className: 'sidebar-title', children: 'Tags' }),
             tagView,
         ],
@@ -84,7 +87,7 @@ export function createHomeView({navigate = () => {}, query = new URLSearchParams
 
     loadImages({ grid, tagView, pagination, page: requestedPage, tags, navigate });
 
-    return el('div', { className: 'layout', children: [sidebar, content] });
+    return el('div', { className: 'layout home-layout', children: [toolbar, sidebar, content] });
 }
 
 function showLoadingTiles(grid) {

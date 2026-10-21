@@ -27,8 +27,9 @@ async function createLoadedView(handler, query = '', navigate = () => {}) {
 export async function testHomeViewRendersPageTagsAndImageGrid() {
     const { view, fetchMock, restore } = await createLoadedView(() => ({ status: 200, body: IMAGES }));
     try {
-        assertTrue(view.matches('.layout'), 'home should use the .layout grid');
-        assertTrue(view.querySelector('.sidebar .search-view') !== null, 'home should have a tag search');
+        assertTrue(view.matches('.layout.home-layout'), 'home should use the .layout grid');
+        assertTrue(view.querySelector('.home-toolbar .search-view') !== null, 'home should have a tag search above the layout content');
+        assertEqual(view.querySelector('.sidebar .search-view'), null, 'home sidebar should not contain tag search');
         assertTrue(view.querySelector('.sidebar .tags') !== null, 'sidebar tag list should exist');
         assertEqual(view.querySelectorAll('.tags .tags-item').length, 2, 'the page tags should replace static tags');
         assertEqual(view.querySelector('.tags-link[data-tag-name="nature"]')?.textContent, 'nature');
@@ -178,7 +179,7 @@ export async function testHomeGridShowsErrorMessageOnFailure() {
         assertTrue(status !== null, 'a fetch failure should show a message');
         assertTrue(status.classList.contains('grid-status--error'), 'failure message should be marked as an error');
         assertTrue(view.querySelector('.sidebar .tags') !== null, 'sidebar should stay usable on grid failure');
-        assertTrue(view.querySelector('.sidebar .search-view') !== null, 'search should stay usable on grid failure');
+        assertTrue(view.querySelector('.home-toolbar .search-view') !== null, 'search should stay usable on grid failure');
     } finally {
         restore();
     }

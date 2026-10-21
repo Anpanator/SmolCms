@@ -50,6 +50,10 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
         attributes: {'aria-label': 'Adjacent images'},
         children: [previousButton, nextButton],
     });
+    const toolbar = el('div', {
+        className: 'layout-toolbar image-toolbar',
+        children: [search.element, imageNav],
+    });
     const deleteButton = hasAccessLevel(session.getUser(), AccessLevel.MOD) ? createDeleteButton() : null;
     const modActions = deleteButton === null ? null : el('section', {
         className: 'mod-actions',
@@ -62,7 +66,6 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
     const sidebar = el('aside', {
         className: 'sidebar',
         children: [
-            search.element,
             el('h2', {className: 'sidebar-title', children: 'Tags'}),
             tagList.element,
             imageDetails.metaSection,
@@ -71,14 +74,25 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
     });
     const content = el('section', {
         className: 'content',
-        children: [status, imageDetails.imageHolder, imageNav],
+        children: [status, imageDetails.imageHolder],
     });
     const state = {navigate, imageDetails, tagList, status};
+    const page = el('div', {
+        className: 'layout image-layout',
+        attributes: {tabindex: '-1', 'aria-label': 'Image view'},
+        children: [toolbar, sidebar, content],
+    });
 
+    page.addEventListener('keydown', handleKeyboard);
+    queueMicrotask(() => {
+        if (page.isConnected) {
+            page.focus({preventScroll: true});
+        }
+    });
     refreshControls();
     loadImage(imageId, state, applyImage);
 
-    return el('div', {className: 'layout image-layout', children: [sidebar, content]});
+    return page;
 
     function createNavButton(className, label, direction) {
         const button = el('button', {
@@ -118,6 +132,35 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
     function setNavigationDisabled(disabled) {
         previousButton.disabled = disabled;
         nextButton.disabled = disabled;
+    }
+
+    function handleKeyboard(event) {
+        const target = event.target;
+        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
+            || (target instanceof Element && (
+                target.closest('input, textarea, select') !== null
+                || (target instanceof HTMLElement && target.isContentEditable)
+            ))
+            || document.querySelector('.modal-backdrop') !== null) {
+            return;
+        }
+
+        // Horizontal arrows change images; leave vertical arrows available for page scrolling.
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            event.preventDefault();
+            if (event.repeat || navigationPending || currentImage === null) {
+                return;
+            }
+            void goToNeighbor(event.key === 'ArrowRight' ? 'next' : 'previous');
+            return;
+        }
+
+        if (event.key === 'Delete' && deleteButton !== null && currentImage !== null) {
+            event.preventDefault();
+            if (!event.repeat && !navigationPending && !deletePending) {
+                void deleteCurrentImage();
+            }
+        }
     }
 
     async function goToNeighbor(direction) {
