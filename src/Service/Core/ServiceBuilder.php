@@ -74,6 +74,11 @@ class ServiceBuilder
                 // In this case we can just take what we have in $builtParameters already
                 continue;
             }
+            if (!array_key_exists($refParam->getPosition(), $builtParameters)
+                && $refParam->isDefaultValueAvailable()) {
+                // Keep an optional constructor dependency's default when it is not configured.
+                continue;
+            }
             // The constructor parameter is a custom class, so we need to build it
             $builtParameters[$refParam->getPosition()] = $this->getService($builtParameters[$refParam->getPosition()]);
             // If the parameter is variadic, it's also always the last one

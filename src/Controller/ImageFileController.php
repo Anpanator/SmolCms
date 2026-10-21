@@ -6,6 +6,7 @@ namespace SmolCms\Controller;
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpStatus;
+use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Attribute\Authenticated;
@@ -43,7 +44,6 @@ readonly class ImageFileController
     {
     }
 
-    #[Authenticated(AccessLevel::NOVICE)]
     public function sampleAction(Request $request): Response
     {
         return $this->serveFile(
@@ -88,9 +88,10 @@ readonly class ImageFileController
 
         $userData = $this->sessionService->getUserData();
         if ($userData === null) {
-            return new Response(HttpStatus::NOT_FOUND);
-        }
-        if (!$this->imageAccessPolicy->canAccess($entity, $userData->accessLevel, $userData->id)) {
+            if ($entity->getStatus() !== ImageStatus::ACCEPTED) {
+                return new Response(HttpStatus::FORBIDDEN);
+            }
+        } elseif (!$this->imageAccessPolicy->canAccess($entity, $userData->accessLevel, $userData->id)) {
             return new Response(HttpStatus::FORBIDDEN);
         }
 

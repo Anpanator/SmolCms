@@ -8,7 +8,6 @@ use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
-use SmolCms\Service\Core\Attribute\Authenticated;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\Image\ImageAccessPolicy;
 use SmolCms\Service\Image\ImageQueryService;
@@ -42,7 +41,6 @@ readonly class ImageApiController
         ));
     }
 
-    #[Authenticated(AccessLevel::NOVICE)]
     public function getImageDetailAction(Request $request): Response
     {
         $id = self::parseImageId(($request->getParams ?? [])['id'] ?? null);
@@ -51,14 +49,15 @@ readonly class ImageApiController
         }
 
         $user = $this->sessionService->getUserData();
-        if ($user === null) {
-            return new Response(HttpStatus::UNAUTHORIZED);
-        }
         $image = $this->imageAccessPolicy->findImage($id);
         if ($image === null) {
             return new Response(HttpStatus::NOT_FOUND);
         }
-        if (!$this->imageAccessPolicy->canAccessImageDetail($image, $user->accessLevel, $user->id)) {
+        if (!$this->imageAccessPolicy->canAccessImageDetail(
+            $image,
+            $user?->accessLevel ?? AccessLevel::NOVICE,
+            $user?->id,
+        )) {
             return new Response(HttpStatus::FORBIDDEN);
         }
 

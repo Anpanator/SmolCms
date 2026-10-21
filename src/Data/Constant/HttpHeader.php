@@ -10,4 +10,5 @@ enum HttpHeader: string
     case X_ACCEL_REDIRECT = 'X-Accel-Redirect';
     case ORIGIN = 'Origin';
     case SEC_FETCH_SITE = 'Sec-Fetch-Site';
+    case CROSS_ORIGIN_RESOURCE_POLICY = 'Cross-Origin-Resource-Policy';
 }

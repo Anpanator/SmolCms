@@ -235,14 +235,42 @@ class ImageApiControllerTest extends FunctionalTestCase
         );
     }
 
-    public function testGetImageDetailAction_RequiresAuthentication(): void
+    public function testGetImageDetailAction_AnonymousCanAccessAcceptedImage(): void
     {
-        ImageTestUtils::createImageEntity($this->imageEntityService, userId: 1);
+        $this->loginUser('anonymous-image-detail-owner-' . bin2hex(random_bytes(4)), 'Anonymous Detail Owner');
+        $owner = $this->sessionService->getUserData();
+        self::assertNotNull($owner);
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $owner->id,
+            status: ImageStatus::ACCEPTED,
+        );
+        $this->sessionService->destroySession();
 
-        $response = $this->simulateDetailRequest('1');
+        $response = $this->simulateDetailRequest((string)$image->getId());
 
-        $this->assertSame(HttpStatus::UNAUTHORIZED, $response->getStatus());
-        $this->assertNull($response->getContent());
+        self::assertSame(HttpStatus::OK, $response->getStatus());
+        $body = json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR);
+        self::assertSame($image->getId(), $body['image']['id']);
+        self::assertSame('accepted', $body['image']['status']);
+    }
+
+    public function testGetImageDetailAction_AnonymousCannotAccessPendingImage(): void
+    {
+        $this->loginUser('anonymous-pending-detail-owner-' . bin2hex(random_bytes(4)), 'Anonymous Pending Detail Owner');
+        $owner = $this->sessionService->getUserData();
+        self::assertNotNull($owner);
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $owner->id,
+            status: ImageStatus::PENDING_REVIEW,
+        );
+        $this->sessionService->destroySession();
+
+        $response = $this->simulateDetailRequest((string)$image->getId());
+
+        self::assertSame(HttpStatus::FORBIDDEN, $response->getStatus());
+        self::assertNull($response->getContent());
     }
 
     public function testGetImageDetailAction_ReturnsDetailWithUploaderDisplayName(): void
