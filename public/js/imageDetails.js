@@ -7,6 +7,8 @@ import {createImageMetadataItems} from './imageMetadata.js';
 
 export {formatDimensions, formatFileSize} from './imageMetadata.js';
 
+const DOWNLOAD_DISABLED_NOTE = 'Log in to download images';
+
 /**
  * @returns {{
  *   imageHolder: HTMLDivElement,
@@ -16,7 +18,7 @@ export {formatDimensions, formatFileSize} from './imageMetadata.js';
  *   update: (image: object|null) => void,
  * }}
  */
-export function createImageDetails() {
+export function createImageDetails({canDownload = true} = {}) {
     const imageHolder = el('div', {className: 'image-view'});
     const uploadMetadata = el('dl', {className: 'image-meta-list'});
     const metadata = el('dl', {className: 'image-meta-list'});
@@ -33,7 +35,7 @@ export function createImageDetails() {
         className: 'image-meta-section',
         children: [el('hr', {className: 'image-meta-separator'}), metadataContent],
     });
-    let downloadLink = null;
+    let downloadControl = null;
 
     return {imageHolder, metaSection, metadata: metadataContent, pendingWarning, update};
 
@@ -41,8 +43,8 @@ export function createImageDetails() {
         imageHolder.replaceChildren();
         uploadMetadata.replaceChildren();
         metadata.replaceChildren();
-        downloadLink?.remove();
-        downloadLink = null;
+        downloadControl?.remove();
+        downloadControl = null;
         pendingWarning.hidden = image?.status !== 'pending_review';
 
         if (!image) {
@@ -66,12 +68,22 @@ export function createImageDetails() {
         metadata.append(...metadataItems.slice(1));
 
         if (image.downloadSrc) {
-            downloadLink = el('a', {
-                className: 'button button--primary image-download',
-                attributes: {href: image.downloadSrc, download: 'download'},
-                children: 'Download',
-            });
-            metaSection.append(downloadLink);
+            downloadControl = canDownload
+                ? el('a', {
+                    className: 'button button--primary image-download',
+                    attributes: {href: image.downloadSrc, download: 'download'},
+                    children: 'Download',
+                })
+                : el('span', {
+                    className: 'image-download-disabled-wrapper',
+                    attributes: {title: DOWNLOAD_DISABLED_NOTE},
+                    children: el('button', {
+                        className: 'button button--primary image-download image-download--disabled',
+                        attributes: {type: 'button', disabled: 'disabled'},
+                        children: 'Download',
+                    }),
+                });
+            metaSection.append(downloadControl);
         }
     }
 }

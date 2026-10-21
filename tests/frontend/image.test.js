@@ -72,7 +72,7 @@ export async function testImageViewRendersSampleImageInLayout() {
     }
 }
 
-export async function testImageViewShowsMetadataAndDownloadLink() {
+export async function testImageViewShowsMetadataAndDisabledDownloadForAnonymousUser() {
     const { view, restore } = await createView(() => detailResponse());
     try {
         assertEqual(metaValue(view, 'Uploaded'), '2026-10-19 10:30:00');
@@ -81,8 +81,30 @@ export async function testImageViewShowsMetadataAndDownloadLink() {
         assertEqual(metaValue(view, 'Format'), 'jpeg');
         assertEqual(metaValue(view, 'File size'), '1.2 KB');
 
+        const download = view.querySelector('.sidebar button.image-download');
+        assertTrue(download !== null, 'disabled download control should exist in the sidebar');
+        assertTrue(download.disabled, 'anonymous users should not be able to download');
+        assertEqual(download.getAttribute('href'), null, 'disabled download control should have no href');
+        assertTrue(!download.hasAttribute('download'), 'disabled download control should have no download action');
+        assertEqual(download.textContent, 'Download');
+        assertEqual(
+            view.querySelector('.image-download-disabled-wrapper')?.getAttribute('title'),
+            'Log in to download images',
+        );
+    } finally {
+        restore();
+    }
+}
+
+export async function testImageViewShowsDownloadLinkForLoggedInUser() {
+    const { view, restore } = await createView(
+        () => detailResponse(),
+        'id=7',
+        {getUser: () => testUser()},
+    );
+    try {
         const download = view.querySelector('.sidebar a.image-download');
-        assertTrue(download !== null, 'download link should exist in the sidebar');
+        assertTrue(download !== null, 'logged-in users should have a working download link');
         assertEqual(download.getAttribute('href'), '/api/image/download?name=ab89c0d0ef.jpeg');
         assertTrue(download.hasAttribute('download'), 'download link should carry the download attribute');
         assertEqual(download.textContent, 'Download');
