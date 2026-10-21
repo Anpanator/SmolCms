@@ -83,6 +83,16 @@ readonly class ImageReviewService
      */
     public function reject(int $id): bool
     {
+        return $this->delete($id);
+    }
+
+    /**
+     * Deletes an image of any status: deletes the database row and all related
+     * image files (original, thumb, sample, download). Returns false only for
+     * an unknown id.
+     */
+    public function delete(int $id): bool
+    {
         $entity = $this->imageEntityService->findOneById($id);
         if ($entity === null) {
             return false;

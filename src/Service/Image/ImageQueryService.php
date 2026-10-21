@@ -101,6 +101,18 @@ readonly class ImageQueryService
     }
 
     /**
+     * Nearest detail-visible neighbor image id (next or previous by id), or
+     * null when no accessible image exists in that direction. Inaccessible
+     * images (e.g. other users' unapproved uploads) are skipped.
+     */
+    public function getNeighborId(int $id, bool $next, ?int $viewerId, bool $canAccessAll): ?int
+    {
+        return $next
+            ? $this->imageEntityService->findNextAccessibleId($id, $viewerId, $canAccessAll)
+            : $this->imageEntityService->findPreviousAccessibleId($id, $viewerId, $canAccessAll);
+    }
+
+    /**
      * Full detail data for a single image, or null for an unknown id.
      *
      * @return array<string, int|string|null|list<string>>|null

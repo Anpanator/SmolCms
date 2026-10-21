@@ -14,6 +14,8 @@ use SmolCms\Service\Image\ImageQueryService;
 
 readonly class ImageApiController
 {
+    private const NEIGHBOR_DIRECTIONS = ['next', 'previous'];
+
     public function __construct(
         private ImageQueryService $imageQueryService,
         private ImageAccessPolicy $imageAccessPolicy,
@@ -67,6 +69,36 @@ readonly class ImageApiController
         }
 
         return new JsonResponse(['image' => $detail]);
+    }
+
+    public function getImageNeighborAction(Request $request): Response
+    {
+        $params = $request->getParams ?? [];
+        $id = self::parseImageId($params['id'] ?? null);
+        $direction = $params['direction'] ?? null;
+        if ($id === null || !is_string($direction) || !in_array($direction, self::NEIGHBOR_DIRECTIONS, true)) {
+            return new Response(HttpStatus::BAD_REQUEST);
+        }
+
+        $user = $this->sessionService->getUserData();
+        $image = $this->imageAccessPolicy->findImage($id);
+        if ($image === null) {
+            return new Response(HttpStatus::NOT_FOUND);
+        }
+        if (!$this->imageAccessPolicy->canAccessImageDetail(
+            $image,
+            $user?->accessLevel ?? AccessLevel::NOVICE,
+            $user?->id,
+        )) {
+            return new Response(HttpStatus::FORBIDDEN);
+        }
+
+        return new JsonResponse(['id' => $this->imageQueryService->getNeighborId(
+            $id,
+            $direction === 'next',
+            $user?->id,
+            $user !== null && $user->accessLevel->value >= AccessLevel::MOD->value,
+        )]);
     }
 
     private static function parseImageId(mixed $id): ?int

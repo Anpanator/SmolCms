@@ -171,6 +171,54 @@ readonly class ImageEntityService extends EntityService
         return $this->countResults($qc);
     }
 
+    /**
+     * Nearest image id above the given one the viewer can open in the image
+     * detail view, or null when no accessible image exists above it.
+     */
+    public function findNextAccessibleId(int $fromId, ?int $viewerId, bool $canAccessAll): ?int
+    {
+        return $this->findAccessibleNeighborId($fromId, true, $viewerId, $canAccessAll);
+    }
+
+    /**
+     * Nearest image id below the given one the viewer can open in the image
+     * detail view, or null when no accessible image exists below it.
+     */
+    public function findPreviousAccessibleId(int $fromId, ?int $viewerId, bool $canAccessAll): ?int
+    {
+        return $this->findAccessibleNeighborId($fromId, false, $viewerId, $canAccessAll);
+    }
+
+    private function findAccessibleNeighborId(
+        int  $fromId,
+        bool $next,
+        ?int $viewerId,
+        bool $canAccessAll,
+    ): ?int
+    {
+        $qc = new QueryCriteria();
+        $qc->select(ImageEntity::class)
+            ->andWhere($next ? 'id > :from_id' : 'id < :from_id')
+            ->orderBy('id', $next ? QueryCriteria::ORDER_ASC : QueryCriteria::ORDER_DESC)
+            ->maxResults(1);
+
+        $parameters = ['from_id' => $fromId];
+        if (!$canAccessAll) {
+            $qc->andWhere($viewerId === null
+                ? 'status = :accepted_status'
+                : '(status = :accepted_status OR (status = :pending_review_status AND user_id = :viewer_id))');
+            $parameters['accepted_status'] = ImageStatus::ACCEPTED->value;
+            if ($viewerId !== null) {
+                $parameters['pending_review_status'] = ImageStatus::PENDING_REVIEW->value;
+                $parameters['viewer_id'] = $viewerId;
+            }
+        }
+        $qc->withParameters($parameters);
+
+        $entity = ($this->execute($qc) ?? [])[0] ?? null;
+        return $entity?->getId();
+    }
+
     public function findRandomTagmeImage(): ?ImageEntity
     {
         $driver = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);

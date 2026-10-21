@@ -289,4 +289,45 @@ class ImageEntityServiceTest extends FunctionalTestCase
             [ImageStatus::ACCEPTED],
         ));
     }
+
+    public function testAccessibleNeighborIds_followIdOrderSkipInvisibleImagesAndRespectBoundaries(): void
+    {
+        $viewerId = 5555;
+        $otherUserId = 6666;
+        $acceptedFirst = $this->makeEntity(status: ImageStatus::ACCEPTED, uploadDate: new DateTime('2026-02-01 10:00:00'), userId: $otherUserId);
+        $foreignPendingReview = $this->makeEntity(status: ImageStatus::PENDING_REVIEW, uploadDate: new DateTime('2026-02-01 11:00:00'), userId: $otherUserId);
+        $acceptedSecond = $this->makeEntity(status: ImageStatus::ACCEPTED, uploadDate: new DateTime('2026-02-01 12:00:00'), userId: $otherUserId);
+        $ownUnprocessed = $this->makeEntity(status: ImageStatus::PENDING, uploadDate: new DateTime('2026-02-01 13:00:00'), userId: $viewerId);
+        $ownRejected = $this->makeEntity(status: ImageStatus::REJECTED, uploadDate: new DateTime('2026-02-01 14:00:00'), userId: $viewerId);
+        $ownPendingReview = $this->makeEntity(status: ImageStatus::PENDING_REVIEW, uploadDate: new DateTime('2026-02-01 15:00:00'), userId: $viewerId);
+        $acceptedLast = $this->makeEntity(status: ImageStatus::ACCEPTED, uploadDate: new DateTime('2026-02-01 16:00:00'), userId: $otherUserId);
+        foreach ([$acceptedFirst, $foreignPendingReview, $acceptedSecond, $ownUnprocessed, $ownRejected, $ownPendingReview, $acceptedLast] as $image) {
+            $this->imageEntityService->saveAsNew($image);
+        }
+
+        // Anonymous viewer: accepted images only, ordered by id in both directions.
+        self::assertSame($acceptedSecond->getId(), $this->imageEntityService->findNextAccessibleId($acceptedFirst->getId(), null, false));
+        self::assertSame($acceptedLast->getId(), $this->imageEntityService->findNextAccessibleId($acceptedSecond->getId(), null, false));
+        self::assertSame($acceptedFirst->getId(), $this->imageEntityService->findPreviousAccessibleId($acceptedSecond->getId(), null, false));
+        self::assertNull($this->imageEntityService->findNextAccessibleId(PHP_INT_MAX, null, false));
+        self::assertNull($this->imageEntityService->findPreviousAccessibleId(0, null, false));
+
+        // Regular viewer: own pending-review uploads are visible, everything else is skipped.
+        self::assertSame($acceptedSecond->getId(), $this->imageEntityService->findNextAccessibleId($acceptedFirst->getId(), $viewerId, false));
+        self::assertSame($ownPendingReview->getId(), $this->imageEntityService->findNextAccessibleId($acceptedSecond->getId(), $viewerId, false));
+        self::assertSame($acceptedLast->getId(), $this->imageEntityService->findNextAccessibleId($ownPendingReview->getId(), $viewerId, false));
+        self::assertSame($ownPendingReview->getId(), $this->imageEntityService->findPreviousAccessibleId($acceptedLast->getId(), $viewerId, false));
+        self::assertSame($acceptedSecond->getId(), $this->imageEntityService->findPreviousAccessibleId($ownPendingReview->getId(), $viewerId, false));
+        self::assertNull($this->imageEntityService->findNextAccessibleId(PHP_INT_MAX, $viewerId, false));
+
+        // Full-access viewer: every image is reachable, including pending and rejected ones.
+        self::assertSame($foreignPendingReview->getId(), $this->imageEntityService->findNextAccessibleId($acceptedFirst->getId(), $viewerId, true));
+        self::assertSame($ownUnprocessed->getId(), $this->imageEntityService->findNextAccessibleId($acceptedSecond->getId(), $viewerId, true));
+        self::assertSame($ownRejected->getId(), $this->imageEntityService->findNextAccessibleId($ownUnprocessed->getId(), $viewerId, true));
+        self::assertSame($ownPendingReview->getId(), $this->imageEntityService->findNextAccessibleId($ownRejected->getId(), $viewerId, true));
+        self::assertSame($acceptedLast->getId(), $this->imageEntityService->findNextAccessibleId($ownPendingReview->getId(), $viewerId, true));
+        self::assertSame($ownPendingReview->getId(), $this->imageEntityService->findPreviousAccessibleId($acceptedLast->getId(), $viewerId, true));
+        self::assertSame($acceptedFirst->getId(), $this->imageEntityService->findPreviousAccessibleId($foreignPendingReview->getId(), $viewerId, true));
+        self::assertNull($this->imageEntityService->findPreviousAccessibleId(0, $viewerId, true));
+    }
 }

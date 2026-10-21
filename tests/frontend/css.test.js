@@ -242,6 +242,14 @@ export function testImageTagEditingAndTagmeControlsHaveStyles() {
     assertTrue(findRule(rules, '.form-message--info', 'color:var(--color-accent-strong)') !== undefined, 'informational tag messages should be styled');
 }
 
+export function testImageNavigationAndModActionStylesExist() {
+    const rules = collectRules(findMainStylesheet());
+    assertTrue(findRule(rules, '.image-nav', 'display:flex') !== undefined, 'previous/next controls should share a row below the image');
+    assertTrue(findRule(rules, '.image-nav .button') !== undefined, 'previous/next controls should share the row width');
+    assertTrue(findRule(rules, '.mod-actions', 'display:flex') !== undefined, 'the mod actions section should have a styled layout');
+    assertTrue(findRule(rules, '.button--danger') !== undefined, 'the delete action should reuse the danger button style');
+}
+
 function assertNotEqualString(actual, expected, message) {
     if (actual === expected) {
         throw new Error(`${message} (got ${expected})`);

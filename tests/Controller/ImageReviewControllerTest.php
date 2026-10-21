@@ -7,6 +7,7 @@ use DateTime;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\AccessLevel;
+use SmolCms\Data\Constant\AuditActionType;
 use SmolCms\Data\Constant\HttpContentType;
 use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpMethod;
@@ -15,6 +16,7 @@ use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Session\SessionService;
+use SmolCms\Service\DB\AuditLogService;
 use SmolCms\Service\DB\ImageEntityService;
 use SmolCms\TestUtils\Attributes\Autowire;
 use SmolCms\TestUtils\FunctionalTestCase;
@@ -30,6 +32,9 @@ class ImageReviewControllerTest extends FunctionalTestCase
 
     #[Autowire]
     private SessionService $sessionService;
+
+    #[Autowire]
+    private AuditLogService $auditLogService;
 
     protected function setUp(): void
     {
@@ -386,6 +391,123 @@ class ImageReviewControllerTest extends FunctionalTestCase
         $this->loginUserWithAccessLevel('mod-user', 'Mod User', AccessLevel::MOD);
 
         $response = $this->simulateReviewPostRequest('/api/review/reject', $id);
+
+        $this->assertSame(HttpStatus::BAD_REQUEST, $response->getStatus());
+        $this->assertNull($response->getContent());
+    }
+
+    public function testDeleteAction_Anonymous_ReturnsUnauthorized(): void
+    {
+        $response = $this->simulateReviewPostRequest('/api/image/delete', '1');
+
+        $this->assertSame(HttpStatus::UNAUTHORIZED, $response->getStatus());
+        $this->assertNull($response->getContent());
+    }
+
+    public function testDeleteAction_Novice_ReturnsForbidden(): void
+    {
+        $this->loginUser('novice-user', 'Novice User');
+
+        $response = $this->simulateReviewPostRequest('/api/image/delete', '1');
+
+        $this->assertSame(HttpStatus::FORBIDDEN, $response->getStatus());
+        $this->assertNull($response->getContent());
+    }
+
+    public function testDeleteAction_AcceptedImage_DeletesRowAndAllFiles(): void
+    {
+        $this->loginUserWithAccessLevel('mod-user', 'Mod User', AccessLevel::MOD);
+        $checksum = ImageTestUtils::randomChecksum();
+        $entity = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+            checksum: $checksum,
+            thumbFilename: ImageTestUtils::randomChecksum() . '.avif',
+            sampleFilename: ImageTestUtils::randomChecksum() . '.webp',
+            downloadFilename: ImageTestUtils::randomChecksum() . '.jpeg',
+        );
+        $originalPath = ImageTestUtils::imageFilePath(IMAGE_STORAGE_DIR, "$checksum.jpeg");
+        $thumbPath = ImageTestUtils::imageFilePath(IMAGE_THUMB_DIR, (string)$entity->getThumbFilename());
+        $samplePath = ImageTestUtils::imageFilePath(IMAGE_SAMPLE_DIR, (string)$entity->getSampleFilename());
+        $downloadPath = ImageTestUtils::imageFilePath(IMAGE_DOWNLOAD_DIR, (string)$entity->getDownloadFilename());
+        foreach ([$originalPath, $thumbPath, $samplePath, $downloadPath] as $path) {
+            $pathDir = dirname($path);
+            if (!is_dir($pathDir)) {
+                mkdir($pathDir, 0777, true);
+            }
+            file_put_contents($path, 'dummy');
+            $this->assertFileExists($path);
+        }
+
+        $response = $this->simulateReviewPostRequest('/api/image/delete', (string)$entity->getId());
+
+        $this->assertSame(HttpStatus::NO_CONTENT, $response->getStatus());
+        $this->assertNull($response->getContent());
+        $this->assertNull($this->imageEntityService->findOneById($entity->getId()));
+        $this->assertFileDoesNotExist($originalPath);
+        $this->assertFileDoesNotExist($thumbPath);
+        $this->assertFileDoesNotExist($samplePath);
+        $this->assertFileDoesNotExist($downloadPath);
+    }
+
+    public function testDeleteAction_WritesAuditLogEntryForTheMod(): void
+    {
+        $this->loginUserWithAccessLevel('audit-mod-user', 'Audit Mod User', AccessLevel::MOD);
+        $mod = $this->sessionService->getUserData();
+        $this->assertNotNull($mod);
+        $entity = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+        );
+
+        $response = $this->simulateReviewPostRequest('/api/image/delete', (string)$entity->getId());
+
+        $this->assertSame(HttpStatus::NO_CONTENT, $response->getStatus());
+        $entries = array_values(array_filter(
+            $this->auditLogService->getEntries(1, '')['entries'],
+            static fn(array $entry): bool => $entry['actionType'] === AuditActionType::IMAGE_DELETED->value
+                && $entry['context'] === "image_id={$entity->getId()}",
+        ));
+        $this->assertCount(1, $entries);
+        $this->assertSame($mod->id, $entries[0]['user']['id']);
+        $this->assertSame("image_id={$entity->getId()}", $entries[0]['context']);
+    }
+
+    public function testDeleteAction_FailedDelete_WritesNoAuditLogEntry(): void
+    {
+        $this->loginUserWithAccessLevel('failed-delete-mod-user', 'Failed Delete Mod', AccessLevel::MOD);
+
+        $response = $this->simulateReviewPostRequest('/api/image/delete', '99999');
+
+        $this->assertSame(HttpStatus::NOT_FOUND, $response->getStatus());
+        $this->assertSame(
+            [],
+            array_filter(
+                $this->auditLogService->getEntries(1, '')['entries'],
+                static fn(array $entry): bool => $entry['actionType'] === AuditActionType::IMAGE_DELETED->value
+                    && $entry['context'] === 'image_id=99999',
+            ),
+        );
+    }
+
+    public function testDeleteAction_UnknownId_ReturnsNotFound(): void
+    {
+        $this->loginUserWithAccessLevel('mod-user', 'Mod User', AccessLevel::MOD);
+
+        $response = $this->simulateReviewPostRequest('/api/image/delete', '99999');
+
+        $this->assertSame(HttpStatus::NOT_FOUND, $response->getStatus());
+        $this->assertNull($response->getContent());
+    }
+
+    #[DataProvider('malformedIdProvider')]
+    public function testDeleteAction_MalformedId_ReturnsBadRequest(?string $id): void
+    {
+        $this->loginUserWithAccessLevel('mod-user', 'Mod User', AccessLevel::MOD);
+
+        $response = $this->simulateReviewPostRequest('/api/image/delete', $id);
 
         $this->assertSame(HttpStatus::BAD_REQUEST, $response->getStatus());
         $this->assertNull($response->getContent());

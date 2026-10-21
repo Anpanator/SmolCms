@@ -22,6 +22,7 @@ enum RouteEnum: string
     case API_SESSION = '/api/session';
     case API_IMAGES = '/api/images';
     case API_IMAGE_DETAIL = '/api/image/detail';
+    case API_IMAGE_NEIGHBOR = '/api/image/neighbor';
     case API_TAGS = '/api/tags';
     case API_TAG_SUGGEST = '/api/tags/suggest';
     case API_TAG_CATEGORIES = '/api/tag-categories';
@@ -31,6 +32,7 @@ enum RouteEnum: string
     case API_REVIEW_QUEUE = '/api/review/queue';
     case API_REVIEW_APPROVE = '/api/review/approve';
     case API_REVIEW_REJECT = '/api/review/reject';
+    case API_IMAGE_DELETE = '/api/image/delete';
     case API_IMAGE_TAGS = '/api/image/tags';
     case API_IMAGE_TAGS_REMOVE = '/api/image/tags/remove';
     case API_TAG_SUGGESTIONS = '/api/tag-suggestions';

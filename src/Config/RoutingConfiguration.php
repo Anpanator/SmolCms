@@ -144,6 +144,12 @@ class RoutingConfiguration
                 controller: ImageApiController::class,
                 handler: 'getImageDetailAction',
             ),
+            RouteEnum::API_IMAGE_NEIGHBOR->name => new Route(
+                path: RouteEnum::API_IMAGE_NEIGHBOR->value,
+                method: HttpMethod::GET,
+                controller: ImageApiController::class,
+                handler: 'getImageNeighborAction',
+            ),
             RouteEnum::API_TAG_SUGGEST->name => new Route(
                 path: RouteEnum::API_TAG_SUGGEST->value,
                 method: HttpMethod::GET,
@@ -209,6 +215,12 @@ class RoutingConfiguration
                 method: HttpMethod::POST,
                 controller: ImageReviewController::class,
                 handler: 'rejectAction',
+            ),
+            RouteEnum::API_IMAGE_DELETE->name => new Route(
+                path: RouteEnum::API_IMAGE_DELETE->value,
+                method: HttpMethod::POST,
+                controller: ImageReviewController::class,
+                handler: 'deleteAction',
             ),
             RouteEnum::API_IMAGE_TAGS->name => new Route(
                 path: RouteEnum::API_IMAGE_TAGS->value,

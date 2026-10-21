@@ -6,11 +6,11 @@ namespace SmolCms\Test\Controller;
 use DateTime;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SmolCms\Data\Business\Url;
+use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpContentType;
 use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
-use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
@@ -379,6 +379,172 @@ class ImageApiControllerTest extends FunctionalTestCase
         $this->assertNull($response->getContent());
     }
 
+    public function testGetImageNeighborAction_AnonymousSkipsInvisibleImages(): void
+    {
+        $this->loginUser('neighbor-uploader-' . bin2hex(random_bytes(4)), 'Neighbor Uploader');
+        $uploader = $this->sessionService->getUserData();
+        self::assertNotNull($uploader);
+        $acceptedFirst = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $uploader->id,
+            status: ImageStatus::ACCEPTED,
+        );
+        $foreignPendingReview = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $uploader->id === 1 ? 2 : 1,
+            status: ImageStatus::PENDING_REVIEW,
+        );
+        $acceptedSecond = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $uploader->id,
+            status: ImageStatus::ACCEPTED,
+        );
+        $this->sessionService->destroySession();
+
+        $nextResponse = $this->simulateNeighborRequest((string)$acceptedFirst->getId(), 'next');
+        self::assertSame(HttpStatus::OK, $nextResponse->getStatus());
+        self::assertSame(
+            ['id' => $acceptedSecond->getId()],
+            json_decode((string)$nextResponse->getContent(), true, JSON_THROW_ON_ERROR),
+            'unapproved images of other users must be skipped',
+        );
+
+        $previousResponse = $this->simulateNeighborRequest((string)$acceptedSecond->getId(), 'previous');
+        self::assertSame(HttpStatus::OK, $previousResponse->getStatus());
+        self::assertSame(
+            ['id' => $acceptedFirst->getId()],
+            json_decode((string)$previousResponse->getContent(), true, JSON_THROW_ON_ERROR),
+        );
+    }
+
+    public function testGetImageNeighborAction_RegularViewerIncludesOwnPendingReviewImages(): void
+    {
+        $this->loginUser('neighbor-owner-' . bin2hex(random_bytes(4)), 'Neighbor Owner');
+        $owner = $this->sessionService->getUserData();
+        self::assertNotNull($owner);
+        $accepted = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $owner->id,
+            status: ImageStatus::ACCEPTED,
+        );
+        $ownUnprocessed = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $owner->id,
+            status: ImageStatus::PENDING,
+        );
+        $ownPendingReview = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $owner->id,
+            status: ImageStatus::PENDING_REVIEW,
+        );
+
+        $nextResponse = $this->simulateNeighborRequest((string)$accepted->getId(), 'next');
+        self::assertSame(HttpStatus::OK, $nextResponse->getStatus());
+        self::assertSame(
+            ['id' => $ownPendingReview->getId()],
+            json_decode((string)$nextResponse->getContent(), true, JSON_THROW_ON_ERROR),
+            'own pending-review images are visible, unprocessed ones are not',
+        );
+
+        $previousResponse = $this->simulateNeighborRequest((string)$ownPendingReview->getId(), 'previous');
+        self::assertSame(HttpStatus::OK, $previousResponse->getStatus());
+        self::assertSame(
+            ['id' => $accepted->getId()],
+            json_decode((string)$previousResponse->getContent(), true, JSON_THROW_ON_ERROR),
+            'the unprocessed upload between the two images must be skipped',
+        );
+    }
+
+    public function testGetImageNeighborAction_ModeratorCanNavigateThroughEveryStatus(): void
+    {
+        $this->loginUserWithAccessLevel(
+            'neighbor-mod-' . bin2hex(random_bytes(4)),
+            'Neighbor Moderator',
+            AccessLevel::MOD,
+        );
+        $mod = $this->sessionService->getUserData();
+        self::assertNotNull($mod);
+        $accepted = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $mod->id === 1 ? 2 : 1,
+            status: ImageStatus::ACCEPTED,
+        );
+        $rejected = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $mod->id === 1 ? 2 : 1,
+            status: ImageStatus::REJECTED,
+        );
+
+        $nextResponse = $this->simulateNeighborRequest((string)$accepted->getId(), 'next');
+        self::assertSame(HttpStatus::OK, $nextResponse->getStatus());
+        self::assertSame(
+            ['id' => $rejected->getId()],
+            json_decode((string)$nextResponse->getContent(), true, JSON_THROW_ON_ERROR),
+            'mods may open images of any status, so none are skipped',
+        );
+
+        $previousResponse = $this->simulateNeighborRequest((string)$rejected->getId(), 'previous');
+        self::assertSame(HttpStatus::OK, $previousResponse->getStatus());
+        self::assertSame(
+            ['id' => $accepted->getId()],
+            json_decode((string)$previousResponse->getContent(), true, JSON_THROW_ON_ERROR),
+        );
+    }
+
+    public function testGetImageNeighborAction_UnknownId_ReturnsNotFound(): void
+    {
+        $response = $this->simulateNeighborRequest('99999', 'next');
+
+        $this->assertSame(HttpStatus::NOT_FOUND, $response->getStatus());
+        $this->assertNull($response->getContent());
+    }
+
+    public function testGetImageNeighborAction_InaccessibleId_ReturnsForbidden(): void
+    {
+        $this->loginUser('neighbor-foreign-owner-' . bin2hex(random_bytes(4)), 'Neighbor Foreign Owner');
+        $owner = $this->sessionService->getUserData();
+        self::assertNotNull($owner);
+        $foreignPendingReview = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $owner->id,
+            status: ImageStatus::PENDING_REVIEW,
+        );
+        $this->sessionService->destroySession();
+
+        $response = $this->simulateNeighborRequest((string)$foreignPendingReview->getId(), 'next');
+
+        $this->assertSame(HttpStatus::FORBIDDEN, $response->getStatus());
+        $this->assertNull($response->getContent());
+    }
+
+    #[DataProvider('malformedIdProvider')]
+    public function testGetImageNeighborAction_MalformedId_ReturnsBadRequest(?string $id): void
+    {
+        $response = $this->simulateNeighborRequest($id, 'next');
+
+        $this->assertSame(HttpStatus::BAD_REQUEST, $response->getStatus());
+        $this->assertNull($response->getContent());
+    }
+
+    public static function invalidDirectionProvider(): array
+    {
+        return [
+            'missing direction' => [null],
+            'empty direction' => [''],
+            'unknown direction' => ['sideways'],
+            'non-string direction' => [['next']],
+        ];
+    }
+
+    #[DataProvider('invalidDirectionProvider')]
+    public function testGetImageNeighborAction_MalformedDirection_ReturnsBadRequest(mixed $direction): void
+    {
+        $response = $this->simulateNeighborRequest('1', $direction);
+
+        $this->assertSame(HttpStatus::BAD_REQUEST, $response->getStatus());
+        $this->assertNull($response->getContent());
+    }
+
     private function simulateListRequest(?array $params = null): Response
     {
         $request = new Request(
@@ -395,6 +561,23 @@ class ImageApiControllerTest extends FunctionalTestCase
             url: new Url(protocol: 'https', host: 'localhost', path: '/api/image/detail'),
             method: HttpMethod::GET,
             getParams: $id === null ? null : ['id' => $id],
+        );
+        return $this->simulateRequest($request);
+    }
+
+    private function simulateNeighborRequest(?string $id, mixed $direction): Response
+    {
+        $params = [];
+        if ($id !== null) {
+            $params['id'] = $id;
+        }
+        if ($direction !== null) {
+            $params['direction'] = $direction;
+        }
+        $request = new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: '/api/image/neighbor'),
+            method: HttpMethod::GET,
+            getParams: $params === [] ? null : $params,
         );
         return $this->simulateRequest($request);
     }

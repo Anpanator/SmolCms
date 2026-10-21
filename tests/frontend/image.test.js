@@ -1,4 +1,4 @@
-import {assertEqual, assertTrue, settle} from './assert.js';
+import {assertEqual, assertFalse, assertTrue, settle} from './assert.js';
 import {mockFetch, testUser, useFetch} from './mocks.js';
 import {createImageView, formatFileSize} from '../../public/js/views/image.js';
 
@@ -436,6 +436,254 @@ export async function testRemovingMissingTagRefreshesImageDetails() {
         assertTrue(view.querySelector('.form-message').textContent.includes('attachment was not found'));
     } finally {
         document.querySelector('.modal-backdrop .modal-cancel')?.click();
+        restore();
+    }
+}
+
+const MOD_SESSION = {getUser: () => testUser({accessLevel: 500})};
+
+function modView(handler, query = 'id=7') {
+    return createView(handler, query, MOD_SESSION);
+}
+
+export async function testImageViewModActionsOnlyVisibleFromModLevel() {
+    for (const [label, session] of [
+        ['anonymous', {getUser: () => null}],
+        ['novice', {getUser: () => testUser()}],
+        ['fellow', {getUser: () => testUser({accessLevel: 200})}],
+    ]) {
+        const {view, restore} = await createView(() => detailResponse(), 'id=7', session);
+        try {
+            assertEqual(view.querySelector('.mod-actions'), null, `${label} users should not see the mod actions section`);
+        } finally {
+            restore();
+        }
+    }
+}
+
+export async function testImageViewShowsModActionsSectionWithDeleteForMods() {
+    const {view, fetchMock, restore} = await modView(() => detailResponse());
+    try {
+        const sidebar = view.querySelector('.sidebar');
+        const section = sidebar.querySelector('.mod-actions');
+        assertTrue(section !== null, 'mods should see the mod actions section');
+        assertEqual(section.querySelector('.sidebar-title')?.textContent, 'Mod Actions');
+        assertTrue(
+            (view.querySelector('.image-meta-section').compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+            'the mod actions section should follow the metadata section',
+        );
+
+        const deleteButton = section.querySelector('.mod-action-delete');
+        assertTrue(deleteButton !== null, 'the mod actions section should contain a delete button');
+        assertEqual(deleteButton.textContent, 'Delete image');
+        assertFalse(deleteButton.disabled, 'a loaded image should enable the delete button');
+        assertTrue(deleteButton.matches('.button--danger'), 'the delete button should use the danger style');
+        assertEqual(fetchMock.calls.length, 1, 'the mod actions section should not trigger extra requests');
+    } finally {
+        restore();
+    }
+}
+
+export async function testImageViewDeleteRequiresConfirmationThenLeavesAuditTrailAndNavigatesHome() {
+    const {view, fetchMock, navigateCalls, restore} = await modView((url, options) => {
+        if (url === '/api/image/detail?id=7') {
+            return detailResponse();
+        }
+        if (url === '/api/image/delete?id=7' && options.method === 'POST') {
+            return {status: 204, body: null};
+        }
+        return {status: 200, body: null};
+    });
+    try {
+        const deleteButton = view.querySelector('.mod-action-delete');
+        deleteButton.click();
+        let dialog = document.querySelector('.modal-backdrop');
+        assertTrue(dialog !== null, 'deletion should ask for confirmation');
+        assertTrue(dialog.textContent.includes('Delete image #7?'), 'the confirmation should name the image');
+        assertTrue(dialog.textContent.includes('cannot be undone'), 'the confirmation should warn about irreversibility');
+        assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/delete')).length, 0,
+            'no delete request should run before confirmation');
+
+        dialog.querySelector('.modal-cancel').click();
+        await settle();
+        assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/delete')).length, 0,
+            'cancelling must not delete');
+        assertFalse(deleteButton.disabled, 'a cancelled deletion should re-enable the delete button');
+
+        deleteButton.click();
+        dialog = document.querySelector('.modal-backdrop');
+        dialog.querySelector('.button--primary').click();
+        await settle();
+
+        const post = fetchMock.calls.find((call) => call.url === '/api/image/delete?id=7');
+        assertTrue(post !== undefined, 'confirming should send the delete request');
+        assertEqual(post.options.method, 'POST');
+        assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/']), 'a deleted image should leave the view');
+    } finally {
+        document.querySelector('.modal-backdrop .modal-cancel')?.click();
+        restore();
+    }
+}
+
+export async function testImageViewDeleteFailureShowsMessageAndStays() {
+    const {view, fetchMock, navigateCalls, restore} = await modView((url, options) => {
+        if (url === '/api/image/detail?id=7') {
+            return detailResponse();
+        }
+        if (url === '/api/image/delete?id=7' && options.method === 'POST') {
+            return {status: 500, body: null};
+        }
+        return {status: 200, body: null};
+    });
+    try {
+        view.querySelector('.mod-action-delete').click();
+        document.querySelector('.modal-backdrop .button--primary').click();
+        await settle();
+
+        const message = view.querySelector('.form-message:not([hidden])');
+        assertTrue(message !== null, 'a failed deletion should show a message');
+        assertTrue(message.textContent.includes('went wrong'), 'a server error should map to a generic message');
+        assertEqual(JSON.stringify(navigateCalls), JSON.stringify([]), 'a failed deletion should not navigate');
+        assertFalse(view.querySelector('.mod-action-delete').disabled, 'a failed deletion should re-enable the button');
+    } finally {
+        document.querySelector('.modal-backdrop .modal-cancel')?.click();
+        restore();
+    }
+}
+
+export async function testImageViewControlsAreDisabledWithoutALoadedImage() {
+    for (const statusCode of [404, 403]) {
+        const {view, restore} = await modView(() => ({status: statusCode, body: null}));
+        try {
+            const deleteButton = view.querySelector('.mod-action-delete');
+            assertTrue(deleteButton !== null, 'mod controls should stay visible without an image');
+            assertTrue(deleteButton.disabled, 'deletion needs a loaded image');
+            deleteButton.click();
+            await settle();
+            assertEqual(document.querySelector('.modal-backdrop'), null, 'a disabled delete button must not confirm');
+
+            const previousButton = view.querySelector('.image-nav-previous');
+            const nextButton = view.querySelector('.image-nav-next');
+            assertTrue(previousButton !== null && nextButton !== null, 'navigation should exist without an image');
+            assertTrue(previousButton.disabled && nextButton.disabled, 'navigation needs a loaded image');
+        } finally {
+            restore();
+        }
+    }
+}
+
+export async function testImageViewNavButtonsSitBelowTheLoadedImage() {
+    const {view, restore} = await createView(() => detailResponse());
+    try {
+        const nav = view.querySelector('.image-nav');
+        assertTrue(nav !== null, 'image navigation should exist');
+        assertTrue(
+            (view.querySelector('.content img.image-view-image').compareDocumentPosition(nav) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+            'previous/next controls should follow the image',
+        );
+        assertFalse(view.querySelector('.image-nav-previous').disabled, 'previous should be available for a loaded image');
+        assertFalse(view.querySelector('.image-nav-next').disabled, 'next should be available for a loaded image');
+    } finally {
+        restore();
+    }
+}
+
+export async function testImageViewNextButtonNavigatesToNextVisibleImage() {
+    const {view, fetchMock, navigateCalls, restore} = await createView((url) => {
+        if (url === '/api/image/detail?id=7') {
+            return detailResponse();
+        }
+        if (url === '/api/image/neighbor?id=7&direction=next') {
+            return {status: 200, body: {id: 12}};
+        }
+        return {status: 200, body: null};
+    });
+    try {
+        view.querySelector('.image-nav-next').click();
+        await settle();
+
+        const call = fetchMock.calls.find((entry) => entry.url === '/api/image/neighbor?id=7&direction=next');
+        assertTrue(call !== undefined, 'next should ask the server for the adjacent image');
+        assertEqual(call.options.method, 'GET');
+        assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/image?id=12']), 'next should update the view');
+    } finally {
+        restore();
+    }
+}
+
+export async function testImageViewPreviousButtonWithoutNeighborShowsInfo() {
+    const {view, fetchMock, navigateCalls, restore} = await createView((url) => {
+        if (url === '/api/image/detail?id=7') {
+            return detailResponse();
+        }
+        if (url === '/api/image/neighbor?id=7&direction=previous') {
+            return {status: 200, body: {id: null}};
+        }
+        return {status: 200, body: null};
+    });
+    try {
+        view.querySelector('.image-nav-previous').click();
+        await settle();
+
+        const call = fetchMock.calls.find((entry) => entry.url === '/api/image/neighbor?id=7&direction=previous');
+        assertTrue(call !== undefined, 'previous should ask the server for the adjacent image');
+        assertEqual(JSON.stringify(navigateCalls), JSON.stringify([]), 'a missing neighbor should not navigate');
+        const message = view.querySelector('.form-message:not([hidden])');
+        assertTrue(message.classList.contains('form-message--info'), 'a boundary should be informational');
+        assertEqual(message.textContent, 'There is no previous image.');
+        assertFalse(view.querySelector('.image-nav-previous').disabled, 'buttons should be usable again');
+    } finally {
+        restore();
+    }
+}
+
+export async function testImageViewNeighborFailureShowsMessage() {
+    const {view, fetchMock, navigateCalls, restore} = await createView((url) => {
+        if (url === '/api/image/detail?id=7') {
+            return detailResponse();
+        }
+        return url === '/api/image/neighbor?id=7&direction=next'
+            ? {status: 500, body: null}
+            : {status: 200, body: null};
+    });
+    try {
+        view.querySelector('.image-nav-next').click();
+        await settle();
+
+        assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/neighbor')).length, 1);
+        assertEqual(JSON.stringify(navigateCalls), JSON.stringify([]), 'a failed lookup should not navigate');
+        const message = view.querySelector('.form-message:not([hidden])');
+        assertTrue(message.textContent.includes('went wrong'), 'a server error should map to a generic message');
+        assertFalse(view.querySelector('.image-nav-next').disabled, 'buttons should be usable again');
+    } finally {
+        restore();
+    }
+}
+
+export async function testImageViewNavigationLocksWhileNeighbourRequestIsPending() {
+    let resolveNeighbour;
+    const {view, navigateCalls, restore} = await createView((url) => {
+        if (url === '/api/image/detail?id=7') {
+            return detailResponse();
+        }
+        if (url === '/api/image/neighbor?id=7&direction=next') {
+            return new Promise((resolve) => {
+                resolveNeighbour = resolve;
+            });
+        }
+        return {status: 200, body: null};
+    });
+    try {
+        view.querySelector('.image-nav-next').click();
+        assertTrue(view.querySelector('.image-nav-next').disabled, 'the pending lookup should disable next');
+        assertTrue(view.querySelector('.image-nav-previous').disabled, 'the pending lookup should disable previous');
+        assertEqual(JSON.stringify(navigateCalls), JSON.stringify([]));
+
+        resolveNeighbour({status: 200, body: {id: 12}});
+        await settle();
+        assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/image?id=12']));
+    } finally {
+        resolveNeighbour?.({status: 200, body: {id: null}});
         restore();
     }
 }
