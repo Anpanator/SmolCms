@@ -34,10 +34,11 @@ export async function testLoggedInNavRendersUserAndLogout() {
     try {
         const nav = createHeaderNav({ session, navigate: () => {} });
         const links = [...nav.element.querySelectorAll('a.nav-link')].map((link) => link.getAttribute('href'));
-        assertEqual(JSON.stringify(links), JSON.stringify(['/', '/upload-image', '/tagme', '/settings']));
+        assertEqual(JSON.stringify(links), JSON.stringify(['/', '/upload-image', '/tagme', '/user?id=1', '/settings']));
         assertEqual(nav.element.querySelector('.nav-submenu-trigger')?.textContent, 'Amy', 'display name should title the account dropdown');
-        assertEqual(nav.element.querySelector('.has-submenu .submenu a[href="/settings"]')?.textContent, 'Profile');
-        assertEqual(nav.element.querySelector('.nav-list > .nav-item > a[href="/settings"]'), null, 'profile link should be in the account dropdown');
+        assertEqual(nav.element.querySelector('.has-submenu .submenu a[href="/user?id=1"]')?.textContent, 'Profile');
+        assertEqual(nav.element.querySelector('.has-submenu .submenu a[href="/settings"]')?.textContent, 'Settings');
+        assertEqual(nav.element.querySelector('.nav-list > .nav-item > a[href="/user?id=1"]'), null, 'profile link should be in the account dropdown');
         assertTrue(nav.element.textContent.includes('Access level: Novice'), 'access level should use its name, not the numeric value');
         assertTrue(!nav.element.textContent.includes('100'), 'access level number should not be shown');
         assertTrue(nav.element.querySelector('.nav-logout') !== null, 'logout button should exist');
@@ -102,18 +103,20 @@ export async function testSetActiveMarksActiveLink() {
     }
 }
 
-export async function testProfileLinkIsActiveInsideAccountDropdown() {
+export async function testProfileAndSettingsLinksAreActiveInsideAccountDropdown() {
     const {session, restore} = await createLoadedSession(() => sessionResponse(testUser()));
     try {
         const nav = createHeaderNav({
             session, navigate: () => {
             }
         });
-        nav.setActive('/settings');
-        assertEqual(
-            nav.element.querySelector('.has-submenu .submenu a.nav-link.active')?.getAttribute('href'),
-            '/settings',
-        );
+        for (const [activePath, expectedHref] of [['/user', '/user?id=1'], ['/settings', '/settings']]) {
+            nav.setActive(activePath);
+            assertEqual(
+                nav.element.querySelector('.has-submenu .submenu a.nav-link.active')?.getAttribute('href'),
+                expectedHref,
+            );
+        }
     } finally {
         restore();
     }
@@ -147,9 +150,9 @@ export async function testModQueueLinkVisibleForModerators() {
                 JSON.stringify(links),
                 JSON.stringify([
                     '/', '/upload-image', '/tagme', '/review', '/tag-queue', '/tags',
-                    '/users', '/audit-log', '/settings',
+                    '/users', '/audit-log', '/user?id=1', '/settings',
                 ]),
-                'moderation and internal links should follow Upload Image and precede the account dropdown',
+                'moderation and internal links should precede both account links',
             );
         } finally {
             restore();

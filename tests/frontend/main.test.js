@@ -9,6 +9,7 @@ export function testMainRouteRegistryCoversEveryClientPage() {
         RoutePath.LOGIN,
         RoutePath.REGISTER,
         RoutePath.SETTINGS,
+        RoutePath.USER_PROFILE,
         RoutePath.UPLOAD_IMAGE,
         RoutePath.IMAGE_DISPLAY,
         RoutePath.TAGME_QUEUE,

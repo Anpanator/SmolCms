@@ -12,6 +12,7 @@ const QUEUE = {
             sampleSrc: '/api/image/sample?name=ab89c0d0ef.webp',
             uploadDate: '2026-10-19 10:30:00',
             uploader: 'Upload User',
+            uploaderId: 8,
         },
         {
             id: 3,
@@ -19,6 +20,7 @@ const QUEUE = {
             sampleSrc: null,
             uploadDate: '2026-10-18 09:00:00',
             uploader: 'Other User',
+            uploaderId: 9,
         },
     ],
 };
@@ -27,6 +29,7 @@ const DETAILS = {
         id: 7,
         uploadDate: '2026-10-19 10:30:00',
         uploader: 'Upload User',
+        uploaderId: 8,
         width: 1920,
         height: 1080,
         format: 'WEBP',
@@ -37,6 +40,7 @@ const DETAILS = {
         id: 3,
         uploadDate: '2026-10-18 09:00:00',
         uploader: 'Other User',
+        uploaderId: 9,
         width: 800,
         height: 600,
         format: 'PNG',
@@ -128,6 +132,8 @@ export async function testModQueueShowsDownloadImageAndActiveMetadata() {
         assertTrue(thumb !== null, 'a queued image with a thumb should render an image');
         assertEqual(thumb.getAttribute('src'), '/public/img/thumb/ab/ab89c0.avif');
         assertTrue(itemWithThumb.textContent.includes('Upload User'), 'uploader should be shown in compact metadata');
+        assertEqual(itemWithThumb.querySelector('.review-uploader')?.getAttribute('href'), '/user?id=8');
+        assertEqual(itemWithThumb.querySelector('button a'), null, 'profile links must not be nested inside the selection button');
         assertTrue(itemWithThumb.textContent.includes('2026-10-19 10:30:00'), 'upload date should be shown');
         assertEqual(itemWithThumb.querySelectorAll('button[data-action]').length, 0, 'thumbnails must not have action buttons');
 
@@ -140,6 +146,7 @@ export async function testModQueueShowsDownloadImageAndActiveMetadata() {
         assertEqual(displayedImage.getAttribute('src'), DETAILS[7].downloadSrc, 'the full-size download image should be used');
         assertTrue(view.querySelector('.review-metadata').textContent.includes('1920 × 1080'));
         assertTrue(view.querySelector('.review-metadata').textContent.includes('1.2 MB'));
+        assertEqual(view.querySelector('.review-metadata a')?.getAttribute('href'), '/user?id=8');
         assertEqual(itemWithThumb.querySelector('.review-select')?.getAttribute('aria-pressed'), 'true');
 
         assertEqual(view.querySelector('.review-actions [data-action="approve"]')?.textContent, 'Approve');

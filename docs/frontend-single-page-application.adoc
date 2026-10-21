@@ -11,6 +11,11 @@ Client path constants live in `public/js/routes.js` and mirror the backend's
 navigation. Keep the path map, view wiring, and navigation in sync when adding
 or renaming a page.
 
+Public profiles are available at `/user?id=<id>`; visitors can view any
+profile, while the signed-in user's own profile links to the `/settings`
+editor. User names in image metadata and internal moderation tools link to
+their public profiles when the user ID is available.
+
 `api.js`, `router.js`, and `session.js` handle HTTP, history navigation, and
 session state. Page modules live in `views/`; shared UI helpers include
 `paginatedTable.js`, `moderationQueue.js`, `imageMetadata.js`, `tagLinks.js`,

@@ -9,6 +9,7 @@ import {createPagination} from '../pagination.js';
 import {createPaginatedTable, parsePositiveInteger} from '../paginatedTable.js';
 import {createSearchBox} from '../searchBox.js';
 import {createMessageBox} from '../forms.js';
+import {userProfileHref} from '../routes.js';
 
 const AUDIT_LOG_URL = '/api/audit-log';
 const PER_PAGE = 30;
@@ -133,6 +134,8 @@ export function createAuditLogView({
 
 function createAuditLogRow(entry) {
     const user = entry?.user ?? {};
+    const displayName = user.displayName ?? '';
+    const profileHref = userProfileHref(user.id);
     return el('tr', {
         className: 'internal-admin-table-row audit-log-table-row',
         attributes: {'data-audit-log-id': entry?.id ?? ''},
@@ -140,7 +143,17 @@ function createAuditLogRow(entry) {
             el('td', {className: 'audit-log-id-cell', children: entry?.id ?? ''}),
             el('td', {
                 className: 'audit-log-user-cell',
-                children: `#${user.id ?? ''} — ${user.loginName ?? ''} (${user.displayName ?? ''})`,
+                children: [
+                    `#${user.id ?? ''} — ${user.loginName ?? ''} (`,
+                    profileHref === null
+                        ? displayName
+                        : el('a', {
+                            className: 'user-profile-link',
+                            attributes: {href: profileHref},
+                            children: displayName,
+                        }),
+                    ')',
+                ],
             }),
             el('td', {
                 className: 'audit-log-action-cell',

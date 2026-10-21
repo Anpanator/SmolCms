@@ -10,6 +10,7 @@ import {el} from '../dom.js';
 import {createImageViewer} from '../imageViewer.js';
 import {createModerationQueue} from '../moderationQueue.js';
 import {clearMessage, createMessageBox, messageForStatus, showMessage} from '../forms.js';
+import {userProfileHref} from '../routes.js';
 
 const QUEUE_URL = '/api/review/queue';
 const IMAGE_DETAIL_URL = '/api/image/detail';
@@ -105,6 +106,14 @@ export function createReviewView({ session, navigate }) {
     function buildQueueItem(image, selectedImage, selectById) {
         const uploader = image.uploader ?? 'Unknown uploader';
         const uploadDate = image.uploadDate ?? '';
+        const uploaderHref = userProfileHref(image.uploaderId);
+        const uploaderValue = uploaderHref === null
+            ? el('span', {className: 'review-uploader', children: uploader})
+            : el('a', {
+                className: 'review-uploader user-profile-link',
+                attributes: {href: uploaderHref},
+                children: uploader,
+            });
         const thumb = image.thumbSrc
             ? el('img', { className: 'review-thumb', attributes: { src: image.thumbSrc, alt: '' } })
             : el('span', {
@@ -124,17 +133,14 @@ export function createReviewView({ session, navigate }) {
                 thumb,
                 el('span', {
                     className: 'review-info',
-                    children: [
-                        el('span', {className: 'review-uploader', children: uploader}),
-                        el('span', {className: 'review-date', children: uploadDate}),
-                    ],
+                    children: el('span', {className: 'review-date', children: uploadDate}),
                 }),
             ],
         });
         const item = el('li', {
             className: 'review-item',
             attributes: {'data-image-id': image.id},
-            children: selectButton,
+            children: [selectButton, el('span', {className: 'review-info', children: uploaderValue})],
         });
         selectButton.addEventListener('click', () => selectById(image.id));
         return item;
