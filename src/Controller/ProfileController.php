@@ -46,6 +46,9 @@ readonly class ProfileController
 
     public function getUserAction(Request $request): Response
     {
+        $sessionUser = $this->sessionService->getUserData();
+        $viewer = $sessionUser === null ? null : $this->userService->findOneById($sessionUser->id);
+
         $userId = self::parsePositiveId($request->getParams['id'] ?? null);
         if ($userId === null) {
             return new Response(HttpStatus::BAD_REQUEST);
@@ -57,12 +60,11 @@ readonly class ProfileController
         }
 
         $targetId = $user->getId() ?? $userId;
-        $viewer = $this->sessionService->getUserData();
-        $viewerIsTarget = $viewer !== null && $viewer->id === $targetId;
+        $viewerIsTarget = $viewer !== null && $viewer->getId() === $targetId;
         $canSeeModActions = $viewer !== null
             && !$viewerIsTarget
-            && $viewer->accessLevel->value >= AccessLevel::MOD->value
-            && $user->getAccessLevel()->value < $viewer->accessLevel->value;
+            && $viewer->getAccessLevel()->value >= AccessLevel::MOD->value
+            && $user->getAccessLevel()->value < $viewer->getAccessLevel()->value;
 
         return new JsonResponse([
             'user' => [

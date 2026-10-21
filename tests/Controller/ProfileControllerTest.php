@@ -371,6 +371,37 @@ class ProfileControllerTest extends FunctionalTestCase
         self::assertSame([], $this->getUserProfileBody($selfUserId)['modActions']);
     }
 
+    public function testDemotedModeratorCannotSeeModActionsWithStaleSession(): void
+    {
+        $suffix = bin2hex(random_bytes(5));
+        $loginName = 'profile-mod-demoted-viewer-' . $suffix;
+        $this->loginUserWithAccessLevel($loginName, 'Demoted Moderator Viewer', AccessLevel::MOD);
+        $sessionViewer = $this->sessionService->getUserData();
+        self::assertNotNull($sessionViewer);
+
+        $target = $this->createUser(
+            'profile-mod-demoted-target-' . $suffix,
+            'Lower Ranked Target',
+            AccessLevel::NOVICE,
+        );
+        $targetId = self::userId($target);
+        $this->auditLogService->record($targetId, AuditActionType::TAG_ADDED, 'demoted-oldest');
+        $this->auditLogService->record($targetId, AuditActionType::TAG_REMOVED, 'demoted-newest');
+
+        self::assertSame(
+            ['demoted-newest', 'demoted-oldest'],
+            array_column($this->getUserProfileBody($targetId)['modActions'], 'context'),
+        );
+
+        $viewer = $this->userService->findOneById($sessionViewer->id);
+        self::assertNotNull($viewer);
+        $viewer->setAccessLevel(AccessLevel::FELLOW);
+        $this->userService->update($viewer);
+
+        self::assertSame(AccessLevel::MOD, $this->sessionService->getUserData()?->accessLevel);
+        self::assertSame([], $this->getUserProfileBody($targetId)['modActions']);
+    }
+
     private function simulateProfileRequest(): \SmolCms\Data\Response\Response
     {
         return $this->simulateRequest(new Request(
