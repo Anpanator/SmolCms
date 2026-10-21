@@ -1,4 +1,4 @@
-import {assertEqual, assertTrue, settle} from './assert.js';
+import {assertEqual, assertFalse, assertTrue, settle} from './assert.js';
 import {mockFetch, testUser, useFetch} from './mocks.js';
 import {createUserProfileView} from '../../public/js/views/userProfile.js';
 
@@ -123,6 +123,12 @@ export async function testUserProfileOmitsEmptyModerationActions() {
     try {
         await settle();
         assertEqual(view.querySelector('.user-profile-mod-actions'), null);
+        const content = view.querySelector('.user-profile-content');
+        assertEqual(content?.childNodes.length, 2, 'empty moderation actions should not add content');
+        assertFalse(
+            content?.textContent.includes('null'),
+            'empty moderation actions should not render a "null" text node',
+        );
     } finally {
         restore();
     }

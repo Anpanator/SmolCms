@@ -67,11 +67,15 @@ export function createUserProfileView({
 
             const recentUploads = createRecentUploadsSection();
             renderRecentUploads(recentUploads.grid, data?.recentUploads);
-            content.replaceChildren(
+            const children = [
                 createProfileDetails(user, data?.approvedTagSuggestions),
                 recentUploads.element,
-                createModActionsSection(data?.modActions),
-            );
+            ];
+            const modActions = createModActionsSection(data?.modActions);
+            if (modActions !== null) {
+                children.push(modActions);
+            }
+            content.replaceChildren(...children);
             clearMessage(status);
         } catch (error) {
             if (error?.status === 404) {
