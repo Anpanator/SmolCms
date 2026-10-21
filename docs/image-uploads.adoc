@@ -24,19 +24,22 @@ when no other image record references it.
 Run `php src/app.php --process-images 100` to process a batch; Docker runs the
 same command periodically in the background. Failed images remain pending for
 retry. The original is never served to users. Thumbnails are static public
-files; viewing and download files are served only to authorized users through
-internal Nginx locations and `X-Accel-Redirect`.
+files. Accepted-image details and viewing samples are accessible anonymously;
+viewing and download files are delivered through internal Nginx locations and
+`X-Accel-Redirect`. Downloads require authentication.
 
-The public `GET /api/images` list contains accepted images. For protected details,
-viewing, downloads, and image-tag actions, regular users can access accepted
-images and pending-review images tagged `tagme`; `MOD` and higher can access
-all image states. Tag input is capped at 2,048 characters and 20 names, with a
-maximum of 100 characters per tag.
+The public `GET /api/images` list contains accepted images. Accepted-image
+details are public; non-accepted details, samples, and downloads remain
+restricted by the image access policy. Authenticated users can access their own
+pending-review details and their own or `tagme`-tagged pending-review samples
+and downloads; `MOD` and higher can access all image states. Tag input is capped
+at 2,048 characters and 20 names, with a maximum of 100 characters per tag.
 
-Authenticated `GET /api/image/detail?id=...` returns details for an accessible
-image. The sample and download endpoints are `GET /api/image/sample` and
-`GET /api/image/download`; they deliver protected files through
-`X-Accel-Redirect`. Moderators use `GET /api/review/queue`,
+`GET /api/image/detail?id=...` returns details for accepted images anonymously;
+pending-review details require the uploader or a moderator. The sample and
+download endpoints are `GET /api/image/sample` and `GET /api/image/download`;
+sample access follows the image policy, while downloads always require
+authentication. They deliver files through `X-Accel-Redirect`. Moderators use `GET /api/review/queue`,
 `POST /api/review/approve`, and `POST /api/review/reject`. Approval moves a
 pending-review image to accepted. Rejection deletes its row and attempts to
 delete unreferenced files instead of assigning a rejected status; a

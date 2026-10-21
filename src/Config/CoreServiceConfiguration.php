@@ -26,6 +26,7 @@ use SmolCms\Service\Core\LoggingService;
 use SmolCms\Service\Core\Startup\RegisterSessionHandlerStartupAction;
 use SmolCms\Service\Core\Startup\RestrictDirectoryAccessStartupAction;
 use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
+use SmolCms\Service\Core\Startup\SetCrossOriginResourcePolicyStartupAction;
 use SmolCms\Service\Core\CaseConverter;
 use SmolCms\Service\DB\AuditLogService;
 use SmolCms\Service\DB\EntityAttributeProcessor;
@@ -81,6 +82,9 @@ class CoreServiceConfiguration
                 ]
             ),
             new Service(
+                identifier: SetCrossOriginResourcePolicyStartupAction::class,
+            ),
+            new Service(
                 identifier: FileSystemAccessService::class,
                 parameters: [
                     ...FS_APP_LEVEL_WHITELIST
@@ -99,6 +103,7 @@ class CoreServiceConfiguration
                     RestrictDirectoryAccessStartupAction::class,
                     RegisterSessionHandlerStartupAction::class,
                     ResumeSessionStartupAction::class,
+                    SetCrossOriginResourcePolicyStartupAction::class,
                 ]
             ),
             new Service(

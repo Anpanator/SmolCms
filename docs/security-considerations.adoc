@@ -26,6 +26,10 @@ these limitations before deploying it:
   `/private/`, and marks protected image locations internal. Treat `/src/` as
   deployment guidance: do not expose it as static content through another
   server configuration.
+* Every application response sets `Cross-Origin-Resource-Policy: same-site`.
+  Accepted-image details and viewing samples are anonymously accessible, while
+  downloads require authentication and pending/private image access remains
+  restricted by the image access policy.
 * The filesystem allowlist is defense in depth; it does not replace OS
   permissions or prevent check-then-use races and native filesystem bypasses.
 * Duplicate registration returns `409`, which can reveal whether a login name

@@ -62,12 +62,30 @@ class ImageFileControllerTest extends FunctionalTestCase
         ];
     }
 
-    public function testSampleAction_Anonymous_ReturnsUnauthorized(): void
+    public function testSampleAction_AnonymousAcceptedImage_ServesInternalRedirect(): void
     {
-        $response = $this->simulateSampleRequest(ImageTestUtils::randomChecksum() . '.webp');
+        $this->loginUser('anonymous-sample-owner-' . bin2hex(random_bytes(4)), 'Anonymous Sample Owner');
+        $owner = $this->sessionService->getUserData();
+        self::assertNotNull($owner);
+        $sampleFilename = ImageTestUtils::randomChecksum() . '.webp';
+        ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $owner->id,
+            status: ImageStatus::ACCEPTED,
+            sampleFilename: $sampleFilename,
+        );
+        ImageTestUtils::writeImageFile(IMAGE_SAMPLE_DIR, $sampleFilename);
+        $this->sessionService->destroySession();
 
-        $this->assertSame(HttpStatus::UNAUTHORIZED, $response->getStatus());
+        $response = $this->simulateSampleRequest($sampleFilename);
+
+        $this->assertSame(HttpStatus::OK, $response->getStatus());
         $this->assertNull($response->getContent());
+        $headers = $response->getHeaders();
+        $expectedRedirect = self::SAMPLE_INTERNAL_PREFIX . substr($sampleFilename, 0, 2) . '/' . $sampleFilename;
+        $this->assertSame($expectedRedirect, $headers[HttpHeader::X_ACCEL_REDIRECT->value]);
+        $this->assertSame('image/webp', $headers[HttpHeader::CONTENT_TYPE->value]);
+        $this->assertArrayNotHasKey(HttpHeader::CONTENT_DISPOSITION->value, $headers);
     }
 
     public function testDownloadAction_Anonymous_ReturnsUnauthorized(): void
@@ -224,6 +242,27 @@ class ImageFileControllerTest extends FunctionalTestCase
         $this->loginUserWithAccessLevel('mod-user', 'Mod User', AccessLevel::MOD);
         $modResponse = $this->simulateSampleRequest($sampleFilename);
         $this->assertSame(HttpStatus::OK, $modResponse->getStatus());
+    }
+
+    public function testSampleAction_AnonymousPendingImage_ReturnsForbidden(): void
+    {
+        $this->loginUser('anonymous-pending-owner-' . bin2hex(random_bytes(4)), 'Anonymous Pending Owner');
+        $owner = $this->sessionService->getUserData();
+        self::assertNotNull($owner);
+        $sampleFilename = ImageTestUtils::randomChecksum() . '.webp';
+        ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $owner->id,
+            status: ImageStatus::PENDING_REVIEW,
+            sampleFilename: $sampleFilename,
+        );
+        ImageTestUtils::writeImageFile(IMAGE_SAMPLE_DIR, $sampleFilename);
+        $this->sessionService->destroySession();
+
+        $response = $this->simulateSampleRequest($sampleFilename);
+
+        $this->assertSame(HttpStatus::FORBIDDEN, $response->getStatus());
+        $this->assertNull($response->getContent());
     }
 
     public function testDownloadAction_PendingReviewImage_NonUploaderForbiddenModeratorAllowed(): void
