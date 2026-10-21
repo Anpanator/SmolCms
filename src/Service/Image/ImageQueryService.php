@@ -80,13 +80,15 @@ readonly class ImageQueryService
      *
      * @return list<array{id: int, thumbSrc: ?string, status: string, uploadDate: string}>
      */
-    public function getRecentUploadsForUser(int $userId, int $limit): array
+    public function getRecentUploadsForUser(int $userId, int $limit, bool $includePendingReview = true): array
     {
         $uploads = [];
         foreach ($this->imageEntityService->findRecentByUser(
             $userId,
             $limit,
-            [ImageStatus::PENDING_REVIEW, ImageStatus::ACCEPTED],
+            $includePendingReview
+                ? [ImageStatus::PENDING_REVIEW, ImageStatus::ACCEPTED]
+                : [ImageStatus::ACCEPTED],
         ) as $entity) {
             $uploads[] = [
                 'id' => $entity->getId(),
@@ -114,6 +116,7 @@ readonly class ImageQueryService
             'status' => $entity->getStatus()->value,
             'id' => $entity->getId(),
             'uploadDate' => $entity->getUploadDate()->format(self::UPLOAD_DATE_FORMAT),
+            'uploaderId' => $uploader?->getId(),
             'uploader' => $uploader?->getDisplayName(),
             'width' => $entity->getWidth(),
             'height' => $entity->getHeight(),

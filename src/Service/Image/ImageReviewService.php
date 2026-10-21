@@ -38,19 +38,23 @@ readonly class ImageReviewService
     /**
      * Review queue entries for all PENDING_REVIEW images, oldest first.
      *
-     * @return array<array<string, int|string|null>>
+     * @return list<array{id: int, thumbSrc: ?string, sampleSrc: ?string, uploadDate: string, uploaderId: ?int, uploader: ?string}>
      */
     public function getReviewQueue(): array
     {
         $entities = $this->imageEntityService->findByStatus(ImageStatus::PENDING_REVIEW);
         return array_map(
-            fn(ImageEntity $entity) => [
-                'id' => $entity->getId(),
-                'thumbSrc' => $this->imageQueryService->getThumbSrc($entity),
-                'sampleSrc' => $this->imageQueryService->getSampleSrc($entity),
-                'uploadDate' => $entity->getUploadDate()->format(self::UPLOAD_DATE_FORMAT),
-                'uploader' => $this->userService->findOneById($entity->getUserId())?->getDisplayName(),
-            ],
+            function (ImageEntity $entity): array {
+                $uploader = $this->userService->findOneById($entity->getUserId());
+                return [
+                    'id' => $entity->getId(),
+                    'thumbSrc' => $this->imageQueryService->getThumbSrc($entity),
+                    'sampleSrc' => $this->imageQueryService->getSampleSrc($entity),
+                    'uploadDate' => $entity->getUploadDate()->format(self::UPLOAD_DATE_FORMAT),
+                    'uploaderId' => $uploader?->getId(),
+                    'uploader' => $uploader?->getDisplayName(),
+                ];
+            },
             $entities
         );
     }

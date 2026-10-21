@@ -17,6 +17,7 @@ enum RouteEnum: string
     case TAG_QUEUE = '/tag-queue';
     case TAGME_QUEUE = '/tagme';
     case USER_MANAGEMENT = '/users';
+    case USER_PROFILE = '/user';
     case AUDIT_LOG = '/audit-log';
     case API_SESSION = '/api/session';
     case API_IMAGES = '/api/images';
@@ -40,5 +41,6 @@ enum RouteEnum: string
     case API_USERS = '/api/users';
     case API_USERS_UPDATE = '/api/users/update';
     case API_PROFILE = '/api/profile';
+    case API_USER_PROFILE = '/api/user/profile';
     case API_TAGME_RANDOM = '/api/tagme/random';
 }
