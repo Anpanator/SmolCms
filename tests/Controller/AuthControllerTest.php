@@ -38,7 +38,7 @@ class AuthControllerTest extends FunctionalTestCase
         $user = new UserEntity(
             id: null,
             loginName: $loginName,
-            password: password_hash($password, PASSWORD_DEFAULT),
+            password: $this->hashTestPassword($password),
             displayName: 'Admin User',
             state: 'active',
             registerDate: new DateTime(),
@@ -152,7 +152,7 @@ class AuthControllerTest extends FunctionalTestCase
         $user = new UserEntity(
             id: null,
             loginName: $loginName,
-            password: password_hash($correctPassword, PASSWORD_DEFAULT),
+            password: $this->hashTestPassword($correctPassword),
             displayName: 'Wrong Password User',
             state: 'active',
             registerDate: new DateTime(),

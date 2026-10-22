@@ -18,6 +18,7 @@ use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Persistence\UserEntity;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
+use SmolCms\Service\Core\Authentication\PasswordService;
 use SmolCms\Service\Core\ApplicationCore;
 use SmolCms\Service\Core\ContextService;
 use SmolCms\Service\Core\ServiceBuilder;
@@ -25,6 +26,7 @@ use SmolCms\Service\Core\Startup\RestrictDirectoryAccessStartupAction;
 use SmolCms\Service\DB\UserService;
 use SmolCms\TestUtils\Attributes\Autowire;
 use SmolCms\TestUtils\TestServices\TestContextService;
+use SmolCms\TestUtils\TestServices\TestPasswordService;
 
 class FunctionalTestCase extends SimpleTestCase
 {
@@ -59,6 +61,11 @@ class FunctionalTestCase extends SimpleTestCase
                 identifier: ContextService::class,
                 class: TestContextService::class,
                 parameters: []
+            ),
+            new Service(
+                identifier: PasswordService::class,
+                class: TestPasswordService::class,
+                parameters: [UserService::class]
             ),
             new Service(
                 identifier: RestrictDirectoryAccessStartupAction::class,
@@ -155,7 +162,7 @@ class FunctionalTestCase extends SimpleTestCase
             $user = new UserEntity(
                 id: null,
                 loginName: $loginName,
-                password: password_hash($password, PASSWORD_DEFAULT),
+                password: $this->hashTestPassword($password),
                 displayName: $displayName,
                 state: 'active',
                 registerDate: new DateTime(),
@@ -180,6 +187,13 @@ class FunctionalTestCase extends SimpleTestCase
             ]
         );
         $this->simulateRequest($loginRequest);
+    }
+
+    protected function hashTestPassword(string $password): string
+    {
+        /** @var PasswordService $passwordService */
+        $passwordService = self::$serviceBuilder->getService(PasswordService::class);
+        return $passwordService->hash($password);
     }
 
     private static function initCore(): void

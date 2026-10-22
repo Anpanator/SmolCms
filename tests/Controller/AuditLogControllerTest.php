@@ -99,7 +99,7 @@ class AuditLogControllerTest extends FunctionalTestCase
         $user = new UserEntity(
             id: null,
             loginName: $loginName,
-            password: password_hash('secure-password-123', PASSWORD_DEFAULT),
+            password: $this->hashTestPassword('secure-password-123'),
             displayName: $displayName,
             state: 'active',
             registerDate: new DateTime('2026-10-19 12:00:00'),
