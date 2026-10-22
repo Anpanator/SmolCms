@@ -101,9 +101,9 @@ treated as unknown. Always copy the key exactly as issued.
   session path; the session is destroyed.
 |===
 
-Authorization does not inspect the owner's `state` column. A key owned by a
-user who is `disabled` or `banned` still authenticates and still passes the
-access-level check; only login and session-based flows consider that state. An
+Authorization does not inspect the owner's `state` column, and the application
+does not enforce `disabled` or `banned` states anywhere: a key owned by such a
+user still authenticates and still passes the access-level check. An
 access-level change applies to API clients on their next request, with no
 caching or token refresh step.
 
