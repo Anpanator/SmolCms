@@ -32,17 +32,24 @@ not imply that they can be called with an API key.
 An `apiEnabled` handler accepts either of two credentials:
 
 . A session cookie issued by `POST /login` (the browser and SPA path).
-. An `Authorization: Bearer <key>` header (the server-to-server path).
+. An `Authorization: Bearer <key>` header. This path is intended for
+  server-to-server clients and for same-origin browser code, such as a `fetch`
+  call from the SPA.
 
 The session is resolved first, and the API key is consulted only when no session
 identity exists. A request carrying both is therefore processed as the session
 user; the `Authorization` header is ignored entirely in that case, even if it is
 malformed or belongs to a different account. Side effects of such a request are
-not marked as API-key-authenticated (see the audit notes below).
+not marked as API-key-authenticated (see the audit notes below). A signed-in
+browser sends its session cookie automatically, so use `credentials: 'omit'`
+(or a browser profile without a session) when the Bearer key must select the
+identity.
 
-A request authenticated only by API key does not start or resume a PHP session
-and receives no session cookie. `SessionService::resumeSession()` starts a
-session only when a `session` cookie is already present.
+A request that authenticates by API key and presents no session cookie does not
+start or resume a PHP session and receives no session cookie;
+`SessionService::resumeSession()` starts a session only when a `session` cookie
+is already present. If a stale or invalid `session` cookie is presented, startup
+discards it before authorization and still does not start a session.
 
 === API key format and storage
 
@@ -132,7 +139,12 @@ absent even though a key was sent.
 There is no CORS support: the application emits no `Access-Control-Allow-*`
 headers and performs no preflight handling. Cross-origin browser calls therefore
 fail regardless of a valid key. Every response also carries
-`Cross-Origin-Resource-Policy: same-site`.
+`Cross-Origin-Resource-Policy: same-site`, which permits same-origin and
+same-site delivery but provides no cross-origin access.
+
+Same-origin browser calls need no CORS headers. A browser sends
+`Sec-Fetch-Site: same-origin` and an `Origin` whose host matches the request
+host, so the check below accepts the call.
 
 For `POST`, `PUT`, and `DELETE`, a same-origin pre-controller check runs before
 authentication:
@@ -267,10 +279,15 @@ A successful call returns `201 Created`, the header
 {"message":"Image uploaded successfully."}
 ----
 
-The message is identical whether one file or ten files were uploaded. The
-response carries no image IDs, count, checksums, paths, or per-file results, so
-a client cannot correlate the call with individual records from the response
-alone.
+The response also carries `Cross-Origin-Resource-Policy: same-site` (emitted at
+application startup and repeated by the shipped nginx configuration). A request
+that presented no session cookie receives no `Set-Cookie` header; if a stale
+session cookie was discarded, the only cookie set is an expired `session` cookie
+that clears it. The response has no `WWW-Authenticate` or `Content-Disposition`
+header, so a same-origin browser can read the JSON body normally. The message is
+identical whether one file or ten files were uploaded. The response carries no
+image IDs, count, checksums, paths, or per-file results, so a client cannot
+correlate the call with individual records from the response alone.
 
 === Side effects
 
@@ -370,9 +387,12 @@ curl --silent --show-error --include \
 ----
 
 To use an existing browser session instead of a key, omit the header and send
-the session cookie with `--cookie "session=<session-id>"`. Do not add an
-`Origin` or non-`same-origin` `Sec-Fetch-Site` header to a server-to-server
-call; either can turn the request into a `403` before authentication.
+the session cookie with `--cookie "session=<session-id>"`. Same-origin browser
+code may send the Bearer header instead; the browser supplies a matching
+`Origin` and `Sec-Fetch-Site: same-origin` automatically, and the pre-controller
+check accepts them. Do not add a mismatched `Origin` or a non-`same-origin`
+`Sec-Fetch-Site` header to a server-to-server call; either can turn the request
+into a `403` before authentication.
 
 An unknown, replaced, or malformed key is rejected before validation, and the
 response has no body:

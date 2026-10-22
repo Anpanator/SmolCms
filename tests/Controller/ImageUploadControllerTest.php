@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace SmolCms\Test\Controller;
 
+use PDO;
+use ReflectionProperty;
 use SmolCms\Data\Business\Service;
 use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\AccessLevel;
@@ -13,8 +15,9 @@ use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Request\Request;
-use PDO;
+use SmolCms\Service\Core\Session\SessionHandler;
 use SmolCms\Service\Core\Session\SessionService;
+use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
 use SmolCms\Service\DB\ApiKeyService;
 use SmolCms\Service\DB\AuditLogService;
 use SmolCms\Service\DB\ImageEntityService;
@@ -55,7 +58,13 @@ class ImageUploadControllerTest extends FunctionalTestCase
     private SessionService $sessionService;
 
     #[Autowire]
+    private SessionHandler $sessionHandler;
+
+    #[Autowire]
     private PDO $pdo;
+
+    /** @var array<string, mixed> */
+    private array $originalCookie;
 
     public static function setUpBeforeClass(): void
     {
@@ -71,6 +80,8 @@ class ImageUploadControllerTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
+        $this->originalCookie = $_COOKIE;
+        $_COOKIE = [];
         parent::setUp();
         $this->uploadUrl = new Url(protocol: 'https', host: 'localhost', path: '/upload-image');
         $this->cleanImageStorage();
@@ -81,6 +92,7 @@ class ImageUploadControllerTest extends FunctionalTestCase
         $this->sessionService->destroySession();
         parent::tearDown();
         $this->cleanImageStorage();
+        $_COOKIE = $this->originalCookie;
     }
 
     public function testPostAction_RequiresAuthentication(): void
@@ -105,11 +117,136 @@ class ImageUploadControllerTest extends FunctionalTestCase
         $this->assertNull($response->getContent());
     }
 
-    public function testPostActionAcceptsApiKeyWithoutSessionAndAuditsUploadAsApi(): void
+    public function testPostActionAcceptsApiKeyWithoutSessionCookieAndAuditsUploadAsApi(): void
     {
         $this->loginUserWithAccessLevel(
             'api-upload-' . bin2hex(random_bytes(5)),
             'API Image Uploader',
+            AccessLevel::WIZARD,
+        );
+        $userData = $this->sessionService->getUserData();
+        self::assertNotNull($userData);
+        $apiKey = $this->apiKeyService->generateForUser($userData->id);
+        $existingImageIds = array_map(
+            static fn($entity) => $entity->getId(),
+            $this->imageEntityService->findByStatus(ImageStatus::PENDING),
+        );
+        $this->sessionService->destroySession();
+        self::assertSame(PHP_SESSION_NONE, session_status());
+        self::assertArrayNotHasKey(SessionService::SESSION_NAME, $_COOKIE);
+        self::assertNull($this->sessionService->getUserData());
+        $tmpPath = ROOT_DIR . '/tests/TestUtils/TestFiles/image.jpg';
+
+        $request = new Request(
+            url: $this->uploadUrl,
+            method: HttpMethod::POST,
+            headers: [
+                HttpHeader::AUTHORIZATION->value => 'Bearer ' . $apiKey,
+                HttpHeader::ORIGIN->value => 'https://' . $this->uploadUrl->host,
+                HttpHeader::SEC_FETCH_SITE->value => 'same-origin',
+            ],
+            files: [
+                'image' => [
+                    'name' => 'test.jpg',
+                    'tmp_name' => $tmpPath,
+                    'size' => 1024,
+                    'type' => 'image/jpeg',
+                    'error' => UPLOAD_ERR_OK,
+                ],
+            ],
+        );
+        self::assertFalse(
+            self::hasHeader($request->headers, 'Cookie'),
+            'An API-key-only request must not carry a session cookie.',
+        );
+
+        $cookieEmitterProperty = new ReflectionProperty(SessionService::class, 'cookieEmitter');
+        $previousCookieEmitter = $cookieEmitterProperty->getValue($this->sessionService);
+        $emittedCookies = [];
+        $this->sessionService->setCookieEmitter(
+            static function (string $name, string $value, array $options) use (&$emittedCookies): void {
+                $emittedCookies[] = ['name' => $name, 'value' => $value, 'options' => $options];
+            },
+        );
+        try {
+            $response = $this->simulateRequest($request);
+        } finally {
+            $cookieEmitterProperty->setValue($this->sessionService, $previousCookieEmitter);
+        }
+
+        self::assertSame([], $emittedCookies, 'API key authentication must not emit a session cookie.');
+        self::assertSame(HttpStatus::CREATED, $response->getStatus());
+        self::assertSame(PHP_SESSION_NONE, session_status(), 'API key authentication must not start a PHP session.');
+        self::assertArrayNotHasKey(SessionService::SESSION_NAME, $_COOKIE);
+        $responseHeaders = $response->getHeaders();
+        self::assertSame(HttpContentType::JSON->value, $responseHeaders[HttpHeader::CONTENT_TYPE->value]);
+        self::assertFalse(self::hasHeader($responseHeaders, 'Set-Cookie'));
+        self::assertFalse(self::hasHeader($responseHeaders, 'WWW-Authenticate'));
+        self::assertFalse(self::hasHeader($responseHeaders, 'Content-Disposition'));
+        $uploadedEntities = array_values(array_filter(
+            $this->imageEntityService->findByStatus(ImageStatus::PENDING),
+            static fn($entity) => !in_array($entity->getId(), $existingImageIds, true),
+        ));
+        self::assertCount(1, $uploadedEntities);
+        $imageId = $uploadedEntities[0]->getId();
+        self::assertSame($userData->id, $uploadedEntities[0]->getUserId());
+
+        $entries = $this->auditLogService->getRecentEntriesForUser($userData->id, 15);
+        self::assertSame(AuditActionType::IMAGE_UPLOADED->value, $entries[0]['actionType']);
+        self::assertSame('image_id=' . $imageId . ';via=api', $entries[0]['context']);
+    }
+
+    public function testPostActionAcceptsApiKeyAfterDiscardingStaleSessionCookie(): void
+    {
+        $this->loginUserWithAccessLevel(
+            'api-upload-stale-' . bin2hex(random_bytes(5)),
+            'Stale Cookie API Uploader',
+            AccessLevel::WIZARD,
+        );
+        $userData = $this->sessionService->getUserData();
+        self::assertNotNull($userData);
+        $apiKey = $this->apiKeyService->generateForUser($userData->id);
+        $this->sessionService->destroySession();
+
+        $_COOKIE[SessionService::SESSION_NAME] = 'stale-session-id';
+        $startupAction = new ResumeSessionStartupAction($this->sessionService, $this->sessionHandler);
+        $startupAction->runAction();
+
+        self::assertArrayNotHasKey(SessionService::SESSION_NAME, $_COOKIE);
+        self::assertSame(PHP_SESSION_NONE, session_status());
+        $tmpPath = ROOT_DIR . '/tests/TestUtils/TestFiles/image.jpg';
+        $request = new Request(
+            url: $this->uploadUrl,
+            method: HttpMethod::POST,
+            headers: [
+                HttpHeader::AUTHORIZATION->value => 'Bearer ' . $apiKey,
+                HttpHeader::ORIGIN->value => 'https://' . $this->uploadUrl->host,
+                HttpHeader::SEC_FETCH_SITE->value => 'same-origin',
+            ],
+            files: [
+                'image' => [
+                    'name' => 'test.jpg',
+                    'tmp_name' => $tmpPath,
+                    'size' => 1024,
+                    'type' => 'image/jpeg',
+                    'error' => UPLOAD_ERR_OK,
+                ],
+            ],
+        );
+        self::assertFalse(self::hasHeader($request->headers, 'Cookie'));
+
+        $response = $this->simulateRequest($request);
+
+        self::assertSame(HttpStatus::CREATED, $response->getStatus());
+        self::assertSame(PHP_SESSION_NONE, session_status());
+        self::assertArrayNotHasKey(SessionService::SESSION_NAME, $_COOKIE);
+    }
+
+    public function testPostActionRejectsCrossOriginApiKeyRequestBeforeAuthorization(): void
+    {
+        $this->loginUserWithAccessLevel(
+            'api-upload-cross-origin-' . bin2hex(random_bytes(5)),
+            'Cross-Origin API Uploader',
             AccessLevel::WIZARD,
         );
         $userData = $this->sessionService->getUserData();
@@ -125,7 +262,11 @@ class ImageUploadControllerTest extends FunctionalTestCase
         $request = new Request(
             url: $this->uploadUrl,
             method: HttpMethod::POST,
-            headers: [HttpHeader::AUTHORIZATION->value => 'Bearer ' . $apiKey],
+            headers: [
+                HttpHeader::AUTHORIZATION->value => 'Bearer ' . $apiKey,
+                HttpHeader::ORIGIN->value => 'https://evil.example',
+                HttpHeader::SEC_FETCH_SITE->value => 'cross-site',
+            ],
             files: [
                 'image' => [
                     'name' => 'test.jpg',
@@ -139,19 +280,13 @@ class ImageUploadControllerTest extends FunctionalTestCase
 
         $response = $this->simulateRequest($request);
 
-        self::assertSame(HttpStatus::CREATED, $response->getStatus());
-        self::assertNotSame(PHP_SESSION_ACTIVE, session_status(), 'API key authentication must not start a PHP session.');
-        $uploadedEntities = array_values(array_filter(
+        self::assertSame(HttpStatus::FORBIDDEN, $response->getStatus());
+        $uploadedEntities = array_filter(
             $this->imageEntityService->findByStatus(ImageStatus::PENDING),
             static fn($entity) => !in_array($entity->getId(), $existingImageIds, true),
-        ));
-        self::assertCount(1, $uploadedEntities);
-        $imageId = $uploadedEntities[0]->getId();
-        self::assertSame($userData->id, $uploadedEntities[0]->getUserId());
-
-        $entries = $this->auditLogService->getRecentEntriesForUser($userData->id, 15);
-        self::assertSame(AuditActionType::IMAGE_UPLOADED->value, $entries[0]['actionType']);
-        self::assertSame('image_id=' . $imageId . ';via=api', $entries[0]['context']);
+        );
+        self::assertCount(0, $uploadedEntities);
+        self::assertSame(PHP_SESSION_NONE, session_status());
     }
 
     public function testPostActionRejectsUnknownApiKey(): void
@@ -330,6 +465,17 @@ class ImageUploadControllerTest extends FunctionalTestCase
         $extensions = array_map(static fn($entity) => $entity->getOriginalExtension(), $uploadedEntities);
         sort($extensions);
         $this->assertSame(['jpeg', 'png'], $extensions);
+    }
+
+    /** @param array<array-key, mixed> $headers */
+    private static function hasHeader(array $headers, string $headerName): bool
+    {
+        foreach (array_keys($headers) as $name) {
+            if (is_string($name) && strcasecmp($name, $headerName) === 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function cleanImageStorage(): void
