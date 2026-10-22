@@ -100,6 +100,30 @@ class ImageTagControllerTest extends FunctionalTestCase
         self::assertNull($this->findUserTagUsage($userId, 'tagme'), 'system tagme usage must not be tracked');
     }
 
+    public function testAddedTagsAppearInTheUsersRecentQuickTags(): void
+    {
+        $this->loginUser('image-tag-recent-' . bin2hex(random_bytes(5)), 'Image Tag Recent');
+        $userId = $this->sessionService->getUserData()->id;
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $userId,
+            status: ImageStatus::ACCEPTED,
+        );
+        $tagName = 'recent-' . bin2hex(random_bytes(4));
+        $this->tagService->createTag($tagName);
+
+        $added = $this->simulateImageTagsPost('/api/image/tags', [
+            'imageId' => $image->getId(),
+            'tags' => $tagName,
+        ]);
+        self::assertSame(HttpStatus::OK, $added->getStatus());
+
+        $quickTags = $this->simulateQuickTagsGet();
+        self::assertSame(HttpStatus::OK, $quickTags->getStatus());
+        $body = json_decode((string)$quickTags->getContent(), true, JSON_THROW_ON_ERROR);
+        self::assertContains($tagName, array_column($body['userRecent'], 'name'));
+    }
+
     public function testAddActionReturnsBadRequestForInvalidFieldsAndNotFoundForUnknownImage(): void
     {
         $this->loginUser('image-tag-invalid-' . bin2hex(random_bytes(5)), 'Image Tag Invalid');
@@ -324,6 +348,14 @@ class ImageTagControllerTest extends FunctionalTestCase
         $statement->execute(['user_id' => $userId, 'tag_name' => $tagName]);
         $usage = $statement->fetch(PDO::FETCH_ASSOC);
         return is_array($usage) ? $usage : null;
+    }
+
+    private function simulateQuickTagsGet(): Response
+    {
+        return $this->simulateRequest(new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: '/api/tags/quick'),
+            method: HttpMethod::GET,
+        ));
     }
 
     private function simulateImageTagsPost(string $path, array $postParams): Response

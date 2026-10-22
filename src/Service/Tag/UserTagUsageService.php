@@ -104,11 +104,7 @@ readonly class UserTagUsageService extends EntityService
             static fn(array $row): array => ['name' => $row['name'], 'category' => $row['category']],
             $mostUsedRows,
         );
-        $userRecent = $this->findRecent(
-            $usageRows,
-            $tagSummaries,
-            array_column($mostUsedRows, 'tagId'),
-        );
+        $userRecent = $this->findRecent($usageRows, $tagSummaries);
 
         return [
             'global' => $global,
@@ -201,22 +197,22 @@ readonly class UserTagUsageService extends EntityService
     }
 
     /**
+     * Lists recently applied tags that are still attached, ordered by last use.
+     * The list may overlap with the most-used list.
+     *
      * @param list<UserTagUsageEntity> $usageRows
      * @param array<int, array{name: string, category: string}> $tagSummaries
-     * @param list<int> $excludedTagIds
      * @return list<array{name: string, category: string}>
      */
-    private function findRecent(array $usageRows, array $tagSummaries, array $excludedTagIds): array
+    private function findRecent(array $usageRows, array $tagSummaries): array
     {
-        $excluded = array_flip($excludedTagIds);
         $rows = [];
         foreach ($usageRows as $usage) {
             $summary = $tagSummaries[$usage->getTagId()] ?? null;
             if ($usage->getUsageCount() < 1
                 || $usage->getLastUsedAt() === null
                 || $summary === null
-                || TagService::normalizeTagName($summary['name']) === self::EXCLUDED_TAG
-                || isset($excluded[$usage->getTagId()])) {
+                || TagService::normalizeTagName($summary['name']) === self::EXCLUDED_TAG) {
                 continue;
             }
             $rows[] = [

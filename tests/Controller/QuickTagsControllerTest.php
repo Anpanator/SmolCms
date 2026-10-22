@@ -51,7 +51,7 @@ class QuickTagsControllerTest extends FunctionalTestCase
         );
     }
 
-    public function testQuickTagsReturnsOrderedLimitedAndDeduplicatedLists(): void
+    public function testQuickTagsReturnsOrderedLimitedAndOverlappingRecentLists(): void
     {
         $this->loginUser('quick-tags-order-' . bin2hex(random_bytes(4)), 'Quick Tags Order');
         $user = $this->sessionService->getUserData();
@@ -76,7 +76,11 @@ class QuickTagsControllerTest extends FunctionalTestCase
                 'user_id' => $user->id,
                 'tag_id' => $tagId,
                 'usage_count' => $index < 12 ? 12 - $index : 1,
-                'last_used_at' => sprintf('2026-10-22 12:%02d:00', 30 - $index),
+                // The most-used tag is also the most recently used, so the
+                // two user lists are allowed to overlap.
+                'last_used_at' => $index === 0
+                    ? '2026-10-22 12:30:00'
+                    : sprintf('2026-10-22 12:%02d:00', $index),
             ]);
         }
 
@@ -91,8 +95,12 @@ class QuickTagsControllerTest extends FunctionalTestCase
         self::assertSame(array_slice($tagNames, 0, 20), array_column($body['global'], 'name'));
         self::assertSame('Artist', $body['global'][0]['category']);
         self::assertSame(array_slice($tagNames, 0, 10), array_column($body['userMostUsed'], 'name'));
-        self::assertSame(array_slice($tagNames, 10, 10), array_column($body['userRecent'], 'name'));
-        self::assertSame([], array_values(array_intersect(
+        $expectedRecentTagNames = [$tagNames[0]];
+        for ($index = 24; $index >= 16; $index--) {
+            $expectedRecentTagNames[] = $tagNames[$index];
+        }
+        self::assertSame($expectedRecentTagNames, array_column($body['userRecent'], 'name'));
+        self::assertSame([$tagNames[0]], array_values(array_intersect(
             array_column($body['userMostUsed'], 'name'),
             array_column($body['userRecent'], 'name'),
         )));

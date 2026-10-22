@@ -92,15 +92,19 @@ export async function testQuickTagButtonsToggleCurrentImageTagsWithoutConfirmati
             url: '/api/image/tags',
             options: {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({imageId: 7, tags: 'sky'})},
         }));
-        assertEqual(sky.getAttribute('aria-pressed'), 'true');
+        const skyAfterAdd = quickTags.element.querySelector('.quick-tag-button[data-tag-name="sky"]');
+        assertEqual(skyAfterAdd.getAttribute('aria-pressed'), 'true');
         assertEqual(added.join('|'), 'sky');
         assertTrue(document.querySelector('.modal-backdrop') === null, 'quick tags should not ask for confirmation');
 
-        sky.click();
+        skyAfterAdd.click();
         await settle();
         assertEqual(requests[1].url, '/api/image/tags/remove');
         assertEqual(JSON.stringify(JSON.parse(requests[1].options.body)), JSON.stringify({imageId: 7, tag: 'sky'}));
-        assertEqual(sky.getAttribute('aria-pressed'), 'false');
+        assertEqual(
+            quickTags.element.querySelector('.quick-tag-button[data-tag-name="sky"]')?.getAttribute('aria-pressed'),
+            'false',
+        );
         assertEqual(removed.join('|'), 'sky');
     } finally {
         restore();
@@ -126,6 +130,99 @@ export async function testQuickTagsFollowChangedImageTagsWithoutReloadingLists(f
         assertEqual(quickTags.element.querySelector('.quick-tag-button[data-tag-name="nature"]')?.getAttribute('aria-pressed'), 'false');
         assertEqual(quickTags.element.querySelector('.quick-tag-button[data-tag-name="sky"]')?.getAttribute('aria-pressed'), 'true');
         assertEqual(fetchMock.calls.length, 1);
+    } finally {
+        restore();
+    }
+}
+
+export async function testQuickTagTogglesRefreshTheListsWithoutClearingTheSuccessMessage(fixture) {
+    let quickTagsRequests = 0;
+    const status = createMessageBox();
+    const quickTags = createQuickTagsView({status});
+    quickTags.element.hidden = false;
+    fixture.append(status, quickTags.element);
+    const fetchMock = mockFetch((url) => {
+        if (url === '/api/tags/quick') {
+            quickTagsRequests++;
+            return {status: 200, body: {
+                global: [{name: 'sky', category: 'General'}],
+                userMostUsed: [],
+                userRecent: quickTagsRequests === 2 ? [{name: 'sky', category: 'General'}] : [],
+            }};
+        }
+        if (url === '/api/image/tags') {
+            return {status: 200, body: {applied: ['sky'], unknown: []}};
+        }
+        return {status: 204, body: null};
+    });
+    const restore = useFetch(fetchMock);
+    try {
+        quickTags.updateImage(7, []);
+        await quickTags.load();
+        assertEqual(quickTagsRequests, 1);
+        assertEqual(quickTags.element.querySelectorAll('.quick-tags-group--user-recent .quick-tag-button').length, 0);
+
+        quickTags.element.querySelector('.quick-tags-group--global .quick-tag-button[data-tag-name="sky"]').click();
+        await settle();
+
+        assertEqual(quickTagsRequests, 2);
+        const recentSky = quickTags.element.querySelector('.quick-tags-group--user-recent .quick-tag-button[data-tag-name="sky"]');
+        assertTrue(recentSky !== null, 'the recent list should refresh after an add');
+        assertEqual(recentSky.getAttribute('aria-pressed'), 'true');
+        assertFalse(status.hidden);
+        assertEqual(status.textContent, 'Added tag: sky.');
+        assertTrue(status.classList.contains('form-message--success'));
+
+        recentSky.click();
+        await settle();
+
+        assertEqual(quickTagsRequests, 3);
+        assertEqual(quickTags.element.querySelectorAll('.quick-tags-group--user-recent .quick-tag-button').length, 0);
+        assertFalse(status.hidden);
+        assertEqual(status.textContent, 'Removed tag: sky.');
+    } finally {
+        restore();
+    }
+}
+
+export async function testQuickTagRefreshFailureKeepsExistingListsAndSuccessMessage(fixture) {
+    let quickTagsRequests = 0;
+    const status = createMessageBox();
+    const quickTags = createQuickTagsView({status});
+    quickTags.element.hidden = false;
+    fixture.append(status, quickTags.element);
+    const fetchMock = mockFetch((url) => {
+        if (url === '/api/tags/quick') {
+            quickTagsRequests++;
+            return quickTagsRequests === 1
+                ? {status: 200, body: {
+                    global: [{name: 'sky', category: 'General'}],
+                    userMostUsed: [],
+                    userRecent: [],
+                }}
+                : {status: 500, body: null};
+        }
+        if (url === '/api/image/tags') {
+            return {status: 200, body: {applied: ['sky'], unknown: []}};
+        }
+        return {status: 204, body: null};
+    });
+    const restore = useFetch(fetchMock);
+    try {
+        quickTags.updateImage(7, []);
+        await quickTags.load();
+
+        quickTags.element.querySelector('.quick-tags-group--global .quick-tag-button[data-tag-name="sky"]').click();
+        await settle();
+
+        assertEqual(quickTagsRequests, 2);
+        assertEqual(
+            quickTags.element.querySelectorAll('.quick-tags-group--global .quick-tag-button[data-tag-name="sky"]').length,
+            1,
+            'a failed refresh should keep the existing lists',
+        );
+        assertFalse(status.hidden);
+        assertEqual(status.textContent, 'Added tag: sky.');
     } finally {
         restore();
     }

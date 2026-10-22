@@ -58,6 +58,7 @@ export function createQuickTagsView({
     let pending = false;
     let loading = false;
     let requestId = 0;
+    let refreshPromise = null;
 
     render();
     return {element, load, updateImage};
@@ -72,11 +73,7 @@ export function createQuickTagsView({
             if (currentRequestId !== requestId) {
                 return;
             }
-            lists = {
-                global: normalizeQuickTags(data?.global, 20),
-                userMostUsed: normalizeQuickTags(data?.userMostUsed, 10),
-                userRecent: normalizeQuickTags(data?.userRecent, 10),
-            };
+            lists = normalizeLists(data);
             loading = false;
             render();
         } catch (error) {
@@ -91,6 +88,45 @@ export function createQuickTagsView({
             }
             showMessage(status, messageForStatus(error?.status ?? 0));
         }
+    }
+
+    /**
+     * Refreshes the lists without clearing the current message or blanking
+     * existing tags. Concurrent refreshes share one request.
+     */
+    async function refreshLists() {
+        if (refreshPromise !== null) {
+            return refreshPromise;
+        }
+        const currentRequestId = ++requestId;
+        refreshPromise = (async () => {
+            try {
+                const data = await get(QUICK_TAGS_URL);
+                if (currentRequestId !== requestId) {
+                    return;
+                }
+                lists = normalizeLists(data);
+                loading = false;
+                render();
+            } catch {
+                if (currentRequestId !== requestId) {
+                    return;
+                }
+                loading = false;
+                render();
+            } finally {
+                refreshPromise = null;
+            }
+        })();
+        return refreshPromise;
+    }
+
+    function normalizeLists(data) {
+        return {
+            global: normalizeQuickTags(data?.global, 20),
+            userMostUsed: normalizeQuickTags(data?.userMostUsed, 10),
+            userRecent: normalizeQuickTags(data?.userRecent, 10),
+        };
     }
 
     function updateImage(nextImageId, tags) {
@@ -183,6 +219,8 @@ export function createQuickTagsView({
                 onTagAdded(tagName);
                 showMessage(status, `Added tag: ${tagName}.`, 'success');
             }
+            renderButtons();
+            await refreshLists();
         } catch (error) {
             if (isAuthError(error)) {
                 navigate('/login');

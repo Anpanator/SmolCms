@@ -41,9 +41,11 @@ than auto-dismissing.
 Image and Tagme queue views can show a right-hand Quick tags sidebar with up to
 20 globally most-used tags on the left and up to 10 user-most-used plus 10
 user-recent tags on the right. Buttons add or remove tags from the current
-image without confirmation, immediately updating its regular tag list; the
-`tagme` system tag is excluded from suggestions. The lists are fetched when
-enabled, including when a view opens with the setting already enabled. A toggle
+image without confirmation, immediately updating its regular tag list and
+silently refreshing the three quick-tag lists so "Your recent" reflects the
+change without clearing the success message; the `tagme` system tag is
+excluded from suggestions. The lists are fetched when enabled, including when
+a view opens with the setting already enabled. A toggle
 below the main tag list controls the sidebar; it is off by default, stored in
 the session, and reset on login. `GET /api/tags/quick` supplies the lists,
 `POST /api/session/quick-tags` changes the setting, and `GET /api/session`
