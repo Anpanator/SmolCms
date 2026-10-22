@@ -53,7 +53,7 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
     let deletePending = false;
 
     const nextButton = createNavButton('image-nav-next', 'Next', 'next');
-    const previousButton = createNavButton('image-nav-previous', 'Previous', 'previous');
+    const previousButton = createNavButton('image-nav-previous', 'Prev', 'previous');
     const imageNav = el('nav', {
         className: 'image-nav',
         attributes: {'aria-label': 'Adjacent images'},
@@ -79,7 +79,7 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
     const quickTagsToggle = createQuickTagsToggle({session, quickTags, layout: page, status, navigate});
 
     const sidebar = el('aside', {
-        className: 'sidebar',
+        className: 'sidebar image-sidebar',
         children: [
             imageNav,
             el('h2', {className: 'sidebar-title', children: 'Tags'}),
@@ -90,7 +90,7 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
         ],
     });
     const content = el('section', {
-        className: 'content',
+        className: 'content image-content',
         children: [status, imageDetails.imageHolder],
     });
     const state = {navigate, imageDetails, tagList, status};

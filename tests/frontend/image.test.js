@@ -841,6 +841,8 @@ export async function testImageViewSidebarPlacesNavigationBeforeTheLoadedImage()
         assertEqual(buttons.length, 2, 'navigation should have two controls');
         assertTrue(buttons[0].classList.contains('image-nav-next'), 'next should come first');
         assertTrue(buttons[1].classList.contains('image-nav-previous'), 'previous should come second');
+        assertEqual(buttons[0].textContent, 'Next');
+        assertEqual(buttons[1].textContent, 'Prev', 'the previous label should be abbreviated');
         assertFalse(view.querySelector('.image-nav-next').disabled, 'next should be available for a loaded image');
         assertFalse(view.querySelector('.image-nav-previous').disabled, 'previous should be available for a loaded image');
     } finally {

@@ -867,9 +867,32 @@ h3 {
 /* Image display view                                                  */
 /* ------------------------------------------------------------------ */
 
+/* Keep the search above the sidebar while the image starts at the top. */
+.image-layout > .image-toolbar {
+    grid-column: 1;
+    grid-row: 1;
+    display: block;
+}
+
+.image-layout > .image-sidebar {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+.image-layout > .image-content {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: start;
+}
+
+.image-layout > .quick-tags-sidebar {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+}
+
 .image-view {
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
     min-width: 0;
 }
 
@@ -962,13 +985,17 @@ h3 {
 }
 
 .image-nav {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-2);
     margin-bottom: var(--space-4);
 }
 
 .image-nav .button {
-    flex: 1 1 0;
+    width: 100%;
+    min-width: 0;
+    padding-inline: var(--space-2);
+    text-align: center;
 }
 
 .mod-actions {
@@ -1870,6 +1897,14 @@ h3 {
 @media (max-width: 48rem) {
     .layout {
         grid-template-columns: 1fr;
+    }
+
+    .image-layout > .image-toolbar,
+    .image-layout > .image-sidebar,
+    .image-layout > .image-content,
+    .image-layout > .quick-tags-sidebar {
+        grid-column: 1;
+        grid-row: auto;
     }
 
     .internal-admin-workspace {
