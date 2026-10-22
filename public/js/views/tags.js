@@ -126,49 +126,69 @@ export function createTagsView({
     pagination.element.setAttribute('aria-label', 'Tag pages');
 
     const page = el('section', {
-        className: 'tags-page',
+        className: 'tags-page internal-admin-page',
         children: [
             el('div', {
-                className: 'tags-management',
+                className: 'internal-admin-workspace tags-workspace',
                 children: [
                     el('section', {
-                        className: 'tags-form-panel',
-                        attributes: {'aria-labelledby': 'create-category-title'},
+                        className: 'internal-admin-list-panel tags-browser',
+                        attributes: {'aria-labelledby': 'tags-browser-title'},
                         children: [
                             el('h2', {
                                 className: 'tags-section-title',
-                                attributes: {id: 'create-category-title'},
-                                children: 'Create category'
+                                attributes: {id: 'tags-browser-title'},
+                                children: 'Browse tags'
                             }),
-                            categoryForm,
-                            search.element,
+                            listMessage,
+                            el('div', {
+                                className: 'data-table-wrap tags-table-wrap',
+                                children: table,
+                            }),
+                            pagination.element,
                         ],
                     }),
-                    el('section', {
-                        className: 'tags-form-panel',
-                        attributes: {'aria-labelledby': 'create-tag-title'},
+                    el('aside', {
+                        className: 'internal-admin-sidebar tags-sidebar',
                         children: [
-                            el('h2', {className: 'tags-section-title', attributes: {id: 'create-tag-title'}, children: 'Create tag'}),
-                            tagForm,
+                            el('section', {
+                                className: 'tags-search-panel',
+                                attributes: {'aria-labelledby': 'tags-search-title'},
+                                children: [
+                                    el('h2', {
+                                        className: 'tags-section-title',
+                                        attributes: {id: 'tags-search-title'},
+                                        children: 'Search tags',
+                                    }),
+                                    search.element,
+                                ],
+                            }),
+                            el('section', {
+                                className: 'tags-form-panel',
+                                attributes: {'aria-labelledby': 'create-tag-title'},
+                                children: [
+                                    el('h2', {
+                                        className: 'tags-section-title',
+                                        attributes: {id: 'create-tag-title'},
+                                        children: 'Create tag',
+                                    }),
+                                    tagForm,
+                                ],
+                            }),
+                            el('section', {
+                                className: 'tags-form-panel',
+                                attributes: {'aria-labelledby': 'create-category-title'},
+                                children: [
+                                    el('h2', {
+                                        className: 'tags-section-title',
+                                        attributes: {id: 'create-category-title'},
+                                        children: 'Create category',
+                                    }),
+                                    categoryForm,
+                                ],
+                            }),
                         ],
                     }),
-                ],
-            }),
-            el('section', {
-                className: 'tags-browser',
-                attributes: {'aria-labelledby': 'tags-browser-title'},
-                children: [
-                    el('h2', {
-                        className: 'tags-section-title',
-                        attributes: {id: 'tags-browser-title'},
-                        children: 'Browse tags'
-                    }),
-                    listMessage,
-                    el('div', {
-                        className: 'data-table-wrap tags-table-wrap',
-                        children: table,
-                    }),
-                    pagination.element,
                 ],
             }),
         ],

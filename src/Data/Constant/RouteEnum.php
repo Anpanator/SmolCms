@@ -20,10 +20,12 @@ enum RouteEnum: string
     case USER_PROFILE = '/user';
     case AUDIT_LOG = '/audit-log';
     case API_SESSION = '/api/session';
+    case API_SESSION_QUICK_TAGS = '/api/session/quick-tags';
     case API_IMAGES = '/api/images';
     case API_IMAGE_DETAIL = '/api/image/detail';
     case API_IMAGE_NEIGHBOR = '/api/image/neighbor';
     case API_TAGS = '/api/tags';
+    case API_TAGS_QUICK = '/api/tags/quick';
     case API_TAG_SUGGEST = '/api/tags/suggest';
     case API_TAG_CATEGORIES = '/api/tag-categories';
     case API_TAG_DELETE = '/api/tags/delete';

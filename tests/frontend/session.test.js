@@ -14,6 +14,7 @@ export async function testInitialLoadFetchesAndCachesUser() {
         const user = await session.load();
         assertEqual(user.displayName, 'Amy');
         assertEqual(session.getUser()?.displayName, 'Amy', 'user should be cached');
+        assertEqual(session.getQuickTagsEnabled(), false, 'the toggle defaults off when not enabled');
         assertTrue(session.isLoaded());
         assertEqual(fetchMock.calls.length, 1);
     } finally {
@@ -101,6 +102,41 @@ export async function testSetUserUpdatesAndNotifies() {
         assertEqual(seen.length, 1, 'setUser should notify subscribers');
         assertEqual(seen[0]?.displayName, 'Updated');
         unsubscribe();
+    } finally {
+        restore();
+    }
+}
+
+export async function testQuickTagsSettingLoadsUpdatesAndResetsForANewSessionUser() {
+    const fetchMock = mockFetch(() => sessionResponse(testUser({id: 1}), true));
+    const restore = useFetch(fetchMock);
+    try {
+        const session = createSession();
+        await session.load();
+        assertEqual(session.getQuickTagsEnabled(), true);
+
+        session.setQuickTagsEnabled(false);
+        assertEqual(session.getQuickTagsEnabled(), false);
+        session.setQuickTagsEnabled(true);
+        assertEqual(session.getQuickTagsEnabled(), true);
+
+        session.setUser(testUser({id: 2}));
+        assertEqual(session.getQuickTagsEnabled(), false, 'another login must start with quick tags off');
+        session.setQuickTagsEnabled(true);
+        session.setUser(null);
+        assertEqual(session.getQuickTagsEnabled(), false, 'logging out must clear the in-memory setting');
+    } finally {
+        restore();
+    }
+}
+
+export async function testAnonymousSessionCannotLoadQuickTagsAsEnabled() {
+    const fetchMock = mockFetch(() => sessionResponse(null, true));
+    const restore = useFetch(fetchMock);
+    try {
+        const session = createSession();
+        await session.load();
+        assertEqual(session.getQuickTagsEnabled(), false, 'anonymous sessions must never enable quick tags');
     } finally {
         restore();
     }

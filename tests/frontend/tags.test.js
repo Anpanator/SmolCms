@@ -100,6 +100,16 @@ export async function testModeratorSeesTagTableAndGeneralCategoryDefault() {
         assertTrue(view.querySelector('.tags-table')?.classList.contains('data-table'), 'tag tables should use the shared table component');
         assertTrue(view.querySelector('.tags-table-wrap')?.classList.contains('data-table-wrap'));
         assertTrue(view.querySelector('.sidebar') === null, 'tag management should not render a tags sidebar');
+        assertTrue(view.querySelector('.tags-workspace')?.classList.contains('internal-admin-workspace'));
+        assertTrue(view.querySelector('.tags-browser')?.classList.contains('internal-admin-list-panel'));
+        assertTrue(view.querySelector('.tags-sidebar')?.classList.contains('internal-admin-sidebar'));
+        assertEqual(
+            [...view.querySelectorAll('.tags-sidebar > section')].map((section) => section.querySelector('h2')?.textContent).join('|'),
+            'Search tags|Create tag|Create category',
+            'the tag search and forms should appear in the requested sidebar order',
+        );
+        assertTrue(view.querySelector('.tags-sidebar .search-view') !== null);
+        assertEqual(view.querySelector('.tags-form-panel .search-view'), null, 'search should not remain in a create form panel');
         assertTrue(view.querySelector('img') === null, 'tag management should not display images');
         assertEqual(view.querySelectorAll('.tags-table thead th').length, 3);
         assertEqual(

@@ -60,6 +60,8 @@ export async function testImageViewRendersSampleImageInLayout() {
         assertTrue(toolbar.querySelector('.image-nav') !== null, 'previous/next controls should share the toolbar');
         assertEqual(view.querySelector('.sidebar .search-view'), null, 'the image sidebar should not contain tag search');
         assertTrue(view.querySelector('.sidebar .tags') !== null, 'sidebar tag list should exist');
+        assertTrue(view.querySelector('.quick-tags-sidebar')?.hidden, 'quick tags should be hidden by default');
+        assertEqual(view.querySelector('.quick-tags-toggle'), null, 'anonymous users cannot enable quick tags');
         assertEqual(view.querySelector('.tag-add-row'), null, 'anonymous users should not see tag controls');
         assertEqual(view.querySelector('.tag-remove-button'), null, 'anonymous users should not see remove controls');
         assertEqual(view.querySelectorAll('.sidebar .tags-item').length, 2, 'detail tags should replace static tags');
@@ -118,6 +120,64 @@ export async function testImageViewShowsDownloadLinkForLoggedInUser() {
         assertEqual(download.getAttribute('href'), '/api/image/download?name=ab89c0d0ef.jpeg');
         assertTrue(download.hasAttribute('download'), 'download link should carry the download attribute');
         assertEqual(download.textContent, 'Download');
+        assertEqual(view.querySelector('.quick-tags-toggle')?.textContent, 'Show quick tags');
+        assertTrue(view.querySelector('.quick-tags-sidebar').hidden, 'logged-in users start with quick tags off');
+    } finally {
+        restore();
+    }
+}
+
+export async function testQuickTagsToggleLoadsAndHidesTheRightSidebarWithoutRefetchingOnDisable() {
+    let quickTagsEnabled = false;
+    const session = {
+        getUser: () => testUser(),
+        getQuickTagsEnabled: () => quickTagsEnabled,
+        setQuickTagsEnabled: (enabled) => { quickTagsEnabled = enabled; },
+    };
+    const {view, fetchMock, restore} = await createView((url, options) => {
+        if (url === '/api/image/detail?id=7') {
+            return detailResponse();
+        }
+        if (url === '/api/tags/quick') {
+            return {status: 200, body: {
+                global: [{name: 'nature', category: 'General'}, {name: 'clouds', category: 'General'}],
+                userMostUsed: [],
+                userRecent: [],
+            }};
+        }
+        if (url === '/api/session/quick-tags' && options.method === 'POST') {
+            return {status: 200, body: {quickTagsEnabled: JSON.parse(options.body).enabled}};
+        }
+        return {status: 200, body: null};
+    }, 'id=7', session);
+    try {
+        const toggle = view.querySelector('.quick-tags-toggle');
+        const quickTags = view.querySelector('.quick-tags-sidebar');
+        assertTrue(toggle !== null);
+        assertTrue(quickTags.hidden);
+        assertFalse(view.classList.contains('layout--with-quick-tags'));
+        assertTrue(
+            (view.querySelector('.tag-editor').compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+            'the toggle should follow the tag list in the left sidebar',
+        );
+        assertEqual(fetchMock.calls.filter((call) => call.url === '/api/tags/quick').length, 0);
+
+        toggle.click();
+        await settle();
+        assertFalse(quickTags.hidden);
+        assertTrue(view.classList.contains('layout--with-quick-tags'));
+        assertEqual(session.getQuickTagsEnabled(), true);
+        assertEqual(toggle.textContent, 'Hide quick tags');
+        assertEqual(fetchMock.calls.filter((call) => call.url === '/api/tags/quick').length, 1);
+        assertEqual(quickTags.querySelector('.quick-tag-button[data-tag-name="nature"]')?.getAttribute('aria-pressed'), 'true');
+
+        toggle.click();
+        await settle();
+        assertTrue(quickTags.hidden);
+        assertFalse(view.classList.contains('layout--with-quick-tags'));
+        assertEqual(session.getQuickTagsEnabled(), false);
+        assertEqual(fetchMock.calls.filter((call) => call.url === '/api/tags/quick').length, 1,
+            'hiding the view should not refetch its lists');
     } finally {
         restore();
     }

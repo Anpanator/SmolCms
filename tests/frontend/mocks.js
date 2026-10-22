@@ -170,8 +170,8 @@ export function muteNavigation(muted) {
 /**
  * Creates a session user descriptor for the mocked /api/session endpoint.
  */
-export function sessionResponse(user) {
-    return { status: 200, body: { user } };
+export function sessionResponse(user, quickTagsEnabled = false) {
+    return { status: 200, body: { user, quickTagsEnabled } };
 }
 
 export function testUser(overrides = {}) {

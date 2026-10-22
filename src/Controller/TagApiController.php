@@ -18,6 +18,7 @@ use SmolCms\Service\Core\Attribute\Authenticated;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\AuditLogService;
 use SmolCms\Service\Tag\TagService;
+use SmolCms\Service\Tag\UserTagUsageService;
 
 readonly class TagApiController
 {
@@ -25,6 +26,7 @@ readonly class TagApiController
         private TagService $tagService,
         private AuditLogService $auditLogService,
         private SessionService  $sessionService,
+        private UserTagUsageService $userTagUsageService,
     )
     {
     }
@@ -50,6 +52,17 @@ readonly class TagApiController
         }
 
         return new JsonResponse($this->tagService->browseTags($page, $query));
+    }
+
+    #[Authenticated(AccessLevel::NOVICE)]
+    public function getQuickTagsAction(Request $request): Response
+    {
+        $user = $this->sessionService->getUserData();
+        if ($user === null) {
+            return new Response(HttpStatus::UNAUTHORIZED);
+        }
+
+        return new JsonResponse($this->userTagUsageService->getQuickTags($user->id));
     }
 
     #[Authenticated(AccessLevel::MOD)]

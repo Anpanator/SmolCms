@@ -161,12 +161,25 @@ class SessionServiceTest extends SimpleTestCase
         $this->sessionService->startSession();
         $_SESSION['temporary'] = 'value';
         $this->sessionService->setUserData(new SessionUserData(1, 'Test User'));
+        $this->sessionService->setQuickTagsEnabled(true);
 
         $this->sessionService->destroySession();
 
         self::assertSame(PHP_SESSION_NONE, session_status());
         self::assertSame([], $_SESSION);
         self::assertNull($this->sessionService->getUserData());
+        self::assertFalse($this->sessionService->getQuickTagsEnabled());
+    }
+
+    public function testQuickTagsSettingDefaultsOffAndCanBeChanged(): void
+    {
+        self::assertFalse($this->sessionService->getQuickTagsEnabled());
+
+        $this->sessionService->setQuickTagsEnabled(true);
+        self::assertTrue($this->sessionService->getQuickTagsEnabled());
+
+        $this->sessionService->setQuickTagsEnabled(false);
+        self::assertFalse($this->sessionService->getQuickTagsEnabled());
     }
 
     public function testSessionOptions_MarkSessionCookieAsHttpOnly(): void

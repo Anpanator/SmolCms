@@ -24,10 +24,24 @@ let nextTagListId = 1;
  *   navigate?: (path: string) => void,
  *   status?: HTMLParagraphElement,
  *   onRefresh?: () => (void|Promise<void>),
+ *   onChange?: (imageId: number|null, tags: string[]) => void,
  * }} [options]
- * @returns {{element: HTMLDivElement, status: HTMLParagraphElement, update: (image: object|null) => void}}
+ * @returns {{
+ *   element: HTMLDivElement,
+ *   status: HTMLParagraphElement,
+ *   update: (image: object|null) => void,
+ *   getTags: () => string[],
+ *   addTag: (tagName: string) => void,
+ *   removeTag: (tagName: string) => void,
+ * }}
  */
-export function createTagList({session, navigate = () => {}, status = createMessageBox(), onRefresh = () => {}} = {}) {
+export function createTagList({
+    session,
+    navigate = () => {},
+    status = createMessageBox(),
+    onRefresh = () => {},
+    onChange = () => {},
+} = {}) {
     const list = el('ul', {className: 'tags'});
     const element = el('div', {className: 'tag-view tag-editor', children: list});
     const canEdit = Boolean(session?.getUser?.());
@@ -46,7 +60,7 @@ export function createTagList({session, navigate = () => {}, status = createMess
         autocomplete = controls.autocomplete;
     }
 
-    return {element, status, update};
+    return {element, status, update, getTags: () => [...tags], addTag, removeTag};
 
     function createEditControls() {
         const id = nextTagListId++;
@@ -106,6 +120,30 @@ export function createTagList({session, navigate = () => {}, status = createMess
         render();
     }
 
+    function addTag(tagName) {
+        if (!canEdit || imageId === null || typeof tagName !== 'string' || tagName.trim() === '') {
+            return;
+        }
+        const nextTags = sortedUniqueTags([...tags, tagName]);
+        if (nextTags.length === tags.length) {
+            return;
+        }
+        tags = nextTags;
+        render();
+    }
+
+    function removeTag(tagName) {
+        if (!canEdit || imageId === null) {
+            return;
+        }
+        const nextTags = tags.filter((tag) => tag !== tagName);
+        if (nextTags.length === tags.length) {
+            return;
+        }
+        tags = nextTags;
+        render();
+    }
+
     function render() {
         const tagLinks = createTagLinkList({
             tags,
@@ -120,12 +158,13 @@ export function createTagList({session, navigate = () => {}, status = createMess
                     },
                     children: '×',
                 });
-                removeButton.addEventListener('click', () => removeTag(tag));
+                removeButton.addEventListener('click', () => removeTagFromImage(tag));
                 return removeButton;
             } : null,
         });
         list.replaceChildren(...tagLinks.childNodes);
         updateControls();
+        onChange(imageId, [...tags]);
     }
 
     async function addTags() {
@@ -188,7 +227,7 @@ export function createTagList({session, navigate = () => {}, status = createMess
         }
     }
 
-    async function removeTag(tag) {
+    async function removeTagFromImage(tag) {
         if (!canEdit || isPending || imageId === null) {
             return;
         }

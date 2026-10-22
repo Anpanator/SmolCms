@@ -14,19 +14,22 @@ const SESSION_URL = '/api/session';
  *   refresh: () => Promise<*>,
  *   getUser: () => *,
  *   setUser: (user: *) => void,
+ *   getQuickTagsEnabled: () => boolean,
+ *   setQuickTagsEnabled: (enabled: boolean) => void,
  *   isLoaded: () => boolean,
  *   subscribe: (listener: (user: *) => void) => () => void,
  * }}
  */
 export function createSession() {
     let user = null;
+    let quickTagsEnabled = false;
     let loaded = false;
     /** @type {Set<(user: *) => void>} */
     const subscribers = new Set();
 
     function notify() {
         for (const listener of subscribers) {
-            listener(user);
+            listener(user, quickTagsEnabled);
         }
     }
 
@@ -36,6 +39,7 @@ export function createSession() {
         }
         const data = await get(SESSION_URL);
         user = data?.user ?? null;
+        quickTagsEnabled = user !== null && data?.quickTagsEnabled === true;
         loaded = true;
         notify();
         return user;
@@ -46,8 +50,16 @@ export function createSession() {
         refresh: () => load({ force: true }),
         getUser: () => user,
         setUser(nextUser) {
+            if (!nextUser || nextUser?.id !== user?.id) {
+                quickTagsEnabled = false;
+            }
             user = nextUser;
             loaded = true;
+            notify();
+        },
+        getQuickTagsEnabled: () => quickTagsEnabled,
+        setQuickTagsEnabled(enabled) {
+            quickTagsEnabled = user !== null && enabled === true;
             notify();
         },
         isLoaded: () => loaded,

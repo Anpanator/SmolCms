@@ -6,6 +6,7 @@ import {get} from '../api.js';
 import {el} from '../dom.js';
 import {clearMessage, createMessageBox, isAuthError, messageForStatus, showMessage} from '../forms.js';
 import {createImageDetails} from '../imageDetails.js';
+import {createQuickTagsToggle, createQuickTagsView} from '../quickTags.js';
 import {createTagList} from '../tagList.js';
 
 const RANDOM_IMAGE_URL = '/api/tagme/random';
@@ -21,12 +22,28 @@ export function createTagmeView({session, navigate = () => {}, query: _query} = 
         children: 'Next random image',
     });
     let isLoading = false;
-    const tagList = createTagList({session, navigate, status, onRefresh: loadRandomImage});
+    let quickTags = null;
+    const tagList = createTagList({
+        session,
+        navigate,
+        status,
+        onRefresh: loadRandomImage,
+        onChange: (imageId, tags) => quickTags?.updateImage(imageId, tags),
+    });
+    quickTags = createQuickTagsView({
+        status,
+        navigate,
+        onTagAdded: (tagName) => tagList.addTag(tagName),
+        onTagRemoved: (tagName) => tagList.removeTag(tagName),
+    });
+    const view = el('div', {className: 'layout tagme-layout'});
+    const quickTagsToggle = createQuickTagsToggle({session, quickTags, layout: view, status, navigate});
     const sidebar = el('aside', {
         className: 'sidebar',
         children: [
             el('h2', {className: 'sidebar-title', children: 'Tags'}),
             tagList.element,
+            quickTagsToggle,
             imageDetails.metaSection,
         ],
     });
@@ -44,7 +61,7 @@ export function createTagmeView({session, navigate = () => {}, query: _query} = 
             imageDetails.imageHolder,
         ],
     });
-    const view = el('div', {className: 'layout tagme-layout', children: [sidebar, content]});
+    view.append(sidebar, content, quickTags.element);
 
     nextButton.addEventListener('click', loadRandomImage);
     loadRandomImage();

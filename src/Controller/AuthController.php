@@ -3,13 +3,16 @@ declare(strict_types=1);
 
 namespace SmolCms\Controller;
 
+use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\DTO\SessionUserData;
 use SmolCms\Data\Request\LoginRequest;
 use SmolCms\Data\Request\Request;
+use SmolCms\Data\Request\SetQuickTagsRequest;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Authentication\AuthenticationService;
+use SmolCms\Service\Core\Attribute\Authenticated;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\UserService;
 
@@ -36,6 +39,7 @@ readonly class AuthController
         }
 
         $this->sessionService->startSession();
+        $this->sessionService->setQuickTagsEnabled(false);
         $sessionUserData = new SessionUserData(
             $user->getId(),
             $user->getDisplayName(),
@@ -51,8 +55,20 @@ readonly class AuthController
         $userData = $this->sessionService->getUserData();
 
         return new JsonResponse(
-            ['user' => $userData === null ? null : $this->serializeUser($userData)]
+            [
+                'user' => $userData === null ? null : $this->serializeUser($userData),
+                'quickTagsEnabled' => $userData !== null && $this->sessionService->getQuickTagsEnabled(),
+            ]
         );
+    }
+
+    #[Authenticated(AccessLevel::NOVICE)]
+    public function setQuickTagsAction(SetQuickTagsRequest $request): Response
+    {
+        $enabled = $request->enabled ?? false;
+        $this->sessionService->setQuickTagsEnabled($enabled);
+
+        return new JsonResponse(['quickTagsEnabled' => $this->sessionService->getQuickTagsEnabled()]);
     }
 
     public function logoutAction(Request $request): Response

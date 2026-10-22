@@ -1,4 +1,4 @@
-import {assertEqual, assertTrue, settle} from './assert.js';
+import {assertEqual, assertFalse, assertTrue, settle} from './assert.js';
 import {mockFetch, useFetch} from './mocks.js';
 import {createHomeView} from '../../public/js/views/home.js';
 
@@ -31,6 +31,8 @@ export async function testHomeViewRendersPageTagsAndImageGrid() {
         assertTrue(view.querySelector('.home-toolbar .search-view') !== null, 'home should have a tag search above the layout content');
         assertEqual(view.querySelector('.sidebar .search-view'), null, 'home sidebar should not contain tag search');
         assertTrue(view.querySelector('.sidebar .tags') !== null, 'sidebar tag list should exist');
+        assertEqual(view.querySelector('.quick-tags-sidebar'), null, 'home does not have a quick-tag sidebar');
+        assertFalse(view.classList.contains('layout--with-quick-tags'));
         assertEqual(view.querySelectorAll('.tags .tags-item').length, 2, 'the page tags should replace static tags');
         assertEqual(view.querySelector('.tags-link[data-tag-name="nature"]')?.textContent, 'nature');
         assertEqual(view.querySelector('.tags-link[data-tag-name="sky"]')?.textContent, 'sky');

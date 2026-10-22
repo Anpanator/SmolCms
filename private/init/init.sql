@@ -75,6 +75,17 @@ CREATE TABLE image_tag
     KEY idx_image_tag_tag (tag_id)
 ) ENGINE = InnoDb;
 
+CREATE TABLE user_tag_usage
+(
+    user_id      INT UNSIGNED NOT NULL,
+    tag_id       INT UNSIGNED NOT NULL,
+    usage_count  INT UNSIGNED NOT NULL DEFAULT 0,
+    last_used_at DATETIME     NULL,
+    PRIMARY KEY (user_id, tag_id),
+    KEY idx_user_tag_usage_user_count (user_id, usage_count DESC, tag_id),
+    KEY idx_user_tag_usage_user_recent (user_id, last_used_at DESC, tag_id)
+) ENGINE = InnoDb;
+
 INSERT IGNORE INTO tag (name, category_id)
 SELECT 'tagme', id FROM tag_category WHERE name = 'General';
 

@@ -11,6 +11,7 @@ import {el} from '../dom.js';
 import {clearMessage, createMessageBox, messageForStatus, showMessage} from '../forms.js';
 import {createImageDetails, formatFileSize} from '../imageDetails.js';
 import {createConfirmDialog} from '../modal.js';
+import {createQuickTagsToggle, createQuickTagsView} from '../quickTags.js';
 import {createSearchView, normalizeTags} from '../search.js';
 import {RoutePath} from '../routes.js';
 import {createTagList} from '../tagList.js';
@@ -32,11 +33,19 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
     });
     const status = createMessageBox();
     const imageDetails = createImageDetails({canDownload: Boolean(session.getUser())});
+    let quickTags = null;
     const tagList = createTagList({
         session,
         navigate,
         status,
         onRefresh: () => loadImage(imageId, state, applyImage),
+        onChange: (currentId, tags) => quickTags?.updateImage(currentId, tags),
+    });
+    quickTags = createQuickTagsView({
+        status,
+        navigate,
+        onTagAdded: (tagName) => tagList.addTag(tagName),
+        onTagRemoved: (tagName) => tagList.removeTag(tagName),
     });
 
     let currentImage = null;
@@ -63,11 +72,18 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
         ],
     });
 
+    const page = el('div', {
+        className: 'layout image-layout',
+        attributes: {tabindex: '-1', 'aria-label': 'Image view'},
+    });
+    const quickTagsToggle = createQuickTagsToggle({session, quickTags, layout: page, status, navigate});
+
     const sidebar = el('aside', {
         className: 'sidebar',
         children: [
             el('h2', {className: 'sidebar-title', children: 'Tags'}),
             tagList.element,
+            quickTagsToggle,
             imageDetails.metaSection,
             ...(modActions !== null ? [modActions] : []),
         ],
@@ -77,11 +93,7 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
         children: [status, imageDetails.imageHolder],
     });
     const state = {navigate, imageDetails, tagList, status};
-    const page = el('div', {
-        className: 'layout image-layout',
-        attributes: {tabindex: '-1', 'aria-label': 'Image view'},
-        children: [toolbar, sidebar, content],
-    });
+    page.append(toolbar, sidebar, content, quickTags.element);
 
     page.addEventListener('keydown', handleKeyboard);
     queueMicrotask(() => {

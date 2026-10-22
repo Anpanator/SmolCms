@@ -12,10 +12,12 @@ use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Constant\TagInputLimits;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\Response;
+use PDO;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\AuditLogService;
 use SmolCms\Service\DB\ImageEntityService;
 use SmolCms\Service\Tag\TagService;
+use SmolCms\Service\Tag\UserTagUsageService;
 use SmolCms\TestUtils\Attributes\Autowire;
 use SmolCms\TestUtils\FunctionalTestCase;
 use SmolCms\TestUtils\ImageTestUtils;
@@ -36,6 +38,12 @@ class ImageTagControllerTest extends FunctionalTestCase
 
     #[Autowire]
     private SessionService $sessionService;
+
+    #[Autowire]
+    private UserTagUsageService $userTagUsageService;
+
+    #[Autowire]
+    private PDO $pdo;
 
     public function testAddActionRequiresAuthenticationAppliesOnlyExistingTagsAndAuditsNewAssociations(): void
     {
@@ -65,6 +73,10 @@ class ImageTagControllerTest extends FunctionalTestCase
             json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR),
         );
         self::assertSame([$tagName], $this->tagService->getTagsForImage($image->getId()));
+        $usage = $this->findUserTagUsage($userId, $tagName);
+        self::assertNotNull($usage, 'a newly attached tag should be tracked for the active user');
+        self::assertSame(1, (int)$usage['usage_count']);
+        self::assertNotNull($usage['last_used_at']);
         $entries = $this->auditLogService->getEntries(1, $loginName)['entries'];
         self::assertCount(1, $entries);
         self::assertSame(AuditActionType::TAG_ADDED->value, $entries[0]['actionType']);
@@ -79,6 +91,13 @@ class ImageTagControllerTest extends FunctionalTestCase
             json_decode((string)$reattached->getContent(), true, JSON_THROW_ON_ERROR),
         );
         self::assertCount(1, $this->auditLogService->getEntries(1, $loginName)['entries']);
+        self::assertSame(1, (int)$this->findUserTagUsage($userId, $tagName)['usage_count']);
+
+        $this->simulateImageTagsPost('/api/image/tags', [
+            'imageId' => $image->getId(),
+            'tags' => 'tagme',
+        ]);
+        self::assertNull($this->findUserTagUsage($userId, 'tagme'), 'system tagme usage must not be tracked');
     }
 
     public function testAddActionReturnsBadRequestForInvalidFieldsAndNotFoundForUnknownImage(): void
@@ -210,7 +229,14 @@ class ImageTagControllerTest extends FunctionalTestCase
 
         $image = ImageTestUtils::createImageEntity($this->imageEntityService, $userId);
         $ordinaryTag = 'remove-' . bin2hex(random_bytes(4));
-        $this->tagService->attachTagToImage($image->getId(), $ordinaryTag);
+        $this->tagService->createTag($ordinaryTag);
+        $this->simulateImageTagsPost('/api/image/tags', [
+            'imageId' => $image->getId(),
+            'tags' => $ordinaryTag,
+        ]);
+        $usageBeforeRemoval = $this->findUserTagUsage($userId, $ordinaryTag);
+        self::assertNotNull($usageBeforeRemoval);
+        self::assertSame(1, (int)$usageBeforeRemoval['usage_count']);
         $removed = $this->simulateImageTagsPost('/api/image/tags/remove', [
             'imageId' => $image->getId(),
             'tag' => ' ' . mb_strtoupper($ordinaryTag, 'UTF-8') . ' ',
@@ -218,11 +244,19 @@ class ImageTagControllerTest extends FunctionalTestCase
         self::assertSame(HttpStatus::NO_CONTENT, $removed->getStatus());
         self::assertNull($removed->getContent());
         self::assertSame([], $this->tagService->getTagsForImage($image->getId()));
+        $usageAfterRemoval = $this->findUserTagUsage($userId, $ordinaryTag);
+        self::assertNotNull($usageAfterRemoval);
+        self::assertSame(0, (int)$usageAfterRemoval['usage_count']);
+        self::assertSame($usageBeforeRemoval['last_used_at'], $usageAfterRemoval['last_used_at']);
 
         $entries = $this->auditLogService->getEntries(1, $loginName)['entries'];
-        self::assertCount(1, $entries);
-        self::assertSame(AuditActionType::TAG_REMOVED->value, $entries[0]['actionType']);
-        self::assertSame("image_id={$image->getId()};tag=$ordinaryTag", $entries[0]['context']);
+        self::assertCount(2, $entries);
+        $removedEntry = array_values(array_filter(
+            $entries,
+            static fn(array $entry): bool => $entry['actionType'] === AuditActionType::TAG_REMOVED->value,
+        ))[0] ?? null;
+        self::assertNotNull($removedEntry);
+        self::assertSame("image_id={$image->getId()};tag=$ordinaryTag", $removedEntry['context']);
 
         self::assertSame(
             HttpStatus::NOT_FOUND,
@@ -275,7 +309,21 @@ class ImageTagControllerTest extends FunctionalTestCase
         ]);
         self::assertSame(HttpStatus::NO_CONTENT, $allowed->getStatus());
         self::assertSame(10, $this->tagService->countTagsForImage($allowedImage->getId()));
-        self::assertSame(2, count($this->auditLogService->getEntries(1, $loginName)['entries']));
+        self::assertNull($this->findUserTagUsage($userId, 'tagme'));
+    }
+
+    /** @return array{usage_count: int|string, last_used_at: string|null}|null */
+    private function findUserTagUsage(int $userId, string $tagName): ?array
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT user_usage.usage_count, user_usage.last_used_at '
+            . 'FROM user_tag_usage AS user_usage '
+            . 'INNER JOIN tag ON tag.id = user_usage.tag_id '
+            . 'WHERE user_usage.user_id = :user_id AND tag.name = :tag_name COLLATE NOCASE'
+        );
+        $statement->execute(['user_id' => $userId, 'tag_name' => $tagName]);
+        $usage = $statement->fetch(PDO::FETCH_ASSOC);
+        return is_array($usage) ? $usage : null;
     }
 
     private function simulateImageTagsPost(string $path, array $postParams): Response

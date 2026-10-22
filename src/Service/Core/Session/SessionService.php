@@ -20,6 +20,7 @@ class SessionService
         'use_only_cookies' => true,
     ];
     private const string KEY_USER = 'user';
+    private const string KEY_QUICK_TAGS_ENABLED = 'quickTagsEnabled';
 
     private ?Closure $cookieEmitter = null;
 
@@ -84,6 +85,16 @@ class SessionService
     public function getUserData(): ?SessionUserData
     {
         return $_SESSION[self::KEY_USER] ?? null;
+    }
+
+    public function setQuickTagsEnabled(bool $enabled): void
+    {
+        $_SESSION[self::KEY_QUICK_TAGS_ENABLED] = $enabled;
+    }
+
+    public function getQuickTagsEnabled(): bool
+    {
+        return ($_SESSION[self::KEY_QUICK_TAGS_ENABLED] ?? false) === true;
     }
 
     public function destroySession(): void

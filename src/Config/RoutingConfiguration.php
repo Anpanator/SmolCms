@@ -66,6 +66,12 @@ class RoutingConfiguration
                 controller: AuthController::class,
                 handler: 'getSessionAction'
             ),
+            RouteEnum::API_SESSION_QUICK_TAGS->name => new Route(
+                path: RouteEnum::API_SESSION_QUICK_TAGS->value,
+                method: HttpMethod::POST,
+                controller: AuthController::class,
+                handler: 'setQuickTagsAction',
+            ),
             'LoginPostRoute' => new Route(
                 path: RouteEnum::LOGIN->value,
                 method: HttpMethod::POST,
@@ -161,6 +167,12 @@ class RoutingConfiguration
                 method: HttpMethod::GET,
                 controller: TagApiController::class,
                 handler: 'getListAction',
+            ),
+            RouteEnum::API_TAGS_QUICK->name => new Route(
+                path: RouteEnum::API_TAGS_QUICK->value,
+                method: HttpMethod::GET,
+                controller: TagApiController::class,
+                handler: 'getQuickTagsAction',
             ),
             'ApiTagsPostRoute' => new Route(
                 path: RouteEnum::API_TAGS->value,

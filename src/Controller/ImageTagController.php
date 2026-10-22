@@ -20,6 +20,7 @@ use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\AuditLogService;
 use SmolCms\Service\Image\ImageAccessPolicy;
 use SmolCms\Service\Tag\TagService;
+use SmolCms\Service\Tag\UserTagUsageService;
 
 readonly class ImageTagController
 {
@@ -28,6 +29,7 @@ readonly class ImageTagController
         private ImageAccessPolicy $imageAccessPolicy,
         private AuditLogService $auditLogService,
         private SessionService $sessionService,
+        private UserTagUsageService $userTagUsageService,
     )
     {
     }
@@ -54,6 +56,7 @@ readonly class ImageTagController
 
         $result = $this->tagService->addTagsToImageWithChanges($imageId, $tagNames);
         foreach ($result['newlyAttached'] as $tagName) {
+            $this->userTagUsageService->recordTagAdded($user->id, $tagName);
             $this->auditLogService->record(
                 $user->id,
                 AuditActionType::TAG_ADDED,
@@ -101,6 +104,7 @@ readonly class ImageTagController
             AuditActionType::TAG_REMOVED,
             "image_id=$imageId;tag=$normalizedTagName",
         );
+        $this->userTagUsageService->recordTagRemoved($user->id, $normalizedTagName);
 
         return new JsonResponse(status: HttpStatus::NO_CONTENT);
     }

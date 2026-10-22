@@ -189,7 +189,10 @@ class AuthControllerTest extends FunctionalTestCase
 
         $this->assertEquals(HttpStatus::OK, $response->getStatus());
         $this->assertSame(HttpContentType::JSON->value, $response->getHeaders()[HttpHeader::CONTENT_TYPE->value]);
-        $this->assertSame(['user' => null], json_decode((string)$response->getContent(), true));
+        $this->assertSame(
+            ['user' => null, 'quickTagsEnabled' => false],
+            json_decode((string)$response->getContent(), true),
+        );
     }
 
     public function testGetSessionAction_ReturnsUserDataWhenLoggedIn(): void
@@ -214,9 +217,85 @@ class AuthControllerTest extends FunctionalTestCase
                     'displayName' => 'Session User',
                     'accessLevel' => AccessLevel::NOVICE->value,
                 ],
+                'quickTagsEnabled' => false,
             ],
             json_decode((string)$response->getContent(), true)
         );
+    }
+
+    public function testQuickTagsToggleRequiresLoginPersistsWithinSessionAndResetsAfterLogout(): void
+    {
+        $anonymous = $this->simulateRequest(new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: '/api/session/quick-tags'),
+            method: HttpMethod::POST,
+            postParams: ['enabled' => true],
+        ));
+        self::assertSame(HttpStatus::UNAUTHORIZED, $anonymous->getStatus());
+
+        $loginName = 'quick-tags-session-' . bin2hex(random_bytes(4));
+        $this->loginUser($loginName, 'Quick Tags User');
+        self::assertFalse($this->sessionService->getQuickTagsEnabled());
+
+        $enabled = $this->simulateRequest(new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: '/api/session/quick-tags'),
+            method: HttpMethod::POST,
+            postParams: ['enabled' => true],
+        ));
+        self::assertSame(HttpStatus::OK, $enabled->getStatus());
+        self::assertSame(
+            ['quickTagsEnabled' => true],
+            json_decode((string)$enabled->getContent(), true, JSON_THROW_ON_ERROR),
+        );
+
+        $session = $this->simulateRequest(new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: '/api/session'),
+            method: HttpMethod::GET,
+        ));
+        self::assertSame(true, json_decode((string)$session->getContent(), true, JSON_THROW_ON_ERROR)['quickTagsEnabled']);
+        self::assertTrue($this->sessionService->getQuickTagsEnabled());
+
+        $disabled = $this->simulateRequest(new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: '/api/session/quick-tags'),
+            method: HttpMethod::POST,
+            postParams: ['enabled' => false],
+        ));
+        self::assertSame(
+            ['quickTagsEnabled' => false],
+            json_decode((string)$disabled->getContent(), true, JSON_THROW_ON_ERROR),
+        );
+
+        $enabledAgain = $this->simulateRequest(new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: '/api/session/quick-tags'),
+            method: HttpMethod::POST,
+            postParams: ['enabled' => true],
+        ));
+        self::assertSame(HttpStatus::OK, $enabledAgain->getStatus());
+        $this->simulateRequest(new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: '/logout'),
+            method: HttpMethod::POST,
+        ));
+        self::assertFalse($this->sessionService->getQuickTagsEnabled());
+
+        $this->loginUser($loginName, 'Quick Tags User');
+        $newSession = $this->simulateRequest(new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: '/api/session'),
+            method: HttpMethod::GET,
+        ));
+        self::assertSame(false, json_decode((string)$newSession->getContent(), true, JSON_THROW_ON_ERROR)['quickTagsEnabled']);
+    }
+
+    public function testQuickTagsToggleRejectsMissingOrNonBooleanEnabledValue(): void
+    {
+        $this->loginUser('quick-tags-invalid-' . bin2hex(random_bytes(4)), 'Quick Tags Invalid');
+
+        foreach ([null, ['enabled' => null], ['enabled' => 'true'], ['enabled' => 1]] as $params) {
+            $response = $this->simulateRequest(new Request(
+                url: new Url(protocol: 'https', host: 'localhost', path: '/api/session/quick-tags'),
+                method: HttpMethod::POST,
+                postParams: $params,
+            ));
+            self::assertSame(HttpStatus::BAD_REQUEST, $response->getStatus());
+        }
     }
 
     public function testLogoutAction_ReturnsNoContentAndDestroysSession(): void

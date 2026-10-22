@@ -33,6 +33,26 @@ export function testLoggedInTagListRendersSortedEditableTags(fixture) {
     assertTrue(!list.element.querySelector('.tag-add-submit').disabled, 'the Add button should be enabled after an image is set');
 }
 
+export function testTagListExposesLocalTagUpdatesForQuickTagControls() {
+    const changes = [];
+    const list = createTagList({
+        session: {getUser: () => testUser()},
+        onChange: (imageId, tags) => changes.push({imageId, tags}),
+    });
+    list.update({id: 7, tags: ['sky', 'nature']});
+
+    assertEqual(list.getTags().join('|'), 'nature|sky');
+    list.addTag('clouds');
+    assertEqual(list.getTags().join('|'), 'clouds|nature|sky');
+    assertEqual(list.element.querySelectorAll('.tags-item').length, 3);
+
+    list.removeTag('nature');
+    assertEqual(list.getTags().join('|'), 'clouds|sky');
+    assertEqual(list.element.querySelectorAll('.tags-item').length, 2);
+    assertEqual(changes.at(-1).imageId, 7);
+    assertEqual(changes.at(-1).tags.join('|'), 'clouds|sky');
+}
+
 export async function testRemovingTagUsesTheSharedConfirmationDialog(fixture) {
     const fetchMock = mockFetch((url, options) => {
         if (url === '/api/image/tags/remove' && options.method === 'POST') {

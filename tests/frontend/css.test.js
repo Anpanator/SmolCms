@@ -276,13 +276,31 @@ export function testSearchInputAndPaginationStylesAreAvailable() {
 
 export function testTagManagementTableAndFormsHaveStyles() {
     const rules = collectRules(findMainStylesheet());
-    assertTrue(findRule(rules, '.tags-page', 'grid-template-columns') !== undefined, 'the tag page should use a single-column layout');
+    const tagsWorkspaceRule = findRule(rules, '.internal-admin-workspace', 'grid-template-columns');
+    assertTrue(tagsWorkspaceRule !== undefined, 'the tag page should use the internal admin workspace split');
+    assertTrue(tagsWorkspaceRule.text.includes('3fr') && tagsWorkspaceRule.text.includes('1fr'));
     assertTrue(findRule(rules, '.data-table', 'border-collapse:collapse') !== undefined, 'shared data tables should use collapsed borders');
     assertTrue(findRule(rules, '.data-table th', 'border-bottom') !== undefined, 'shared table headings and rows should be separated');
     assertTrue(findRule(rules, '.data-table-wrap', 'overflow-x:auto') !== undefined, 'shared table wrappers should scroll horizontally');
     assertTrue(findRule(rules, '.data-table-status td', 'text-align:center') !== undefined, 'shared status rows should be centered');
-    assertTrue(findRule(rules, '.tags-management', 'grid-template-columns') !== undefined, 'tag creation forms should have a responsive layout');
+    assertTrue(findRule(rules, '.tags-search-panel', 'display:flex') !== undefined, 'tag search should have a dedicated sidebar panel');
     assertTrue(findRule(rules, '.tags-form-panel', 'min-width:0') !== undefined, 'form panels should be allowed to shrink');
+}
+
+export function testGalleryWidthAndQuickTagsLayoutStylesExist() {
+    const rules = collectRules(findMainStylesheet());
+    assertTrue(
+        findRule(rules, '.view-container:has(> .home-layout)', 'max-width:var(--gallery-max-width)') !== undefined,
+        'home, image, and tagme pages should receive the wider content cap',
+    );
+    const quickLayout = findRule(rules, '.layout--with-quick-tags', 'grid-template-columns');
+    assertTrue(quickLayout?.text.includes('var(--sidebar-width)'));
+    assertTrue(quickLayout?.text.includes('var(--quick-tags-sidebar-width)'));
+    assertTrue(findRule(rules, '.quick-tags-columns', 'grid-template-columns') !== undefined);
+    const buttonRule = findRule(rules, '.quick-tag-button', 'text-overflow:ellipsis');
+    assertTrue(buttonRule?.text.includes('overflow:hidden'), 'quick-tag names should not overflow their buttons');
+    assertTrue(findRule(rules, '.quick-tag-button--active', 'background:var(--color-accent)') !== undefined);
+    assertTrue(findRule(rules, '.quick-tags-sidebar[hidden]', 'display:none') !== undefined);
 }
 
 export function testImageTagEditingAndTagmeControlsHaveStyles() {
