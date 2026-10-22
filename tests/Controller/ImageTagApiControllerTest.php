@@ -106,7 +106,7 @@ class ImageTagApiControllerTest extends FunctionalTestCase
         $oldest = null;
         $baseDate = new DateTime('2026-10-05 00:00:00');
 
-        for ($index = 0; $index < 29; $index++) {
+        for ($index = 0; $index < 25; $index++) {
             $date = (clone $baseDate)->modify('+' . $index . ' minutes');
             $image = $this->createAcceptedImage($date->format('Y-m-d H:i:s'));
             if ($index === 0) {
@@ -125,16 +125,16 @@ class ImageTagApiControllerTest extends FunctionalTestCase
         $firstPage = json_decode((string)$firstPageResponse->getContent(), true, JSON_THROW_ON_ERROR);
         self::assertSame(HttpStatus::OK, $firstPageResponse->getStatus());
         self::assertSame(1, $firstPage['page']);
-        self::assertSame(28, $firstPage['perPage']);
-        self::assertSame(29, $firstPage['total']);
-        self::assertCount(28, $firstPage['images']);
+        self::assertSame(24, $firstPage['perPage']);
+        self::assertSame(25, $firstPage['total']);
+        self::assertCount(24, $firstPage['images']);
         self::assertNotNull($oldest);
         self::assertNotContains($oldest->getId(), array_column($firstPage['images'], 'id'));
         self::assertSame(
             [
-                ['name' => $alpha, 'imageCount' => 28],
-                ['name' => $beta, 'imageCount' => 28],
-                ['name' => $marker, 'imageCount' => 28],
+                ['name' => $alpha, 'imageCount' => 24],
+                ['name' => $beta, 'imageCount' => 24],
+                ['name' => $marker, 'imageCount' => 24],
             ],
             $firstPage['tags']
         );
@@ -142,7 +142,7 @@ class ImageTagApiControllerTest extends FunctionalTestCase
         $secondPageResponse = $this->simulateImageList(['page' => '2', 'tags' => $marker]);
         $secondPage = json_decode((string)$secondPageResponse->getContent(), true, JSON_THROW_ON_ERROR);
         self::assertSame(2, $secondPage['page']);
-        self::assertSame(29, $secondPage['total']);
+        self::assertSame(25, $secondPage['total']);
         self::assertSame([$oldest->getId()], array_column($secondPage['images'], 'id'));
         self::assertSame(
             [

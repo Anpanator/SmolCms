@@ -18,7 +18,7 @@ use SmolCms\Service\Tag\TagService;
 readonly class ImageQueryService
 {
     private const UPLOAD_DATE_FORMAT = 'Y-m-d H:i:s';
-    private const int IMAGES_PER_PAGE = 28;
+    private const int IMAGES_PER_PAGE = 24;
 
     public function __construct(
         private ImageEntityService $imageEntityService,

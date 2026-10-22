@@ -38,7 +38,6 @@
     --shadow-strong: 0 4px 12px rgb(0 0 0 / 18%);
     --sidebar-width: 12rem;
     --quick-tags-sidebar-width: 18rem;
-    --tile-min: 11rem;
     --max-width: 75rem;
     --gallery-max-width: 100rem;
 }
@@ -466,7 +465,7 @@ h3 {
 
 .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(var(--tile-min), 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: var(--space-4);
 }
 

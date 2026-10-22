@@ -8,7 +8,7 @@ const IMAGES = {
         { id: 3, thumbSrc: '/public/img/thumb/cd/cd1234.avif', status: 'accepted' },
     ],
     page: 1,
-    perPage: 25,
+    perPage: 24,
     total: 27,
     tags: [
         { name: 'nature', imageCount: 2 },
@@ -155,7 +155,7 @@ export function testHomeGridShowsLoadingStateFirst() {
 
 export async function testHomeGridShowsEmptyStateAndNoTags() {
     const { view, restore } = await createLoadedView(
-        () => ({ status: 200, body: { images: [], page: 1, perPage: 25, total: 0, tags: [] } }),
+        () => ({ status: 200, body: { images: [], page: 1, perPage: 24, total: 0, tags: [] } }),
         'tags=missing',
     );
     try {
@@ -192,7 +192,7 @@ export async function testHomeTileWithoutThumbShowsPlaceholder() {
         () => ({ status: 200, body: {
             images: [{ id: 9, thumbSrc: null }],
             page: 1,
-            perPage: 25,
+            perPage: 24,
             total: 1,
             tags: [],
         } }),
@@ -216,7 +216,7 @@ export async function testPendingReviewTilesGetUnapprovedClass() {
                 {id: 10, thumbSrc: '/public/img/thumb/cd/cd1234.avif', status: 'accepted'},
             ],
             page: 1,
-            perPage: 25,
+            perPage: 24,
             total: 2,
             tags: [],
         }}),

@@ -69,7 +69,7 @@ class ImageQueryServiceTest extends FunctionalTestCase
             $result['images'],
         );
         self::assertSame(1, $result['page']);
-        self::assertSame(28, $result['perPage']);
+        self::assertSame(24, $result['perPage']);
         self::assertSame(2, $result['total']);
         self::assertSame([['name' => $tagName, 'imageCount' => 2]], $result['tags']);
     }
