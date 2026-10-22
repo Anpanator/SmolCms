@@ -5,9 +5,10 @@ import {createProfileView} from '../../public/js/views/profile.js';
 
 async function createLoggedInSession(
     user = testUser(),
-    profileResponse = {status: 200, body: {approvedTagSuggestions: 3, recentUploads: []}},
+    profileResponse = {status: 200, body: {approvedTagSuggestions: 3, recentUploads: [], hasApiKey: false}},
+    apiKeyResponses = {},
 ) {
-    const fetchMock = mockFetch((url) => {
+    const fetchMock = mockFetch((url, options) => {
         if (url === '/api/session') {
             return sessionResponse(user);
         }
@@ -15,7 +16,10 @@ async function createLoggedInSession(
             return profileResponse;
         }
         if (url === '/api/profile/api-key') {
-            return {status: 201, body: {apiKey: 'generated-secret-key'}};
+            return apiKeyResponses[options.method]
+                ?? (options.method === 'DELETE'
+                    ? {status: 204, body: null}
+                    : {status: 201, body: {apiKey: 'generated-secret-key'}});
         }
         throw new Error(`unexpected fetch of ${url}`);
     });
@@ -58,6 +62,7 @@ export async function testProfileApiKeySectionIsLimitedToWizardAndAbove() {
     const {session, restore} = await createLoggedInSession(testUser({accessLevel: 400}));
     try {
         const view = createProfileView({session, navigate: () => {}});
+        await settle();
         const section = view.querySelector('.profile-api-key');
         assertTrue(section !== null, 'WIZARD users should see the API key section');
         assertEqual(section.querySelector('h2')?.textContent, 'API key');
@@ -66,7 +71,10 @@ export async function testProfileApiKeySectionIsLimitedToWizardAndAbove() {
                 && section.textContent.includes('endpoints enabled for API keys'),
             'the section should explain one-time display and API access',
         );
-        assertTrue(section.querySelector('button') !== null, 'WIZARD users should be able to generate a key');
+        assertTrue(
+            section.querySelector('.profile-api-key-generate-button') !== null,
+            'WIZARD users should be able to generate a key',
+        );
     } finally {
         restore();
     }
@@ -80,11 +88,48 @@ export async function testProfileApiKeySectionIsLimitedToWizardAndAbove() {
     }
 }
 
+export async function testProfileApiKeyControlsShowRotateAndDeleteWhenKeyExists() {
+    const profileResponse = {
+        status: 200,
+        body: {approvedTagSuggestions: 3, recentUploads: [], hasApiKey: true},
+    };
+    const {session, restore} = await createLoggedInSession(testUser({accessLevel: 400}), profileResponse);
+    try {
+        const view = createProfileView({session, navigate: () => {}});
+        await settle();
+
+        const generateButton = view.querySelector('.profile-api-key-generate-button');
+        const deleteButton = view.querySelector('.profile-api-key-delete-button');
+        assertEqual(generateButton?.textContent, 'Rotate API key');
+        assertTrue(deleteButton !== null && !deleteButton.hidden, 'users with a key should see its delete button');
+        assertTrue(deleteButton?.classList.contains('button--danger'), 'the delete button should use the danger style');
+    } finally {
+        restore();
+    }
+}
+
+export async function testProfileApiKeyControlsShowGenerateWithoutDeleteWhenNoKeyExists() {
+    const {session, restore} = await createLoggedInSession(testUser({accessLevel: 400}));
+    try {
+        const view = createProfileView({session, navigate: () => {}});
+        await settle();
+
+        assertEqual(view.querySelector('.profile-api-key-generate-button')?.textContent, 'Generate API key');
+        assertTrue(
+            view.querySelector('.profile-api-key-delete-button')?.hidden,
+            'users without a key should not see the delete button',
+        );
+    } finally {
+        restore();
+    }
+}
+
 export async function testProfileGeneratesAndShowsApiKeyOnce() {
     const {session, fetchMock, restore} = await createLoggedInSession(testUser({accessLevel: 400}));
     try {
         const view = createProfileView({session, navigate: () => {}});
-        const button = view.querySelector('.profile-api-key button');
+        await settle();
+        const button = view.querySelector('.profile-api-key-generate-button');
         button.click();
         await settle();
 
@@ -98,10 +143,118 @@ export async function testProfileGeneratesAndShowsApiKeyOnce() {
             'the generated key should be shown after success',
         );
         assertEqual(view.querySelector('.profile-api-key-output')?.hidden, false);
+        assertEqual(button.textContent, 'Rotate API key', 'generating a key should switch to the rotate label');
+        assertTrue(
+            !view.querySelector('.profile-api-key-delete-button')?.hidden,
+            'generating a key should reveal the delete button',
+        );
         assertTrue(
             view.querySelector('.profile-api-key .form-message')?.textContent.includes('only be shown once'),
             'the result should remind the user the key is shown once',
         );
+    } finally {
+        restore();
+    }
+}
+
+export async function testProfileDeleteApiKeyConfirmsAndResetsTheKeyControls() {
+    const profileResponse = {
+        status: 200,
+        body: {approvedTagSuggestions: 3, recentUploads: [], hasApiKey: true},
+    };
+    const {session, fetchMock, restore} = await createLoggedInSession(
+        testUser({accessLevel: 400}),
+        profileResponse,
+    );
+    try {
+        const view = createProfileView({session, navigate: () => {}});
+        await settle();
+
+        const generateButton = view.querySelector('.profile-api-key-generate-button');
+        generateButton.click();
+        await settle();
+        assertEqual(view.querySelector('.profile-api-key-value')?.textContent, 'generated-secret-key');
+        assertEqual(view.querySelector('.profile-api-key-output')?.hidden, false);
+        assertEqual(generateButton.textContent, 'Rotate API key', 'generating another key should keep the rotate label');
+
+        const deleteButton = view.querySelector('.profile-api-key-delete-button');
+        deleteButton.click();
+        const dialog = document.querySelector('.modal-backdrop');
+        assertTrue(dialog !== null, 'deleting a key should ask for confirmation');
+        assertTrue(
+            dialog.querySelector('.modal-message')?.textContent.includes('no longer be able to authenticate'),
+            'the confirmation should warn that deletion revokes API access',
+        );
+        assertTrue(
+            !fetchMock.calls.some((call) => call.url === '/api/profile/api-key' && call.options.method === 'DELETE'),
+            'the delete request should wait for confirmation',
+        );
+
+        dialog.querySelector('.modal-actions .button--primary').click();
+        await settle();
+
+        const deleteRequest = fetchMock.calls.find(
+            (call) => call.url === '/api/profile/api-key' && call.options.method === 'DELETE',
+        );
+        assertTrue(deleteRequest !== undefined, 'confirmation should send a DELETE request');
+        assertEqual(view.querySelector('.profile-api-key-generate-button')?.textContent, 'Generate API key');
+        assertTrue(view.querySelector('.profile-api-key-delete-button')?.hidden);
+        assertEqual(view.querySelector('.profile-api-key-output')?.hidden, true);
+        assertEqual(view.querySelector('.profile-api-key-value')?.textContent, '');
+        assertEqual(view.querySelector('.profile-api-key .form-message')?.textContent, 'API key deleted.');
+    } finally {
+        restore();
+    }
+}
+
+export async function testProfileDeleteApiKeyTreatsNotFoundAsNoKey() {
+    const profileResponse = {
+        status: 200,
+        body: {approvedTagSuggestions: 3, recentUploads: [], hasApiKey: true},
+    };
+    const {session, restore} = await createLoggedInSession(
+        testUser({accessLevel: 400}),
+        profileResponse,
+        {DELETE: {status: 404, body: null}},
+    );
+    try {
+        const view = createProfileView({session, navigate: () => {}});
+        await settle();
+
+        view.querySelector('.profile-api-key-delete-button').click();
+        document.querySelector('.modal-backdrop .modal-actions .button--primary').click();
+        await settle();
+
+        assertEqual(view.querySelector('.profile-api-key-generate-button')?.textContent, 'Generate API key');
+        assertTrue(view.querySelector('.profile-api-key-delete-button')?.hidden);
+        assertEqual(view.querySelector('.profile-api-key-output')?.hidden, true);
+    } finally {
+        restore();
+    }
+}
+
+export async function testUnauthorizedApiKeyDeletionNavigatesToLogin() {
+    const profileResponse = {
+        status: 200,
+        body: {approvedTagSuggestions: 3, recentUploads: [], hasApiKey: true},
+    };
+    const {session, restore} = await createLoggedInSession(
+        testUser({accessLevel: 400}),
+        profileResponse,
+        {DELETE: {status: 401, body: null}},
+    );
+    try {
+        const navigateCalls = [];
+        const view = createProfileView({session, navigate: (path) => navigateCalls.push(path)});
+        await settle();
+
+        view.querySelector('.profile-api-key-delete-button').click();
+        document.querySelector('.modal-backdrop .modal-actions .button--primary').click();
+        await settle();
+
+        assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/login']));
+        assertEqual(view.querySelector('.profile-api-key-generate-button')?.textContent, 'Rotate API key');
+        assertTrue(!view.querySelector('.profile-api-key-delete-button')?.hidden);
     } finally {
         restore();
     }

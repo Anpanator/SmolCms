@@ -3,8 +3,9 @@
  * POSTs JSON to /settings. On 401 the user is sent to the login view.
  * Importing this module has no side effects.
  */
-import {get, postJson} from '../api.js';
+import {get, postJson, request} from '../api.js';
 import {el} from '../dom.js';
+import {createConfirmDialog} from '../modal.js';
 import {AccessLevel, accessLevelName, hasAccessLevel} from '../accessLevel.js';
 import {
     clearMessage,
@@ -62,7 +63,7 @@ export function createProfileView({session, navigate}) {
     }
     children.push(form);
     if (apiKeySection !== null) {
-        children.push(apiKeySection);
+        children.push(apiKeySection.element);
     }
     if (recentUploadsSection !== null) {
         children.push(recentUploadsSection.element);
@@ -77,6 +78,9 @@ export function createProfileView({session, navigate}) {
                     ? String(count)
                     : 'Unavailable';
                 renderRecentUploads(recentUploadsSection.grid, data?.recentUploads);
+                if (typeof data?.hasApiKey === 'boolean') {
+                    apiKeySection?.setHasApiKey(data.hasApiKey, true);
+                }
             })
             .catch(() => {
                 approvedTagSuggestionsInput.value = 'Unavailable';
@@ -121,10 +125,27 @@ function createApiKeySection({navigate}) {
         children: key,
     });
     const generateButton = el('button', {
-        className: 'button button--primary',
+        className: 'button button--primary profile-api-key-generate-button',
         attributes: {type: 'button'},
         children: 'Generate API key',
     });
+    const deleteButton = el('button', {
+        className: 'button button--danger profile-api-key-delete-button',
+        attributes: {type: 'button', hidden: 'hidden'},
+        children: 'Delete API key',
+    });
+    let localKeyStateChanged = false;
+
+    function setHasApiKey(hasApiKey, fromProfile = false) {
+        if (fromProfile && localKeyStateChanged) {
+            return;
+        }
+        if (!fromProfile) {
+            localKeyStateChanged = true;
+        }
+        generateButton.textContent = hasApiKey ? 'Rotate API key' : 'Generate API key';
+        deleteButton.hidden = !hasApiKey;
+    }
 
     generateButton.addEventListener('click', async (event) => {
         event.preventDefault();
@@ -140,6 +161,7 @@ function createApiKeySection({navigate}) {
             }
             key.textContent = data.apiKey;
             keyOutput.hidden = false;
+            setHasApiKey(true);
             showMessage(message, 'API key generated. Copy it now; it will only be shown once.', 'success');
         } catch (error) {
             if (isAuthError(error)) {
@@ -152,7 +174,49 @@ function createApiKeySection({navigate}) {
         }
     });
 
-    return el('section', {
+    deleteButton.addEventListener('click', async (event) => {
+        event.preventDefault();
+        if (deleteButton.disabled) {
+            return;
+        }
+        deleteButton.disabled = true;
+        try {
+            const dialog = createConfirmDialog({
+                message: 'Delete your API key? Any application using it will no longer be able to authenticate.',
+                confirmLabel: 'Delete API key',
+                cancelLabel: 'Keep API key',
+            });
+            if (!(await dialog.result)) {
+                return;
+            }
+
+            clearMessage(message);
+            await request(RoutePath.API_PROFILE_API_KEY, {method: 'DELETE'});
+            resetApiKey();
+            showMessage(message, 'API key deleted.', 'success');
+        } catch (error) {
+            if (isAuthError(error)) {
+                navigate('/login');
+                return;
+            }
+            if (error?.status === 404) {
+                resetApiKey();
+                showMessage(message, 'API key deleted.', 'success');
+                return;
+            }
+            showMessage(message, messageForStatus(error?.status ?? 0));
+        } finally {
+            deleteButton.disabled = false;
+        }
+    });
+
+    function resetApiKey() {
+        key.textContent = '';
+        keyOutput.hidden = true;
+        setHasApiKey(false);
+    }
+
+    const element = el('section', {
         className: 'profile-api-key',
         children: [
             el('h2', {className: 'profile-api-key-title', children: 'API key'}),
@@ -161,10 +225,12 @@ function createApiKeySection({navigate}) {
                 children: 'The key is shown only once and grants API access to endpoints enabled for API keys.',
             }),
             generateButton,
+            deleteButton,
             message,
             keyOutput,
         ],
     });
+    return {element, setHasApiKey};
 }
 
 function createReadOnlyField(label, name, value) {

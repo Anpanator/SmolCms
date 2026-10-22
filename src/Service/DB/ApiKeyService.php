@@ -36,6 +36,22 @@ readonly class ApiKeyService
         return $apiKey;
     }
 
+    public function hasForUser(int $userId): bool
+    {
+        $statement = $this->pdo->prepare('SELECT 1 FROM api_key WHERE user_id = :user_id LIMIT 1');
+        $statement->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $statement->execute();
+        return $statement->fetchColumn() !== false;
+    }
+
+    public function deleteForUser(int $userId): bool
+    {
+        $statement = $this->pdo->prepare('DELETE FROM api_key WHERE user_id = :user_id');
+        $statement->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $statement->execute();
+        return $statement->rowCount() > 0;
+    }
+
     public function findUserDataByApiKey(#[SensitiveParameter] string $apiKey): ?SessionUserData
     {
         $statement = $this->pdo->prepare(

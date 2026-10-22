@@ -43,6 +43,7 @@ readonly class ProfileController
         return new JsonResponse([
             'approvedTagSuggestions' => $this->tagApprovalService->countForUser($user->id),
             'recentUploads' => $this->imageQueryService->getRecentUploadsForUser($user->id, self::RECENT_UPLOADS_LIMIT),
+            'hasApiKey' => $this->apiKeyService->hasForUser($user->id),
         ]);
     }
 
@@ -54,6 +55,19 @@ readonly class ProfileController
             return new Response(HttpStatus::UNAUTHORIZED);
         }
         return new JsonResponse(['apiKey' => $this->apiKeyService->generateForUser($user->id)], HttpStatus::CREATED);
+    }
+
+    #[Authenticated(AccessLevel::WIZARD)]
+    public function deleteApiKeyAction(Request $request): Response
+    {
+        $user = $this->sessionService->getUserData();
+        if ($user === null) {
+            return new Response(HttpStatus::UNAUTHORIZED);
+        }
+        if (!$this->apiKeyService->deleteForUser($user->id)) {
+            return new Response(HttpStatus::NOT_FOUND);
+        }
+        return new JsonResponse(status: HttpStatus::NO_CONTENT);
     }
 
     public function getUserAction(Request $request): Response

@@ -70,7 +70,7 @@ class ProfileControllerTest extends FunctionalTestCase
 
         self::assertSame(HttpStatus::OK, $response->getStatus());
         self::assertSame(
-            ['approvedTagSuggestions' => 3, 'recentUploads' => []],
+            ['approvedTagSuggestions' => 3, 'recentUploads' => [], 'hasApiKey' => false],
             json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR),
         );
     }
@@ -99,6 +99,11 @@ class ProfileControllerTest extends FunctionalTestCase
         $firstKey = json_decode((string)$firstResponse->getContent(), true, JSON_THROW_ON_ERROR)['apiKey'];
         self::assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $firstKey);
         self::assertSame($userId, $this->apiKeyService->findUserDataByApiKey($firstKey)?->id);
+        $profile = $this->simulateProfileRequest();
+        self::assertTrue(
+            json_decode((string)$profile->getContent(), true, JSON_THROW_ON_ERROR)['hasApiKey'],
+            'the private profile should report the user’s API-key presence',
+        );
 
         $secondResponse = $this->simulateApiKeyRequest();
         self::assertSame(HttpStatus::CREATED, $secondResponse->getStatus());
@@ -110,6 +115,45 @@ class ProfileControllerTest extends FunctionalTestCase
         $this->sessionService->destroySession();
         $apiKeyRequest = $this->simulateApiKeyRequest(['Authorization' => 'Bearer ' . $secondKey]);
         self::assertSame(HttpStatus::UNAUTHORIZED, $apiKeyRequest->getStatus());
+    }
+
+    public function testApiKeyDeletionRequiresWizardAndReturnsNotFoundWhenAbsent(): void
+    {
+        $unauthorized = $this->simulateApiKeyRequest(method: HttpMethod::DELETE);
+        self::assertSame(HttpStatus::UNAUTHORIZED, $unauthorized->getStatus());
+
+        $this->loginUserWithAccessLevel(
+            'api-key-delete-master-' . bin2hex(random_bytes(5)),
+            'API Key Delete Master',
+            AccessLevel::MASTER,
+        );
+        $forbidden = $this->simulateApiKeyRequest(method: HttpMethod::DELETE);
+        self::assertSame(HttpStatus::FORBIDDEN, $forbidden->getStatus());
+
+        $loginName = 'api-key-delete-wizard-' . bin2hex(random_bytes(5));
+        $this->loginUserWithAccessLevel($loginName, 'API Key Delete Wizard', AccessLevel::WIZARD);
+        $userId = $this->sessionService->getUserData()->id;
+        $keyResponse = $this->simulateApiKeyRequest();
+        self::assertSame(HttpStatus::CREATED, $keyResponse->getStatus());
+        $apiKey = json_decode((string)$keyResponse->getContent(), true, JSON_THROW_ON_ERROR)['apiKey'];
+
+        $this->sessionService->destroySession();
+        $apiKeyAuthenticated = $this->simulateApiKeyRequest(
+            ['Authorization' => 'Bearer ' . $apiKey],
+            HttpMethod::DELETE,
+        );
+        self::assertSame(HttpStatus::UNAUTHORIZED, $apiKeyAuthenticated->getStatus());
+
+        $this->loginUserWithAccessLevel($loginName, 'API Key Delete Wizard', AccessLevel::WIZARD);
+        $deleted = $this->simulateApiKeyRequest(method: HttpMethod::DELETE);
+        self::assertSame(HttpStatus::NO_CONTENT, $deleted->getStatus());
+        self::assertNull($deleted->getContent());
+        self::assertNull($this->apiKeyService->findUserDataByApiKey($apiKey));
+
+        $notFound = $this->simulateApiKeyRequest(method: HttpMethod::DELETE);
+        self::assertSame(HttpStatus::NOT_FOUND, $notFound->getStatus());
+        self::assertNull($notFound->getContent());
+        self::assertSame($userId, $this->sessionService->getUserData()->id);
     }
 
     public function testProfileReturnsOnlyTheUsersFifteenMostRecentProcessedUploads(): void
@@ -443,11 +487,14 @@ class ProfileControllerTest extends FunctionalTestCase
         self::assertSame([], $this->getUserProfileBody($targetId)['modActions']);
     }
 
-    private function simulateApiKeyRequest(array $headers = []): \SmolCms\Data\Response\Response
+    private function simulateApiKeyRequest(
+        array $headers = [],
+        HttpMethod $method = HttpMethod::POST,
+    ): \SmolCms\Data\Response\Response
     {
         return $this->simulateRequest(new Request(
             url: new Url(protocol: 'https', host: 'localhost', path: RouteEnum::API_PROFILE_API_KEY->value),
-            method: HttpMethod::POST,
+            method: $method,
             headers: $headers,
             postParams: [],
         ));

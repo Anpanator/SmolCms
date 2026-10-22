@@ -62,6 +62,43 @@ class ApiKeyServiceTest extends FunctionalTestCase
         self::assertSame(1, (int)$count);
     }
 
+    public function testHasForUserReflectsWhetherTheUserHasAnApiKey(): void
+    {
+        $user = $this->createUser('api-key-presence-' . bin2hex(random_bytes(4)), 'API Key Presence User');
+        $otherUser = $this->createUser('api-key-presence-other-' . bin2hex(random_bytes(4)), 'Other API Key User');
+        $userId = $user->getId();
+        $otherUserId = $otherUser->getId();
+
+        self::assertFalse($this->apiKeyService->hasForUser($userId));
+        self::assertFalse($this->apiKeyService->hasForUser($otherUserId));
+
+        $this->apiKeyService->generateForUser($userId);
+
+        self::assertTrue($this->apiKeyService->hasForUser($userId));
+        self::assertFalse($this->apiKeyService->hasForUser($otherUserId));
+    }
+
+    public function testDeleteForUserRemovesOnlyThatUsersKeyAndAllowsRegeneration(): void
+    {
+        $user = $this->createUser('api-key-delete-' . bin2hex(random_bytes(4)), 'API Key Delete User');
+        $otherUser = $this->createUser('api-key-delete-other-' . bin2hex(random_bytes(4)), 'Other API Key User');
+        $userId = $user->getId();
+        $otherUserId = $otherUser->getId();
+        $apiKey = $this->apiKeyService->generateForUser($userId);
+        $otherApiKey = $this->apiKeyService->generateForUser($otherUserId);
+
+        self::assertTrue($this->apiKeyService->deleteForUser($userId));
+        self::assertFalse($this->apiKeyService->hasForUser($userId));
+        self::assertNull($this->apiKeyService->findUserDataByApiKey($apiKey));
+        self::assertTrue($this->apiKeyService->hasForUser($otherUserId));
+        self::assertSame($otherUserId, $this->apiKeyService->findUserDataByApiKey($otherApiKey)?->id);
+        self::assertFalse($this->apiKeyService->deleteForUser($userId));
+
+        $replacementKey = $this->apiKeyService->generateForUser($userId);
+        self::assertTrue($this->apiKeyService->hasForUser($userId));
+        self::assertSame($userId, $this->apiKeyService->findUserDataByApiKey($replacementKey)?->id);
+    }
+
     public function testLookupReturnsNullForUnknownKey(): void
     {
         self::assertNull($this->apiKeyService->findUserDataByApiKey(str_repeat('0', 64)));

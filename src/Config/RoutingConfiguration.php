@@ -300,6 +300,12 @@ class RoutingConfiguration
                 controller: ProfileController::class,
                 handler: 'generateApiKeyAction',
             ),
+            'ApiProfileApiKeyDeleteRoute' => new Route(
+                path: RouteEnum::API_PROFILE_API_KEY->value,
+                method: HttpMethod::DELETE,
+                controller: ProfileController::class,
+                handler: 'deleteApiKeyAction',
+            ),
             RouteEnum::API_USER_PROFILE->name => new Route(
                 path: RouteEnum::API_USER_PROFILE->value,
                 method: HttpMethod::GET,
