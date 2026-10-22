@@ -182,11 +182,11 @@ export function testLayoutAndGridUseCssGrid() {
         content.append(grid);
         assertEqual(getComputedStyle(grid).display, 'grid', '.grid should be a CSS grid');
 
-        // six equal columns declared in the stylesheet, filling the content width
+        // five equal columns declared in the stylesheet, filling the content width
         const rules = collectRules(findMainStylesheet());
-        const gridRule = findRule(rules, '.grid', 'grid-template-columns:repeat(6,minmax(0');
-        assertTrue(gridRule !== undefined, '.grid should use six equal columns');
-        assertEqual(getComputedStyle(grid).gridTemplateColumns.split(' ').length, 6, '.grid should render six columns');
+        const gridRule = findRule(rules, '.grid', 'grid-template-columns:repeat(5,minmax(0');
+        assertTrue(gridRule !== undefined, '.grid should use five equal columns');
+        assertEqual(getComputedStyle(grid).gridTemplateColumns.split(' ').length, 5, '.grid should render five columns');
     } finally {
         layout.remove();
     }

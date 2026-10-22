@@ -8,7 +8,7 @@ const IMAGES = {
         { id: 3, thumbSrc: '/public/img/thumb/cd/cd1234.avif', status: 'accepted' },
     ],
     page: 1,
-    perPage: 24,
+    perPage: 15,
     total: 27,
     tags: [
         { name: 'nature', imageCount: 2 },
@@ -114,7 +114,7 @@ export async function testHomeTagLinksToggleIndividualFilters() {
 export async function testHomePaginationUsesUrlStateAndKeepsTagFilter() {
     const navigation = [];
     const { view, fetchMock, restore } = await createLoadedView(
-        () => ({ status: 200, body: { ...IMAGES, page: 2, total: 51 } }),
+        () => ({ status: 200, body: { ...IMAGES, page: 2, total: 45 } }),
         'page=2&tags=nature',
         (path) => navigation.push(path),
     );
@@ -155,7 +155,7 @@ export function testHomeGridShowsLoadingStateFirst() {
 
 export async function testHomeGridShowsEmptyStateAndNoTags() {
     const { view, restore } = await createLoadedView(
-        () => ({ status: 200, body: { images: [], page: 1, perPage: 24, total: 0, tags: [] } }),
+        () => ({ status: 200, body: { images: [], page: 1, perPage: 15, total: 0, tags: [] } }),
         'tags=missing',
     );
     try {
@@ -192,7 +192,7 @@ export async function testHomeTileWithoutThumbShowsPlaceholder() {
         () => ({ status: 200, body: {
             images: [{ id: 9, thumbSrc: null }],
             page: 1,
-            perPage: 24,
+            perPage: 15,
             total: 1,
             tags: [],
         } }),
@@ -216,7 +216,7 @@ export async function testPendingReviewTilesGetUnapprovedClass() {
                 {id: 10, thumbSrc: '/public/img/thumb/cd/cd1234.avif', status: 'accepted'},
             ],
             page: 1,
-            perPage: 24,
+            perPage: 15,
             total: 2,
             tags: [],
         }}),

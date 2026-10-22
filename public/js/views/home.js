@@ -11,7 +11,7 @@ import {messageForStatus} from '../forms.js';
 import {createTagLinkList, normalizeActiveTags} from '../tagLinks.js';
 
 const IMAGES_URL = '/api/images';
-const DEFAULT_PER_PAGE = 24;
+const DEFAULT_PER_PAGE = 15;
 const LOADING_TILE_COUNT = 6;
 
 /** Build the shared list of tag links used by the home and image sidebars. */
