@@ -23,7 +23,7 @@ readonly class ImageUploadController
     {
     }
 
-    #[Authenticated(AccessLevel::NOVICE)]
+    #[Authenticated(AccessLevel::NOVICE, apiEnabled: true)]
     public function postAction(Request $request): Response
     {
         // TODO: Move this type of validation to attribute, and receive ValidatedRequest instead?

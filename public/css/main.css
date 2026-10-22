@@ -1324,6 +1324,40 @@ h3 {
     color: var(--color-muted);
 }
 
+.profile-api-key {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-top: var(--space-6);
+    padding: var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+}
+
+.profile-api-key-title {
+    font-size: 1.2rem;
+}
+
+.profile-api-key-note {
+    margin: 0;
+    color: var(--color-muted);
+}
+
+.profile-api-key-output {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.profile-api-key-value {
+    display: block;
+    padding: var(--space-2);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    overflow-wrap: anywhere;
+}
+
 .profile-recent-uploads {
     display: flex;
     flex-direction: column;

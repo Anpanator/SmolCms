@@ -11,6 +11,7 @@ readonly class Authenticated
 {
     public function __construct(
         public AccessLevel $accessLevel,
+        public bool $apiEnabled = false,
     )
     {
     }

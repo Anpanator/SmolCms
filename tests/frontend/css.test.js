@@ -61,6 +61,9 @@ export function testImageTileAndReviewStylesExist() {
 
     assertTrue(findRule(rules, '.tile-unapproved', 'border:2pxsolid') !== undefined, 'unapproved thumbnails should have an orange border');
     assertTrue(findRule(rules, '.image-pending-warning', 'color:var(--color-danger)') !== undefined, 'pending warnings should use the danger color');
+    assertTrue(findRule(rules, '.profile-api-key', 'display:flex') !== undefined, 'the profile API key section should use the page layout');
+    assertTrue(findRule(rules, '.profile-api-key-value', 'overflow-wrap:anywhere') !== undefined, 'generated API keys should wrap on narrow screens');
+    assertTrue(findRule(rules, '.profile-api-key-value', 'background:var(--color-bg)') !== undefined, 'generated API keys should use the page background');
     const profileGridRule = findRule(rules, '.profile-recent-uploads-grid', 'display:grid');
     assertTrue(
         /grid-template-columns:repeat\(5,minmax\(0(?:px)?,1fr\)\)/.test(profileGridRule?.text ?? ''),

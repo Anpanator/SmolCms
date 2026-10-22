@@ -17,6 +17,7 @@ use SmolCms\Data\Persistence\TagApprovalEntity;
 use SmolCms\Data\Persistence\UserEntity;
 use SmolCms\Data\Request\Request;
 use SmolCms\Service\Core\Session\SessionService;
+use SmolCms\Service\DB\ApiKeyService;
 use SmolCms\Service\DB\AuditLogService;
 use SmolCms\Service\DB\ImageEntityService;
 use SmolCms\Service\DB\TagApprovalService;
@@ -46,6 +47,9 @@ class ProfileControllerTest extends FunctionalTestCase
     #[Autowire]
     private AuditLogService $auditLogService;
 
+    #[Autowire]
+    private ApiKeyService $apiKeyService;
+
     public function testProfileRequiresAuthenticationAndReturnsApprovedSuggestionCount(): void
     {
         $unauthorized = $this->simulateProfileRequest();
@@ -69,6 +73,43 @@ class ProfileControllerTest extends FunctionalTestCase
             ['approvedTagSuggestions' => 3, 'recentUploads' => []],
             json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR),
         );
+    }
+
+    public function testApiKeyGenerationRequiresWizardAndReturnsEachNewKeyOnlyOnce(): void
+    {
+        $unauthorized = $this->simulateApiKeyRequest();
+        self::assertSame(HttpStatus::UNAUTHORIZED, $unauthorized->getStatus());
+
+        $this->loginUserWithAccessLevel(
+            'api-key-master-' . bin2hex(random_bytes(5)),
+            'API Key Master',
+            AccessLevel::MASTER,
+        );
+        $forbidden = $this->simulateApiKeyRequest();
+        self::assertSame(HttpStatus::FORBIDDEN, $forbidden->getStatus());
+
+        $this->loginUserWithAccessLevel(
+            'api-key-wizard-' . bin2hex(random_bytes(5)),
+            'API Key Wizard',
+            AccessLevel::WIZARD,
+        );
+        $userId = $this->sessionService->getUserData()->id;
+        $firstResponse = $this->simulateApiKeyRequest();
+        self::assertSame(HttpStatus::CREATED, $firstResponse->getStatus());
+        $firstKey = json_decode((string)$firstResponse->getContent(), true, JSON_THROW_ON_ERROR)['apiKey'];
+        self::assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $firstKey);
+        self::assertSame($userId, $this->apiKeyService->findUserDataByApiKey($firstKey)?->id);
+
+        $secondResponse = $this->simulateApiKeyRequest();
+        self::assertSame(HttpStatus::CREATED, $secondResponse->getStatus());
+        $secondKey = json_decode((string)$secondResponse->getContent(), true, JSON_THROW_ON_ERROR)['apiKey'];
+        self::assertNotSame($firstKey, $secondKey);
+        self::assertNull($this->apiKeyService->findUserDataByApiKey($firstKey));
+        self::assertSame($userId, $this->apiKeyService->findUserDataByApiKey($secondKey)?->id);
+
+        $this->sessionService->destroySession();
+        $apiKeyRequest = $this->simulateApiKeyRequest(['Authorization' => 'Bearer ' . $secondKey]);
+        self::assertSame(HttpStatus::UNAUTHORIZED, $apiKeyRequest->getStatus());
     }
 
     public function testProfileReturnsOnlyTheUsersFifteenMostRecentProcessedUploads(): void
@@ -400,6 +441,16 @@ class ProfileControllerTest extends FunctionalTestCase
 
         self::assertSame(AccessLevel::MOD, $this->sessionService->getUserData()?->accessLevel);
         self::assertSame([], $this->getUserProfileBody($targetId)['modActions']);
+    }
+
+    private function simulateApiKeyRequest(array $headers = []): \SmolCms\Data\Response\Response
+    {
+        return $this->simulateRequest(new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: RouteEnum::API_PROFILE_API_KEY->value),
+            method: HttpMethod::POST,
+            headers: $headers,
+            postParams: [],
+        ));
     }
 
     private function simulateProfileRequest(): \SmolCms\Data\Response\Response

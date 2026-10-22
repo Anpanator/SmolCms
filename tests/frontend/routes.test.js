@@ -41,6 +41,7 @@ export function testRoutePathsMirrorTheBackendEnum() {
         API_USERS: '/api/users',
         API_USERS_UPDATE: '/api/users/update',
         API_PROFILE: '/api/profile',
+        API_PROFILE_API_KEY: '/api/profile/api-key',
         API_USER_PROFILE: '/api/user/profile',
         API_TAGME_RANDOM: '/api/tagme/random',
     });

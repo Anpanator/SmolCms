@@ -14,6 +14,9 @@ async function createLoggedInSession(
         if (url === '/api/profile') {
             return profileResponse;
         }
+        if (url === '/api/profile/api-key') {
+            return {status: 201, body: {apiKey: 'generated-secret-key'}};
+        }
         throw new Error(`unexpected fetch of ${url}`);
     });
     const restore = useFetch(fetchMock);
@@ -46,6 +49,59 @@ export async function testProfileDisplaysAccessLevelReadOnly() {
         const accessLevel = view.querySelector('input[name="accessLevel"]');
         assertEqual(accessLevel?.value, 'Master', 'profile should display the named access level');
         assertTrue(accessLevel?.readOnly, 'access level should be read-only');
+    } finally {
+        restore();
+    }
+}
+
+export async function testProfileApiKeySectionIsLimitedToWizardAndAbove() {
+    const {session, restore} = await createLoggedInSession(testUser({accessLevel: 400}));
+    try {
+        const view = createProfileView({session, navigate: () => {}});
+        const section = view.querySelector('.profile-api-key');
+        assertTrue(section !== null, 'WIZARD users should see the API key section');
+        assertEqual(section.querySelector('h2')?.textContent, 'API key');
+        assertTrue(
+            section.textContent.includes('shown only once')
+                && section.textContent.includes('endpoints enabled for API keys'),
+            'the section should explain one-time display and API access',
+        );
+        assertTrue(section.querySelector('button') !== null, 'WIZARD users should be able to generate a key');
+    } finally {
+        restore();
+    }
+
+    const nonWizard = await createLoggedInSession(testUser({accessLevel: 300}));
+    try {
+        const view = createProfileView({session: nonWizard.session, navigate: () => {}});
+        assertEqual(view.querySelector('.profile-api-key'), null, 'MASTER users should not see the API key section');
+    } finally {
+        nonWizard.restore();
+    }
+}
+
+export async function testProfileGeneratesAndShowsApiKeyOnce() {
+    const {session, fetchMock, restore} = await createLoggedInSession(testUser({accessLevel: 400}));
+    try {
+        const view = createProfileView({session, navigate: () => {}});
+        const button = view.querySelector('.profile-api-key button');
+        button.click();
+        await settle();
+
+        const call = fetchMock.calls.find((request) => request.url === '/api/profile/api-key');
+        assertTrue(call !== undefined, 'the API key button should call its endpoint');
+        assertEqual(call.options.method, 'POST');
+        assertEqual(call.options.body, '{}');
+        assertEqual(
+            view.querySelector('.profile-api-key-value')?.textContent,
+            'generated-secret-key',
+            'the generated key should be shown after success',
+        );
+        assertEqual(view.querySelector('.profile-api-key-output')?.hidden, false);
+        assertTrue(
+            view.querySelector('.profile-api-key .form-message')?.textContent.includes('only be shown once'),
+            'the result should remind the user the key is shown once',
+        );
     } finally {
         restore();
     }

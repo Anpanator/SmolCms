@@ -5,18 +5,25 @@ namespace SmolCms\Test\Controller;
 
 use SmolCms\Data\Business\Service;
 use SmolCms\Data\Business\Url;
+use SmolCms\Data\Constant\AccessLevel;
+use SmolCms\Data\Constant\AuditActionType;
 use SmolCms\Data\Constant\HttpContentType;
 use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Request\Request;
+use PDO;
+use SmolCms\Service\Core\Session\SessionService;
+use SmolCms\Service\DB\ApiKeyService;
+use SmolCms\Service\DB\AuditLogService;
 use SmolCms\Service\DB\ImageEntityService;
 use SmolCms\Service\Image\ImageTypeDetectionFacade;
 use SmolCms\Service\Tag\TagService;
 use SmolCms\Service\Validation\ImageUploadValidator;
 use SmolCms\TestUtils\Attributes\Autowire;
 use SmolCms\TestUtils\FunctionalTestCase;
+use SmolCms\TestUtils\LoginWithAccessLevel;
 
 readonly class TestImageUploadValidator extends ImageUploadValidator
 {
@@ -28,6 +35,8 @@ readonly class TestImageUploadValidator extends ImageUploadValidator
 
 class ImageUploadControllerTest extends FunctionalTestCase
 {
+    use LoginWithAccessLevel;
+
     private Url $uploadUrl;
 
     #[Autowire]
@@ -35,6 +44,18 @@ class ImageUploadControllerTest extends FunctionalTestCase
 
     #[Autowire]
     private TagService $tagService;
+
+    #[Autowire]
+    private ApiKeyService $apiKeyService;
+
+    #[Autowire]
+    private AuditLogService $auditLogService;
+
+    #[Autowire]
+    private SessionService $sessionService;
+
+    #[Autowire]
+    private PDO $pdo;
 
     public static function setUpBeforeClass(): void
     {
@@ -57,6 +78,7 @@ class ImageUploadControllerTest extends FunctionalTestCase
 
     protected function tearDown(): void
     {
+        $this->sessionService->destroySession();
         parent::tearDown();
         $this->cleanImageStorage();
     }
@@ -81,6 +103,95 @@ class ImageUploadControllerTest extends FunctionalTestCase
 
         $this->assertEquals(HttpStatus::UNAUTHORIZED, $response->getStatus());
         $this->assertNull($response->getContent());
+    }
+
+    public function testPostActionAcceptsApiKeyWithoutSessionAndAuditsUploadAsApi(): void
+    {
+        $this->loginUserWithAccessLevel(
+            'api-upload-' . bin2hex(random_bytes(5)),
+            'API Image Uploader',
+            AccessLevel::WIZARD,
+        );
+        $userData = $this->sessionService->getUserData();
+        self::assertNotNull($userData);
+        $apiKey = $this->apiKeyService->generateForUser($userData->id);
+        $existingImageIds = array_map(
+            static fn($entity) => $entity->getId(),
+            $this->imageEntityService->findByStatus(ImageStatus::PENDING),
+        );
+        $this->sessionService->destroySession();
+        $tmpPath = ROOT_DIR . '/tests/TestUtils/TestFiles/image.jpg';
+
+        $request = new Request(
+            url: $this->uploadUrl,
+            method: HttpMethod::POST,
+            headers: [HttpHeader::AUTHORIZATION->value => 'Bearer ' . $apiKey],
+            files: [
+                'image' => [
+                    'name' => 'test.jpg',
+                    'tmp_name' => $tmpPath,
+                    'size' => 1024,
+                    'type' => 'image/jpeg',
+                    'error' => UPLOAD_ERR_OK,
+                ],
+            ],
+        );
+
+        $response = $this->simulateRequest($request);
+
+        self::assertSame(HttpStatus::CREATED, $response->getStatus());
+        self::assertNotSame(PHP_SESSION_ACTIVE, session_status(), 'API key authentication must not start a PHP session.');
+        $uploadedEntities = array_values(array_filter(
+            $this->imageEntityService->findByStatus(ImageStatus::PENDING),
+            static fn($entity) => !in_array($entity->getId(), $existingImageIds, true),
+        ));
+        self::assertCount(1, $uploadedEntities);
+        $imageId = $uploadedEntities[0]->getId();
+        self::assertSame($userData->id, $uploadedEntities[0]->getUserId());
+
+        $entries = $this->auditLogService->getRecentEntriesForUser($userData->id, 15);
+        self::assertSame(AuditActionType::IMAGE_UPLOADED->value, $entries[0]['actionType']);
+        self::assertSame('image_id=' . $imageId . ';via=api', $entries[0]['context']);
+    }
+
+    public function testPostActionRejectsUnknownApiKey(): void
+    {
+        $request = new Request(
+            url: $this->uploadUrl,
+            method: HttpMethod::POST,
+            headers: [HttpHeader::AUTHORIZATION->value => 'Bearer ' . str_repeat('0', 64)],
+            files: [],
+        );
+
+        $response = $this->simulateRequest($request);
+
+        self::assertSame(HttpStatus::UNAUTHORIZED, $response->getStatus());
+    }
+
+    public function testPostActionForOrphanedApiKeyReturnsForbiddenWithoutDestroyingSession(): void
+    {
+        $this->loginUserWithAccessLevel(
+            'api-upload-deleted-' . bin2hex(random_bytes(5)),
+            'Deleted API Image Uploader',
+            AccessLevel::WIZARD,
+        );
+        $userData = $this->sessionService->getUserData();
+        self::assertNotNull($userData);
+        $apiKey = $this->apiKeyService->generateForUser($userData->id);
+        $deleteUser = $this->pdo->prepare('DELETE FROM user WHERE id = :id');
+        $deleteUser->execute(['id' => $userData->id]);
+        $this->sessionService->destroySession();
+        $this->sessionService->startSession();
+
+        $request = new Request(
+            url: $this->uploadUrl,
+            method: HttpMethod::POST,
+            headers: [HttpHeader::AUTHORIZATION->value => 'Bearer ' . $apiKey],
+        );
+        $response = $this->simulateRequest($request);
+
+        self::assertSame(HttpStatus::FORBIDDEN, $response->getStatus());
+        self::assertSame(PHP_SESSION_ACTIVE, session_status(), 'API-key failures must not destroy an existing session.');
     }
 
     public function testPostAction_unreadableTmpFile_returnsInternalServerError(): void

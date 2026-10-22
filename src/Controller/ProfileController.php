@@ -11,6 +11,7 @@ use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Attribute\Authenticated;
 use SmolCms\Service\Core\Session\SessionService;
+use SmolCms\Service\DB\ApiKeyService;
 use SmolCms\Service\DB\AuditLogService;
 use SmolCms\Service\DB\TagApprovalService;
 use SmolCms\Service\DB\UserService;
@@ -27,6 +28,7 @@ readonly class ProfileController
         private ImageQueryService $imageQueryService,
         private UserService $userService,
         private AuditLogService $auditLogService,
+        private ApiKeyService $apiKeyService,
     )
     {
     }
@@ -42,6 +44,16 @@ readonly class ProfileController
             'approvedTagSuggestions' => $this->tagApprovalService->countForUser($user->id),
             'recentUploads' => $this->imageQueryService->getRecentUploadsForUser($user->id, self::RECENT_UPLOADS_LIMIT),
         ]);
+    }
+
+    #[Authenticated(AccessLevel::WIZARD)]
+    public function generateApiKeyAction(Request $request): Response
+    {
+        $user = $this->sessionService->getUserData();
+        if ($user === null) {
+            return new Response(HttpStatus::UNAUTHORIZED);
+        }
+        return new JsonResponse(['apiKey' => $this->apiKeyService->generateForUser($user->id)], HttpStatus::CREATED);
     }
 
     public function getUserAction(Request $request): Response

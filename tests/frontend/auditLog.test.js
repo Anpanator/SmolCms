@@ -25,6 +25,20 @@ const ENTRIES = [
         context: 'Unrecognized action context',
         time: '2026-10-20 11:50:00',
     },
+    {
+        id: 77,
+        user: {id: 3, loginName: 'alice', displayName: 'Alice Smith'},
+        actionType: 5,
+        context: 'image_id=41;via=api',
+        time: '2026-10-20 11:40:00',
+    },
+    {
+        id: 76,
+        user: {id: 3, loginName: 'alice', displayName: 'Alice Smith'},
+        actionType: 3,
+        context: 'Deleted tag "landscape"',
+        time: '2026-10-20 11:30:00',
+    },
 ];
 
 async function createLoadedView(handler = () => undefined, {accessLevel = 500, query = ''} = {}) {
@@ -106,7 +120,7 @@ export async function testAuditLogTableShowsUsersAndMapsActionNames() {
             [...view.querySelectorAll('.audit-log-table thead th')].map((cell) => cell.textContent).join('|'),
             'ID|User|Action|Context|Time',
         );
-        assertEqual(view.querySelectorAll('.audit-log-table-row').length, 3);
+        assertEqual(view.querySelectorAll('.audit-log-table-row').length, 5);
 
         const added = view.querySelector('.audit-log-table-row[data-audit-log-id="80"]');
         assertEqual(added.querySelector('.audit-log-id-cell').textContent, '80');
@@ -122,6 +136,13 @@ export async function testAuditLogTableShowsUsersAndMapsActionNames() {
         assertEqual(
             view.querySelector('.audit-log-table-row[data-audit-log-id="78"] .audit-log-action-cell').textContent,
             'Unknown',
+        );
+        const uploaded = view.querySelector('.audit-log-table-row[data-audit-log-id="77"]');
+        assertEqual(uploaded.querySelector('.audit-log-action-cell').textContent, 'Image uploaded');
+        assertEqual(uploaded.querySelector('.audit-log-context-cell').textContent, 'image_id=41;via=api');
+        assertEqual(
+            view.querySelector('.audit-log-table-row[data-audit-log-id="76"] .audit-log-action-cell').textContent,
+            'Tag deleted',
         );
         assertEqual(auditLogCalls(fetchMock).length, 1);
     } finally {

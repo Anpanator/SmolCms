@@ -282,6 +282,12 @@ class RoutingConfiguration
                 controller: ProfileController::class,
                 handler: 'getAction',
             ),
+            'ApiProfileApiKeyPostRoute' => new Route(
+                path: RouteEnum::API_PROFILE_API_KEY->value,
+                method: HttpMethod::POST,
+                controller: ProfileController::class,
+                handler: 'generateApiKeyAction',
+            ),
             RouteEnum::API_USER_PROFILE->name => new Route(
                 path: RouteEnum::API_USER_PROFILE->value,
                 method: HttpMethod::GET,

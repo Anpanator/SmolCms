@@ -1,69 +1,132 @@
 <?php
+
 declare(strict_types=1);
 
 namespace SmolCms\Test\Service\Core\Action;
 
-use PHPUnit\Framework\MockObject\MockObject;
 use DateTime;
+use PHPUnit\Framework\MockObject\MockObject;
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\DTO\SessionUserData;
 use SmolCms\Data\Persistence\UserEntity;
 use SmolCms\Data\Request\Request;
 use SmolCms\Service\Core\Action\AuthorizationPreControllerAction;
+use SmolCms\Service\Core\Authentication\ApiKeyAuthenticationService;
+use SmolCms\Service\Core\Authentication\SessionAuthenticationService;
 use SmolCms\Service\Core\Attribute\Authenticated;
+use SmolCms\Service\Core\ContextService;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\UserService;
 use SmolCms\TestUtils\Attributes\Mock;
 use SmolCms\TestUtils\Attributes\Stub;
 use SmolCms\TestUtils\SimpleTestCase;
 
-
 class AuthorizationPreControllerActionTest extends SimpleTestCase
 {
     private AuthorizationPreControllerAction $action;
 
-    #[Stub(SessionService::class)]
+    #[Mock(SessionAuthenticationService::class)]
+    private SessionAuthenticationService|MockObject $sessionAuthenticationService;
+
+    #[Mock(ApiKeyAuthenticationService::class)]
+    private ApiKeyAuthenticationService|MockObject $apiKeyAuthenticationService;
+
+    #[Mock(SessionService::class)]
     private SessionService|MockObject $sessionService;
 
     #[Mock(UserService::class)]
     private UserService|MockObject $userService;
 
+    #[Stub(ContextService::class)]
+    private ContextService|MockObject $contextService;
+
+    #[Stub(Request::class)]
+    private Request|MockObject $request;
+
     protected function setUp(): void
     {
         parent::setUp();
-        $this->action = new AuthorizationPreControllerAction($this->sessionService, $this->userService);
+        $this->action = new AuthorizationPreControllerAction(
+            $this->sessionAuthenticationService,
+            $this->apiKeyAuthenticationService,
+            $this->sessionService,
+            $this->userService,
+            $this->contextService,
+        );
     }
 
-    public function testProcess_ReturnsNullWhenNoAuthenticatedAttribute(): void
+    public function testProcessReturnsNullWhenNoAuthenticatedAttribute(): void
     {
         $controller = new AuthorizationPreControllerActionTest_NoAuthController();
-        $request = $this->createStub(Request::class);
+        $request = $this->request;
         $handlerArguments = [];
+        $this->sessionAuthenticationService
+            ->expects(self::never())
+            ->method('resolve')
+            ->seal();
+        $this->apiKeyAuthenticationService
+            ->expects(self::never())
+            ->method('resolve')
+            ->seal();
         $this->userService
             ->expects(self::never())
             ->method('findOneById')
             ->seal();
+        $this->sessionService->expects(self::never())->method('destroySession');
 
         $result = $this->action->process($request, $controller, 'handle', $handlerArguments);
 
         self::assertNull($result);
     }
 
-    public function testProcess_ReturnsUnauthorizedWhenNoUserInSession(): void
+    public function testProcessReturnsUnauthorizedWhenNoSessionOrApiKeyIsPresent(): void
     {
         $controller = new AuthorizationPreControllerActionTest_WithAuthController();
-        $request = $this->createStub(Request::class);
+        $request = $this->request;
         $handlerArguments = [];
-
-        $this->sessionService
-            ->method('getUserData')
+        $this->sessionAuthenticationService
+            ->expects(self::once())
+            ->method('resolve')
+            ->willReturn(null)
+            ->seal();
+        $this->apiKeyAuthenticationService
+            ->expects(self::once())
+            ->method('resolve')
+            ->with(self::identicalTo($request))
             ->willReturn(null)
             ->seal();
         $this->userService
             ->expects(self::never())
             ->method('findOneById')
             ->seal();
+        $this->sessionService->expects(self::never())->method('setUserData');
+
+        $result = $this->action->process($request, $controller, 'apiRestrictedFellow', $handlerArguments);
+
+        self::assertNotNull($result);
+        self::assertSame(HttpStatus::UNAUTHORIZED, $result->getStatus());
+    }
+
+    public function testProcessDoesNotConsultApiKeyDelegateWhenEndpointIsNotApiEnabled(): void
+    {
+        $controller = new AuthorizationPreControllerActionTest_WithAuthController();
+        $request = $this->request;
+        $handlerArguments = [];
+        $this->sessionAuthenticationService
+            ->expects(self::once())
+            ->method('resolve')
+            ->willReturn(null)
+            ->seal();
+        $this->apiKeyAuthenticationService
+            ->expects(self::never())
+            ->method('resolve')
+            ->seal();
+        $this->userService
+            ->expects(self::never())
+            ->method('findOneById')
+            ->seal();
+        $this->sessionService->expects(self::never())->method('setUserData');
 
         $result = $this->action->process($request, $controller, 'restrictedFellow', $handlerArguments);
 
@@ -71,60 +134,109 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
         self::assertSame(HttpStatus::UNAUTHORIZED, $result->getStatus());
     }
 
-    public function testProcess_ReturnsForbiddenWhenInsufficientAccessLevel(): void
+    public function testProcessReturnsNullWhenSessionUserHasSufficientAccessLevel(): void
     {
         $controller = new AuthorizationPreControllerActionTest_WithAuthController();
-        $request = $this->createStub(Request::class);
+        $request = $this->request;
         $handlerArguments = [];
-
-        $userData = new SessionUserData(1, 'test', AccessLevel::NOVICE);
+        $this->sessionAuthenticationService
+            ->expects(self::once())
+            ->method('resolve')
+            ->willReturn(new SessionUserData(1, 'Stale name', AccessLevel::NOVICE))
+            ->seal();
+        $this->apiKeyAuthenticationService->expects(self::never())->method('resolve');
         $this->userService
             ->expects(self::once())
             ->method('findOneById')
             ->with(1)
-            ->willReturn($this->createUser(AccessLevel::NOVICE))
+            ->willReturn($this->createUser(AccessLevel::WIZARD, 'Fresh name'))
             ->seal();
-        $this->sessionService
-            ->method('getUserData')
-            ->willReturn($userData)
-            ->seal();
+        $this->sessionService->expects(self::once())->method('setUserData');
+        $this->sessionService->expects(self::never())->method('destroySession');
 
-        $result = $this->action->process($request, $controller, 'restrictedWizard', $handlerArguments);
-
-        self::assertNotNull($result);
-        self::assertSame(HttpStatus::FORBIDDEN, $result->getStatus());
-    }
-
-    public function testProcess_ReturnsNullWhenSufficientAccessLevel(): void
-    {
-        $controller = new AuthorizationPreControllerActionTest_WithAuthController();
-        $request = $this->createStub(Request::class);
-        $handlerArguments = [];
-
-        $userData = new SessionUserData(1, 'test', AccessLevel::WIZARD);
-        $this->userService
-            ->expects(self::once())
-            ->method('findOneById')
-            ->with(1)
-            ->willReturn($this->createUser(AccessLevel::WIZARD))
-            ->seal();
-        $this->sessionService
-            ->method('getUserData')
-            ->willReturn($userData)
-            ->seal();
-
-        $result = $this->action->process($request, $controller, 'restrictedWizard', $handlerArguments);
+        $result = $this->action->process($request, $controller, 'restrictedFellow', $handlerArguments);
 
         self::assertNull($result);
     }
 
-    public function testProcess_ReturnsNullWhenExactAccessLevelMatch(): void
+    public function testProcessReturnsNullWhenSessionUserMatchesRequiredAccessLevel(): void
     {
         $controller = new AuthorizationPreControllerActionTest_WithAuthController();
-        $request = $this->createStub(Request::class);
+        $request = $this->request;
         $handlerArguments = [];
+        $this->sessionAuthenticationService
+            ->expects(self::once())
+            ->method('resolve')
+            ->willReturn(new SessionUserData(1, 'Session name', AccessLevel::FELLOW))
+            ->seal();
+        $this->apiKeyAuthenticationService->expects(self::never())->method('resolve');
+        $this->userService
+            ->expects(self::once())
+            ->method('findOneById')
+            ->with(1)
+            ->willReturn($this->createUser(AccessLevel::FELLOW, 'Session name'))
+            ->seal();
+        $this->sessionService->expects(self::once())->method('setUserData');
+        $this->sessionService->expects(self::never())->method('destroySession');
 
-        $userData = new SessionUserData(1, 'test', AccessLevel::FELLOW);
+        $result = $this->action->process($request, $controller, 'restrictedFellow', $handlerArguments);
+
+        self::assertNull($result);
+    }
+
+    public function testProcessAcceptsApiKeyAndRefreshesSessionData(): void
+    {
+        $controller = new AuthorizationPreControllerActionTest_WithAuthController();
+        $request = $this->request;
+        $handlerArguments = [];
+        $this->sessionAuthenticationService
+            ->expects(self::once())
+            ->method('resolve')
+            ->willReturn(null)
+            ->seal();
+        $this->apiKeyAuthenticationService
+            ->expects(self::once())
+            ->method('resolve')
+            ->with(self::identicalTo($request))
+            ->willReturn(new SessionUserData(1, 'Stale name', AccessLevel::NOVICE))
+            ->seal();
+        $this->userService
+            ->expects(self::once())
+            ->method('findOneById')
+            ->with(1)
+            ->willReturn($this->createUser(AccessLevel::FELLOW, 'Fresh name'))
+            ->seal();
+        $this->sessionService
+            ->expects(self::once())
+            ->method('setUserData')
+            ->with(self::callback(static fn(SessionUserData $data): bool => (
+                $data->id === 1
+                && $data->displayName === 'Fresh name'
+                && $data->accessLevel === AccessLevel::FELLOW
+            )));
+        $this->sessionService
+            ->expects(self::never())
+            ->method('destroySession');
+
+        $result = $this->action->process($request, $controller, 'apiRestrictedFellow', $handlerArguments);
+
+        self::assertNull($result);
+    }
+
+    public function testProcessForbidsApiKeyUserBelowRequiredAccessLevel(): void
+    {
+        $controller = new AuthorizationPreControllerActionTest_WithAuthController();
+        $request = $this->request;
+        $handlerArguments = [];
+        $this->sessionAuthenticationService
+            ->expects(self::once())
+            ->method('resolve')
+            ->willReturn(null);
+        $this->apiKeyAuthenticationService
+            ->expects(self::once())
+            ->method('resolve')
+            ->willReturn(new SessionUserData(1, 'Test', AccessLevel::WIZARD))
+            ->seal();
         $this->userService
             ->expects(self::once())
             ->method('findOneById')
@@ -132,24 +244,31 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
             ->willReturn($this->createUser(AccessLevel::FELLOW))
             ->seal();
         $this->sessionService
-            ->method('getUserData')
-            ->willReturn($userData)
-            ->seal();
+            ->expects(self::once())
+            ->method('setUserData');
+        $this->sessionService
+            ->expects(self::never())
+            ->method('destroySession');
 
-        $result = $this->action->process($request, $controller, 'restrictedFellow', $handlerArguments);
+        $result = $this->action->process($request, $controller, 'apiRestrictedWizard', $handlerArguments);
 
-        self::assertNull($result);
+        self::assertNotNull($result);
+        self::assertSame(HttpStatus::FORBIDDEN, $result->getStatus());
     }
 
-    public function testProcessUsesCurrentDatabaseRoleAndRefreshesStaleSession(): void
+    public function testProcessUsesSessionUserAndCurrentDatabaseAccessLevel(): void
     {
         $controller = new AuthorizationPreControllerActionTest_WithAuthController();
-        $request = $this->createStub(Request::class);
+        $request = $this->request;
         $handlerArguments = [];
-
-        $this->sessionService
-            ->method('getUserData')
+        $this->sessionAuthenticationService
+            ->expects(self::once())
+            ->method('resolve')
             ->willReturn(new SessionUserData(1, 'Stale display name', AccessLevel::ADMIN))
+            ->seal();
+        $this->apiKeyAuthenticationService
+            ->expects(self::never())
+            ->method('resolve')
             ->seal();
         $this->userService
             ->expects(self::once())
@@ -157,6 +276,13 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
             ->with(1)
             ->willReturn($this->createUser(AccessLevel::NOVICE, 'Current display name'))
             ->seal();
+        $this->sessionService
+            ->expects(self::once())
+            ->method('setUserData')
+            ->with(self::callback(static fn(SessionUserData $data): bool => (
+                $data->displayName === 'Current display name'
+                && $data->accessLevel === AccessLevel::NOVICE
+            )));
 
         $result = $this->action->process($request, $controller, 'restrictedWizard', $handlerArguments);
 
@@ -164,15 +290,18 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
         self::assertSame(HttpStatus::FORBIDDEN, $result->getStatus());
     }
 
-    public function testProcessFailsClosedWhenSessionUserNoLongerExists(): void
+    public function testProcessFailsClosedAndDestroysSessionWhenSessionUserNoLongerExists(): void
     {
         $controller = new AuthorizationPreControllerActionTest_WithAuthController();
-        $request = $this->createStub(Request::class);
+        $request = $this->request;
         $handlerArguments = [];
-
-        $this->sessionService
-            ->method('getUserData')
-            ->willReturn(new SessionUserData(1, 'deleted user', AccessLevel::ADMIN))
+        $this->sessionAuthenticationService
+            ->expects(self::once())
+            ->method('resolve')
+            ->willReturn(new SessionUserData(1, 'deleted user', AccessLevel::ADMIN));
+        $this->apiKeyAuthenticationService
+            ->expects(self::never())
+            ->method('resolve')
             ->seal();
         $this->userService
             ->expects(self::once())
@@ -180,8 +309,42 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
             ->with(1)
             ->willReturn(null)
             ->seal();
+        $this->sessionService
+            ->expects(self::once())
+            ->method('destroySession')
+            ->seal();
 
         $result = $this->action->process($request, $controller, 'restrictedFellow', $handlerArguments);
+
+        self::assertNotNull($result);
+        self::assertSame(HttpStatus::FORBIDDEN, $result->getStatus());
+    }
+
+    public function testProcessFailsClosedWithoutDestroyingSessionWhenApiKeyOwnerNoLongerExists(): void
+    {
+        $controller = new AuthorizationPreControllerActionTest_WithAuthController();
+        $request = $this->request;
+        $handlerArguments = [];
+        $this->sessionAuthenticationService
+            ->expects(self::once())
+            ->method('resolve')
+            ->willReturn(null);
+        $this->apiKeyAuthenticationService
+            ->expects(self::once())
+            ->method('resolve')
+            ->willReturn(new SessionUserData(1, 'deleted user', AccessLevel::WIZARD))
+            ->seal();
+        $this->userService
+            ->expects(self::once())
+            ->method('findOneById')
+            ->with(1)
+            ->willReturn(null)
+            ->seal();
+        $this->sessionService
+            ->expects(self::never())
+            ->method('destroySession');
+
+        $result = $this->action->process($request, $controller, 'apiRestrictedFellow', $handlerArguments);
 
         self::assertNotNull($result);
         self::assertSame(HttpStatus::FORBIDDEN, $result->getStatus());
@@ -218,6 +381,16 @@ class AuthorizationPreControllerActionTest_WithAuthController
 
     #[Authenticated(AccessLevel::WIZARD)]
     public function restrictedWizard(): void
+    {
+    }
+
+    #[Authenticated(AccessLevel::FELLOW, apiEnabled: true)]
+    public function apiRestrictedFellow(): void
+    {
+    }
+
+    #[Authenticated(AccessLevel::WIZARD, apiEnabled: true)]
+    public function apiRestrictedWizard(): void
     {
     }
 }

@@ -10,6 +10,14 @@ CREATE TABLE user
     access_level    INTEGER  NOT NULL
 );
 
+CREATE TABLE api_key
+(
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id  INTEGER      NOT NULL UNIQUE,
+    key_hash VARCHAR(64)  NOT NULL UNIQUE,
+    created  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE session
 (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,

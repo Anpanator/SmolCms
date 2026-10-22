@@ -43,6 +43,7 @@ enum RouteEnum: string
     case API_USERS = '/api/users';
     case API_USERS_UPDATE = '/api/users/update';
     case API_PROFILE = '/api/profile';
+    case API_PROFILE_API_KEY = '/api/profile/api-key';
     case API_USER_PROFILE = '/api/user/profile';
     case API_TAGME_RANDOM = '/api/tagme/random';
 }

@@ -16,7 +16,9 @@ const PER_PAGE = 30;
 const ACTION_NAMES = new Map([
     [1, 'Tag added'],
     [2, 'Tag removed'],
+    [3, 'Tag deleted'],
     [4, 'Image deleted'],
+    [5, 'Image uploaded'],
 ]);
 
 /**

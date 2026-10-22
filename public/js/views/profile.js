@@ -5,7 +5,7 @@
  */
 import {get, postJson} from '../api.js';
 import {el} from '../dom.js';
-import {accessLevelName} from '../accessLevel.js';
+import {AccessLevel, accessLevelName, hasAccessLevel} from '../accessLevel.js';
 import {
     clearMessage,
     createControlField,
@@ -17,6 +17,7 @@ import {
     showMessage,
 } from '../forms.js';
 import {validateDisplayName} from '../validation.js';
+import {RoutePath} from '../routes.js';
 
 const RECENT_UPLOADS_LIMIT = 15;
 
@@ -38,6 +39,9 @@ export function createProfileView({session, navigate}) {
         ? createReadOnlyField('Approved tag suggestions', 'approvedTagSuggestions', 'Loading…')
         : null;
     const recentUploadsSection = user ? createRecentUploadsSection() : null;
+    const apiKeySection = hasAccessLevel(user, AccessLevel.WIZARD)
+        ? createApiKeySection({navigate})
+        : null;
 
     const form = el('form', {
         className: 'form',
@@ -57,6 +61,9 @@ export function createProfileView({session, navigate}) {
         }));
     }
     children.push(form);
+    if (apiKeySection !== null) {
+        children.push(apiKeySection);
+    }
     if (recentUploadsSection !== null) {
         children.push(recentUploadsSection.element);
     }
@@ -103,6 +110,61 @@ export function createProfileView({session, navigate}) {
     });
 
     return el('section', {className: 'page profile-page', children});
+}
+
+function createApiKeySection({navigate}) {
+    const message = createMessageBox();
+    const key = el('code', {className: 'profile-api-key-value'});
+    const keyOutput = el('p', {
+        className: 'profile-api-key-output',
+        attributes: {hidden: 'hidden', 'aria-live': 'polite'},
+        children: key,
+    });
+    const generateButton = el('button', {
+        className: 'button button--primary',
+        attributes: {type: 'button'},
+        children: 'Generate API key',
+    });
+
+    generateButton.addEventListener('click', async (event) => {
+        event.preventDefault();
+        generateButton.disabled = true;
+        clearMessage(message);
+        key.textContent = '';
+        keyOutput.hidden = true;
+        try {
+            const data = await postJson(RoutePath.API_PROFILE_API_KEY, {});
+            if (typeof data?.apiKey !== 'string' || data.apiKey === '') {
+                showMessage(message, 'Could not generate an API key.');
+                return;
+            }
+            key.textContent = data.apiKey;
+            keyOutput.hidden = false;
+            showMessage(message, 'API key generated. Copy it now; it will only be shown once.', 'success');
+        } catch (error) {
+            if (isAuthError(error)) {
+                navigate('/login');
+                return;
+            }
+            showMessage(message, messageForStatus(error?.status ?? 0));
+        } finally {
+            generateButton.disabled = false;
+        }
+    });
+
+    return el('section', {
+        className: 'profile-api-key',
+        children: [
+            el('h2', {className: 'profile-api-key-title', children: 'API key'}),
+            el('p', {
+                className: 'profile-api-key-note',
+                children: 'The key is shown only once and grants API access to endpoints enabled for API keys.',
+            }),
+            generateButton,
+            message,
+            keyOutput,
+        ],
+    });
 }
 
 function createReadOnlyField(label, name, value) {

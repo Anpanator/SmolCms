@@ -12,4 +12,5 @@ namespace SmolCms\Data\Constant;
 enum ContextKey: string
 {
     case PAGE_TITLE = 'string';
+    case AUTHENTICATED_VIA_API = 'boolean';
 }
