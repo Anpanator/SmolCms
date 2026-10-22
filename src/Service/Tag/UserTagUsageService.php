@@ -137,6 +137,7 @@ readonly class UserTagUsageService
             . 'INNER JOIN tag ON tag.id = user_usage.tag_id '
             . 'INNER JOIN tag_category AS category ON category.id = tag.category_id '
             . 'WHERE user_usage.user_id = :user_id '
+            . 'AND user_usage.usage_count > 0 '
             . 'AND user_usage.last_used_at IS NOT NULL '
             . 'AND tag.name <> :excluded_tag COLLATE NOCASE '
             . $excluded

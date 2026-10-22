@@ -7,6 +7,8 @@ tags/categories and image-tag links, per-user quick-tag usage
 tag additions, removals, and deletions, plus image uploads and deletions.
 `user_tag_usage` increments counts and updates recency for newly attached tags;
 removals decrement counts to a zero floor without changing the last-use time.
+The recent quick-tag list includes only tags with a positive usage count
+(currently attached).
 `TagService` coordinates tags, categories, image associations, and usage
 counts; suggestion and approval records are handled by the tag-suggestion
 services.

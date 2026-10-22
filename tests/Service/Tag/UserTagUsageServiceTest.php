@@ -47,6 +47,32 @@ class UserTagUsageServiceTest extends FunctionalTestCase
         self::assertSame($afterAdds['last_used_at'], $afterFloor['last_used_at']);
     }
 
+    public function testRecentListExcludesRemovedTagsAndIncludesAttachedTags(): void
+    {
+        $userId = 903;
+        $prefix = 'user-usage-recent-' . bin2hex(random_bytes(4)) . '-';
+        $attachedTagNames = [];
+        for ($index = 0; $index < 11; $index++) {
+            $tagName = $prefix . 'attached-' . sprintf('%02d', $index);
+            $attachedTagNames[] = $tagName;
+            self::assertNotNull($this->tagService->createTag($tagName));
+            $this->userTagUsageService->recordTagAdded($userId, $tagName);
+        }
+
+        $removedTagName = $prefix . 'removed';
+        self::assertNotNull($this->tagService->createTag($removedTagName));
+        $this->userTagUsageService->recordTagAdded($userId, $removedTagName);
+        $this->userTagUsageService->recordTagRemoved($userId, $removedTagName);
+
+        $recentTagNames = array_column(
+            $this->userTagUsageService->getQuickTags($userId)['userRecent'],
+            'name',
+        );
+
+        self::assertContains($attachedTagNames[10], $recentTagNames);
+        self::assertNotContains($removedTagName, $recentTagNames);
+    }
+
     public function testRemovingWithoutPriorUsageCreatesZeroRowAndTagmeIsNeverTracked(): void
     {
         $tagName = 'user-usage-removed-' . bin2hex(random_bytes(4));

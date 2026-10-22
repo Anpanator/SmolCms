@@ -75,7 +75,7 @@ class QuickTagsControllerTest extends FunctionalTestCase
             $usageInsert->execute([
                 'user_id' => $user->id,
                 'tag_id' => $tagId,
-                'usage_count' => $index < 12 ? 12 - $index : 0,
+                'usage_count' => $index < 12 ? 12 - $index : 1,
                 'last_used_at' => sprintf('2026-10-22 12:%02d:00', 30 - $index),
             ]);
         }
