@@ -242,7 +242,35 @@ class ImageUploadControllerTest extends FunctionalTestCase
         self::assertArrayNotHasKey(SessionService::SESSION_NAME, $_COOKIE);
     }
 
-    public function testPostActionRejectsCrossOriginApiKeyRequestBeforeAuthorization(): void
+    public function testOptionsActionReturnsCorsPreflightHeadersWithoutAuthentication(): void
+    {
+        $request = new Request(
+            url: $this->uploadUrl,
+            method: HttpMethod::OPTIONS,
+            headers: [
+                HttpHeader::ORIGIN->value => 'https://app.example',
+                'Access-Control-Request-Method' => 'POST',
+                'Access-Control-Request-Headers' => 'authorization, content-type',
+                HttpHeader::SEC_FETCH_SITE->value => 'cross-site',
+            ],
+        );
+
+        $response = $this->simulateRequest($request);
+
+        self::assertSame(HttpStatus::NO_CONTENT, $response->getStatus());
+        self::assertNull($response->getContent());
+        $headers = $response->getHeaders();
+        self::assertSame('*', $headers[HttpHeader::ACCESS_CONTROL_ALLOW_ORIGIN->value]);
+        self::assertSame('POST, OPTIONS', $headers[HttpHeader::ACCESS_CONTROL_ALLOW_METHODS->value]);
+        self::assertSame(
+            'Authorization, Content-Type',
+            $headers[HttpHeader::ACCESS_CONTROL_ALLOW_HEADERS->value],
+        );
+        self::assertSame('86400', $headers[HttpHeader::ACCESS_CONTROL_MAX_AGE->value]);
+        self::assertSame('POST, OPTIONS', $headers[HttpHeader::ALLOW->value]);
+    }
+
+    public function testPostActionAcceptsCrossOriginApiKeyUpload(): void
     {
         $this->loginUserWithAccessLevel(
             'api-upload-cross-origin-' . bin2hex(random_bytes(5)),
@@ -264,6 +292,53 @@ class ImageUploadControllerTest extends FunctionalTestCase
             method: HttpMethod::POST,
             headers: [
                 HttpHeader::AUTHORIZATION->value => 'Bearer ' . $apiKey,
+                HttpHeader::ORIGIN->value => 'https://app.example',
+                HttpHeader::SEC_FETCH_SITE->value => 'cross-site',
+            ],
+            files: [
+                'image' => [
+                    'name' => 'test.jpg',
+                    'tmp_name' => $tmpPath,
+                    'size' => 1024,
+                    'type' => 'image/jpeg',
+                    'error' => UPLOAD_ERR_OK,
+                ],
+            ],
+        );
+
+        $response = $this->simulateRequest($request);
+
+        self::assertSame(HttpStatus::CREATED, $response->getStatus());
+        self::assertSame(
+            '*',
+            $response->getHeaders()[HttpHeader::ACCESS_CONTROL_ALLOW_ORIGIN->value],
+        );
+        self::assertSame(PHP_SESSION_NONE, session_status());
+        $uploadedEntities = array_values(array_filter(
+            $this->imageEntityService->findByStatus(ImageStatus::PENDING),
+            static fn($entity) => !in_array($entity->getId(), $existingImageIds, true),
+        ));
+        self::assertCount(1, $uploadedEntities);
+        self::assertSame($userData->id, $uploadedEntities[0]->getUserId());
+        $entries = $this->auditLogService->getRecentEntriesForUser($userData->id, 15);
+        self::assertSame(
+            'image_id=' . $uploadedEntities[0]->getId() . ';via=api',
+            $entries[0]['context'],
+        );
+    }
+
+    public function testPostActionRejectsCrossOriginRequestWithoutApiKey(): void
+    {
+        $existingImageIds = array_map(
+            static fn($entity) => $entity->getId(),
+            $this->imageEntityService->findByStatus(ImageStatus::PENDING),
+        );
+        $tmpPath = ROOT_DIR . '/tests/TestUtils/TestFiles/image.jpg';
+
+        $request = new Request(
+            url: $this->uploadUrl,
+            method: HttpMethod::POST,
+            headers: [
                 HttpHeader::ORIGIN->value => 'https://evil.example',
                 HttpHeader::SEC_FETCH_SITE->value => 'cross-site',
             ],
@@ -281,12 +356,65 @@ class ImageUploadControllerTest extends FunctionalTestCase
         $response = $this->simulateRequest($request);
 
         self::assertSame(HttpStatus::FORBIDDEN, $response->getStatus());
+        self::assertSame(
+            '*',
+            $response->getHeaders()[HttpHeader::ACCESS_CONTROL_ALLOW_ORIGIN->value],
+        );
         $uploadedEntities = array_filter(
             $this->imageEntityService->findByStatus(ImageStatus::PENDING),
             static fn($entity) => !in_array($entity->getId(), $existingImageIds, true),
         );
         self::assertCount(0, $uploadedEntities);
         self::assertSame(PHP_SESSION_NONE, session_status());
+    }
+
+    public function testPostActionRejectsCrossOriginSessionUploadEvenWithApiKeyHeader(): void
+    {
+        $this->loginUserWithAccessLevel(
+            'api-upload-cross-origin-session-' . bin2hex(random_bytes(5)),
+            'Cross-Origin Session Uploader',
+            AccessLevel::WIZARD,
+        );
+        $userData = $this->sessionService->getUserData();
+        self::assertNotNull($userData);
+        $apiKey = $this->apiKeyService->generateForUser($userData->id);
+        $sessionId = session_id();
+        self::assertNotSame('', $sessionId);
+        $existingImageIds = array_map(
+            static fn($entity) => $entity->getId(),
+            $this->imageEntityService->findByStatus(ImageStatus::PENDING),
+        );
+        $tmpPath = ROOT_DIR . '/tests/TestUtils/TestFiles/image.jpg';
+
+        $request = new Request(
+            url: $this->uploadUrl,
+            method: HttpMethod::POST,
+            headers: [
+                HttpHeader::AUTHORIZATION->value => 'Bearer ' . $apiKey,
+                HttpHeader::ORIGIN->value => 'https://evil.example',
+                HttpHeader::SEC_FETCH_SITE->value => 'cross-site',
+                HttpHeader::COOKIE->value => SessionService::SESSION_NAME . '=' . $sessionId,
+            ],
+            files: [
+                'image' => [
+                    'name' => 'test.jpg',
+                    'tmp_name' => $tmpPath,
+                    'size' => 1024,
+                    'type' => 'image/jpeg',
+                    'error' => UPLOAD_ERR_OK,
+                ],
+            ],
+        );
+
+        $response = $this->simulateRequest($request);
+
+        self::assertSame(HttpStatus::FORBIDDEN, $response->getStatus());
+        self::assertSame(PHP_SESSION_ACTIVE, session_status());
+        $uploadedEntities = array_filter(
+            $this->imageEntityService->findByStatus(ImageStatus::PENDING),
+            static fn($entity) => !in_array($entity->getId(), $existingImageIds, true),
+        );
+        self::assertCount(0, $uploadedEntities);
     }
 
     public function testPostActionRejectsUnknownApiKey(): void

@@ -12,8 +12,9 @@ Upload validation decodes the image to confirm it is readable and capture its
 dimensions, but stores the original bytes unchanged. Stored files are
 content-addressed by SHA-256. A new image starts pending and is tagged `tagme`;
 each successful upload is recorded as an `IMAGE_UPLOADED` audit action. Uploads
-can also authenticate with an API key for same-origin browser code and
-server-to-server clients; see `docs/api/index.adoc`.
+can also authenticate with an API key for browser code (including cross-origin
+clients using the endpoint's CORS preflight) and server-to-server clients; see
+`docs/api/index.adoc`.
 
 === Processing and delivery
 

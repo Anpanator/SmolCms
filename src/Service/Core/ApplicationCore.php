@@ -24,6 +24,7 @@ readonly class ApplicationCore
         private PreControllerActionFacade $preControllerActionFacade,
         private ExceptionResponseService  $exceptionResponseService,
         private CliCommandHandler         $cliCommandHandler,
+        private CorsService               $corsService,
     )
     {
     }
@@ -69,10 +70,13 @@ readonly class ApplicationCore
         try {
             $response = $this->preControllerActionFacade->process($request, $controller, $handler, $handlerArguments);
         } catch (Throwable $e) {
-            return $this->exceptionResponseService->createResponseFromException($e);
+            $response = $this->exceptionResponseService->createResponseFromException($e);
         }
         if (!$response) {
             $response = $this->generateDefaultResponse();
+        }
+        if ($this->corsService->isCorsEnabled($controller, $handler)) {
+            $this->corsService->addResponseHeaders($request, $response);
         }
         return $response;
     }

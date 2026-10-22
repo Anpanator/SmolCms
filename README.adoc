@@ -58,4 +58,6 @@ include::docs/security-considerations.adoc[]
 Endpoints that accept API-key authentication (`Authorization: Bearer <key>`) are
 referenced in link:docs/api/index.adoc[the API documentation]. Only handlers
 whose authorization attribute sets `apiEnabled: true` belong to that reference;
-currently this covers `POST /upload-image`.
+currently this covers `POST /upload-image`. The upload endpoint also answers
+`OPTIONS` preflight requests so cross-origin browser clients can upload with an
+API key.

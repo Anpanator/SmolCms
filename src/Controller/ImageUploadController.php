@@ -4,11 +4,13 @@ declare(strict_types=1);
 namespace SmolCms\Controller;
 
 use SmolCms\Data\Constant\AccessLevel;
+use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Attribute\Authenticated;
+use SmolCms\Service\Core\Attribute\CorsEnabled;
 use SmolCms\Service\Image\ImageTypeDetectionFacade;
 use SmolCms\Service\Image\ImageUploadService;
 use SmolCms\Service\Validation\ImageUploadValidator;
@@ -23,6 +25,16 @@ readonly class ImageUploadController
     {
     }
 
+    #[CorsEnabled]
+    public function optionsAction(Request $request): Response
+    {
+        return new Response(
+            status: HttpStatus::NO_CONTENT,
+            headers: [HttpHeader::ALLOW->value => 'POST, OPTIONS'],
+        );
+    }
+
+    #[CorsEnabled]
     #[Authenticated(AccessLevel::NOVICE, apiEnabled: true)]
     public function postAction(Request $request): Response
     {

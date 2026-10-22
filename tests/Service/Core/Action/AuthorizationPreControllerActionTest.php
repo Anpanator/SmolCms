@@ -6,7 +6,10 @@ namespace SmolCms\Test\Service\Core\Action;
 
 use DateTime;
 use PHPUnit\Framework\MockObject\MockObject;
+use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\AccessLevel;
+use SmolCms\Data\Constant\HttpHeader;
+use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\DTO\SessionUserData;
 use SmolCms\Data\Persistence\UserEntity;
@@ -15,7 +18,9 @@ use SmolCms\Service\Core\Action\AuthorizationPreControllerAction;
 use SmolCms\Service\Core\Authentication\ApiKeyAuthenticationService;
 use SmolCms\Service\Core\Authentication\SessionAuthenticationService;
 use SmolCms\Service\Core\Attribute\Authenticated;
+use SmolCms\Service\Core\Attribute\CorsEnabled;
 use SmolCms\Service\Core\ContextService;
+use SmolCms\Service\Core\CorsService;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\UserService;
 use SmolCms\TestUtils\Attributes\Mock;
@@ -53,6 +58,7 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
             $this->sessionService,
             $this->userService,
             $this->contextService,
+            new CorsService(),
         );
     }
 
@@ -132,6 +138,34 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
 
         self::assertNotNull($result);
         self::assertSame(HttpStatus::UNAUTHORIZED, $result->getStatus());
+    }
+
+    public function testProcessRejectsCrossOriginSessionIdentityForCorsHandler(): void
+    {
+        $controller = new AuthorizationPreControllerActionTest_WithAuthController();
+        $request = new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: '/upload-image'),
+            method: HttpMethod::POST,
+            headers: [
+                HttpHeader::ORIGIN->value => 'https://app.example',
+                HttpHeader::SEC_FETCH_SITE->value => 'cross-site',
+            ],
+        );
+        $handlerArguments = [];
+        $this->sessionAuthenticationService
+            ->expects(self::once())
+            ->method('resolve')
+            ->willReturn(new SessionUserData(1, 'Session name', AccessLevel::NOVICE))
+            ->seal();
+        $this->apiKeyAuthenticationService->expects(self::never())->method('resolve');
+        $this->userService->expects(self::never())->method('findOneById');
+        $this->sessionService->expects(self::never())->method('setUserData');
+        $this->sessionService->expects(self::never())->method('destroySession');
+
+        $result = $this->action->process($request, $controller, 'corsApiUpload', $handlerArguments);
+
+        self::assertNotNull($result);
+        self::assertSame(HttpStatus::FORBIDDEN, $result->getStatus());
     }
 
     public function testProcessReturnsNullWhenSessionUserHasSufficientAccessLevel(): void
@@ -397,6 +431,12 @@ class AuthorizationPreControllerActionTest_WithAuthController
 
     #[Authenticated(AccessLevel::WIZARD, apiEnabled: true)]
     public function apiRestrictedWizard(): void
+    {
+    }
+
+    #[CorsEnabled]
+    #[Authenticated(AccessLevel::NOVICE, apiEnabled: true)]
+    public function corsApiUpload(): void
     {
     }
 }

@@ -98,6 +98,12 @@ class RoutingConfiguration
                 method: HttpMethod::POST,
                 controller: ImageUploadController::class,
             ),
+            'ImageUploadOptionsRoute' => new Route(
+                path: RouteEnum::UPLOAD_IMAGE->value,
+                method: HttpMethod::OPTIONS,
+                controller: ImageUploadController::class,
+                handler: 'optionsAction',
+            ),
             RouteEnum::IMAGE_DISPLAY->name => new Route(
                 path: RouteEnum::IMAGE_DISPLAY->value,
                 method: HttpMethod::GET,

@@ -19,9 +19,12 @@ these limitations before deploying it:
   `POST /upload-image` currently opts in. API-key-authenticated uploads use the usual access
   check and add `via=api` to the `IMAGE_UPLOADED` audit context.
 * State-changing requests have no CSRF token. For `POST`, `PUT`, and `DELETE`,
-  the pre-controller check rejects non-`same-origin` `Sec-Fetch-Site` values
-  or an `Origin` whose host differs from the request host, when those headers
-  are present; rate limiting is also absent.
+  the pre-controller check rejects cross-origin `Sec-Fetch-Site` values or an
+  `Origin` whose host differs from the request host, unless a CORS-enabled
+  handler is called with a Bearer key and no session cookie. The upload
+  endpoint returns `Access-Control-Allow-Origin: *` without
+  `Access-Control-Allow-Credentials`, so cross-origin session authentication is
+  not possible. Rate limiting is also absent.
 * Image uploads use signature detection, GD decode validation, and limits of
   16,384 pixels per side and 20 million total pixels. The worker re-encodes
   generated variants; these checks are not a substitute for content

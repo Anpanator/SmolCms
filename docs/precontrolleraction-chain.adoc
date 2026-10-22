@@ -1,8 +1,11 @@
 == PreControllerAction Chain
 
 The default pre-controller chain runs the same-origin check, authorization,
-request mapping, then validation. An action can stop the chain with a
-`Response`; otherwise the controller handler runs.
+request mapping, then validation. The same-origin check accepts a cross-origin
+request only for a CORS-enabled API-key handler with a Bearer header and no
+session cookie, which is how `POST /upload-image` supports cross-origin browser
+uploads. An action can stop the chain with a `Response`; otherwise the
+controller handler runs.
 
 `#[Authenticated(...)]` declares a handler's minimum `AccessLevel`.
 `apiEnabled: true` opts a handler into Bearer API-key authentication; otherwise

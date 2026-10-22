@@ -14,6 +14,7 @@ use SmolCms\Service\Core\Authentication\ApiKeyAuthenticationService;
 use SmolCms\Service\Core\Authentication\SessionAuthenticationService;
 use SmolCms\Service\Core\Attribute\Authenticated;
 use SmolCms\Service\Core\ContextService;
+use SmolCms\Service\Core\CorsService;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\UserService;
 
@@ -25,6 +26,7 @@ final readonly class AuthorizationPreControllerAction implements PreControllerAc
         private SessionService $sessionService,
         private UserService $userService,
         private ContextService $contextService,
+        private CorsService $corsService,
     )
     {
     }
@@ -53,6 +55,14 @@ final readonly class AuthorizationPreControllerAction implements PreControllerAc
 
         if ($userData === null) {
             return new Response(HttpStatus::UNAUTHORIZED);
+        }
+
+        // Cross-origin CORS handlers only accept API-key identities. Session
+        // authentication stays same-origin even when a Bearer header is present.
+        if (!$authenticatedViaApi
+            && $this->corsService->isCorsEnabled($controller, $handler)
+            && $this->corsService->isCrossOrigin($request)) {
+            return new Response(HttpStatus::FORBIDDEN);
         }
 
         $user = $this->userService->findOneById($userData->id);
