@@ -34,7 +34,9 @@ images visible to the viewer; pending-review tiles use distinct
 sample, with a download link labeled *Download*.
 Image and tag moderation queues act on the currently selected item: Approve
 and Reject submit that selection, and a success message remains visible rather
-than auto-dismissing.
+than auto-dismissing. Deleting an image asks for confirmation: Enter confirms
+and Escape cancels. A successful deletion opens the previous visible neighbor
+with history replacement, or the home page when no previous image exists.
 
 === Quick tags and layout
 
@@ -47,7 +49,9 @@ change without clearing the success message; the `tagme` system tag is
 excluded from suggestions. The lists are fetched when enabled, including when
 a view opens with the setting already enabled. A toggle
 below the main tag list controls the sidebar; it is off by default, stored in
-the session, and reset on login. `GET /api/tags/quick` supplies the lists,
+the session, and reset on login. Pending quick-tag actions use `aria-disabled`
+rather than native disabling, so the toggle and tag buttons keep focus and
+image-view hotkeys remain usable. `GET /api/tags/quick` supplies the lists,
 `POST /api/session/quick-tags` changes the setting, and `GET /api/session`
 includes `quickTagsEnabled`.
 

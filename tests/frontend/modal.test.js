@@ -50,6 +50,61 @@ export async function testConfirmDialogResolvesTrueOnConfirm() {
     assertFalse(document.body.contains(dialog.element));
 }
 
+export async function testConfirmDialogConfirmsOnEnter(fixture) {
+    const opener = document.createElement('button');
+    fixture.append(opener);
+    opener.focus();
+    const dialog = createConfirmDialog({message: 'Confirm with Enter?', confirmLabel: 'Delete'});
+    assertEqual(document.activeElement, dialog.element, 'the dialog should receive focus when opened');
+
+    const event = new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true});
+    dialog.element.dispatchEvent(event);
+
+    assertTrue(event.defaultPrevented, 'Enter should be handled by the confirmation dialog');
+    assertTrue(await dialog.result, 'Enter should confirm the dialog');
+    assertFalse(document.body.contains(dialog.element));
+    assertEqual(document.activeElement, opener, 'confirming should restore focus to the opener');
+}
+
+export async function testConfirmDialogDoesNotInterceptEnterOnFocusedCancelButton() {
+    const dialog = createConfirmDialog({message: 'Keep with Enter?'});
+    const cancel = dialog.element.querySelector('.modal-cancel');
+    cancel.focus();
+
+    const event = new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true});
+    cancel.dispatchEvent(event);
+
+    assertFalse(event.defaultPrevented, 'Enter on Cancel should keep its native button behavior');
+    assertTrue(document.body.contains(dialog.element), 'the dialog should stay open');
+    cancel.click();
+    assertFalse(await dialog.result, 'clicking Cancel should still cancel');
+}
+
+export async function testGenericModalDoesNotConfirmOnEnter() {
+    const modal = createModal({content: 'Plain modal'});
+    const event = new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true});
+    document.dispatchEvent(event);
+
+    assertFalse(event.defaultPrevented, 'Enter should not be intercepted outside confirmation dialogs');
+    assertTrue(document.body.contains(modal.element));
+    modal.close();
+}
+
+export async function testConfirmDialogCancelsOnEscape(fixture) {
+    const opener = document.createElement('button');
+    fixture.append(opener);
+    opener.focus();
+    const dialog = createConfirmDialog({message: 'Escape?'});
+
+    const event = new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true});
+    dialog.element.dispatchEvent(event);
+
+    assertTrue(event.defaultPrevented, 'Escape should be handled by the dialog');
+    assertFalse(await dialog.result, 'Escape should cancel the dialog');
+    assertFalse(document.body.contains(dialog.element));
+    assertEqual(document.activeElement, opener, 'cancelling should restore focus to the opener');
+}
+
 export async function testConfirmDialogTreatsCancelEscapeAndBackdropAsCancellation() {
     const canceled = createConfirmDialog({message: 'Cancel?'});
     canceled.element.querySelector('.modal-cancel').click();

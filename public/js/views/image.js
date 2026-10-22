@@ -137,7 +137,8 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
     function refreshControls() {
         setNavigationDisabled(currentImage === null || navigationPending);
         if (deleteButton !== null) {
-            deleteButton.disabled = currentImage === null || deletePending;
+            deleteButton.disabled = currentImage === null;
+            deleteButton.setAttribute('aria-disabled', String(currentImage === null || deletePending));
         }
     }
 
@@ -184,8 +185,8 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
         setNavigationDisabled(true);
         try {
             const data = await get(`${NEIGHBOR_URL}?id=${fromId}&direction=${direction}`);
-            const neighborId = data?.id ?? null;
-            if (!Number.isSafeInteger(neighborId) || neighborId <= 0) {
+            const neighborId = parseNeighborId(data);
+            if (neighborId === null) {
                 showMessage(status, direction === 'next' ? NO_NEXT_MESSAGE : NO_PREVIOUS_MESSAGE, 'info');
                 return;
             }
@@ -204,7 +205,7 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
             return;
         }
         deletePending = true;
-        deleteButton.disabled = true;
+        refreshControls();
         try {
             const dialog = createConfirmDialog({
                 message: `Delete image #${image.id}? This action cannot be undone.`,
@@ -214,8 +215,12 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
                 return;
             }
             clearMessage(status);
+            const previousId = await findPreviousImageId(image.id);
             await postJson(`${DELETE_URL}?id=${image.id}`);
-            navigate(RoutePath.START_PAGE);
+            navigate(
+                previousId === null ? RoutePath.START_PAGE : `${RoutePath.IMAGE_DISPLAY}?id=${previousId}`,
+                {replace: true},
+            );
         } catch (error) {
             showMessage(status, messageForStatus(error?.status ?? 0));
         } finally {
@@ -223,11 +228,30 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
             refreshControls();
         }
     }
+
+    /**
+     * The previous neighbor must be resolved before deleting its current image;
+     * a failed lookup only falls back to the home page after a successful delete.
+     */
+    async function findPreviousImageId(id) {
+        try {
+            const data = await get(`${NEIGHBOR_URL}?id=${id}&direction=previous`);
+            return parseNeighborId(data);
+        } catch {
+            return null;
+        }
+    }
 }
 
 /** Positive-integer string or null (anything else is rejected server-side with 400). */
 function parseImageId(raw) {
     return /^[1-9][0-9]*$/.test(raw ?? '') ? Number(raw) : null;
+}
+
+/** Positive-integer neighbor id or null for missing/invalid values. */
+function parseNeighborId(data) {
+    const id = data?.id ?? null;
+    return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
 function buildHomePath(tags) {

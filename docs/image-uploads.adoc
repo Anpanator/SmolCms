@@ -49,4 +49,6 @@ authentication. They deliver files through `X-Accel-Redirect`. Moderators use
 Rejection deletes its row and attempts to delete unreferenced files instead of
 assigning a rejected status; a content-addressed file is retained while another
 image record references it. MODs can also use `POST /api/image/delete`, which
-records an `IMAGE_DELETED` audit entry.
+records an `IMAGE_DELETED` audit entry. The image view confirms deletion with
+Enter or cancels it with Escape, then opens the previous visible neighbor (or
+the home page when none exists) and replaces the deleted image in history.

@@ -313,6 +313,14 @@ export function testGalleryWidthAndQuickTagsLayoutStylesExist() {
     assertTrue(buttonRule?.text.includes('overflow:hidden'), 'quick-tag names should not overflow their buttons');
     assertTrue(findRule(rules, '.quick-tag-button--active', 'background:var(--color-accent)') !== undefined);
     assertTrue(findRule(rules, '.quick-tags-sidebar[hidden]', 'display:none') !== undefined);
+    assertTrue(
+        findRule(rules, '.quick-tag-button[aria-disabled="true"]', 'cursor:wait') !== undefined,
+        'pending quick-tag buttons should look disabled without losing focus',
+    );
+    assertTrue(
+        findRule(rules, '.button[aria-disabled="true"]', 'cursor:wait') !== undefined,
+        'aria-disabled buttons such as the quick-tags toggle should look disabled',
+    );
 }
 
 export function testImageTagEditingAndTagmeControlsHaveStyles() {

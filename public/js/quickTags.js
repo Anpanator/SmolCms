@@ -136,6 +136,7 @@ export function createQuickTagsView({
     }
 
     function render() {
+        const focused = captureFocusedButton();
         globalGroup.heading.textContent = 'Most used';
         userMostUsedGroup.heading.textContent = 'Your most used';
         userRecentGroup.heading.textContent = 'Your recent';
@@ -143,6 +144,35 @@ export function createQuickTagsView({
         renderGroup(userMostUsedGroup, lists.userMostUsed);
         renderGroup(userRecentGroup, lists.userRecent);
         renderButtons();
+        restoreFocusedButton(focused);
+    }
+
+    /**
+     * Remembers a focused tag button across list replacements so keyboard
+     * users keep the image-view hotkeys working.
+     */
+    function captureFocusedButton() {
+        const active = document.activeElement;
+        if (!(active instanceof HTMLElement) || !active.classList.contains('quick-tag-button')
+            || !element.contains(active)) {
+            return null;
+        }
+        return {
+            group: groups.find((group) => group.list.contains(active)) ?? null,
+            tagName: active.dataset.tagName,
+        };
+    }
+
+    function restoreFocusedButton(focused) {
+        if (focused === null || element.hidden) {
+            return;
+        }
+        const findTag = (group) => [...group.list.querySelectorAll('.quick-tag-button')]
+            .find((button) => button.dataset.tagName === focused.tagName) ?? null;
+        const button = (focused.group === null ? null : findTag(focused.group))
+            ?? groups.map(findTag).find((candidate) => candidate !== null)
+            ?? null;
+        button?.focus({preventScroll: true});
     }
 
     function renderGroup(group, tags) {
@@ -165,7 +195,8 @@ export function createQuickTagsView({
                 button.classList.toggle('quick-tag-button--active', isActive);
                 button.setAttribute('aria-pressed', String(isActive));
                 button.setAttribute('aria-label', `${isActive ? 'Remove' : 'Add'} tag ${tagName}`);
-                button.disabled = imageId === null || pending;
+                button.disabled = imageId === null;
+                button.setAttribute('aria-disabled', String(imageId === null || pending));
             }
         }
     }
@@ -298,7 +329,7 @@ export function createQuickTagsToggle({session, quickTags, layout, status = crea
     function renderButton() {
         button.textContent = enabled ? 'Hide quick tags' : 'Show quick tags';
         button.setAttribute('aria-expanded', String(enabled));
-        button.disabled = pending;
+        button.setAttribute('aria-disabled', String(pending));
     }
 }
 
