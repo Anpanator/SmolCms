@@ -30,8 +30,9 @@ directories, then uses Compose to build the `dev` target and start
 set `SMOLCMS_DEV_PORT` to change it.
 
 SQLite data, uploads, generated images, and logs persist below `~/SmolCms`
-(`db`, `upload`, `img`, `public-img`, and `logs`). The script creates these
-directories with setgid group-write permissions and repairs group permissions
+(`db`, `upload`, `img`, `public-img`, and `logs`). User accounts and sessions
+live in the SQLite database, so replacing the container does not log users out.
+The script creates these directories with setgid group-write permissions and repairs group permissions
 on existing host-owned data for the rootless container user. The development
 image enables `display_errors`.
 

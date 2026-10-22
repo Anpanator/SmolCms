@@ -192,6 +192,17 @@ class SessionServiceTest extends SimpleTestCase
         self::assertTrue($options['cookie_httponly']);
     }
 
+    public function testSessionOptions_KeepServerSideSessionsAsLongAsTheCookie(): void
+    {
+        $reflection = new ReflectionClass(SessionService::class);
+        $options = $reflection->getConstant('SESSION_OPTIONS');
+
+        self::assertIsArray($options);
+        self::assertArrayHasKey('gc_maxlifetime', $options);
+        self::assertSame($options['cookie_lifetime'], $options['gc_maxlifetime']);
+        self::assertSame(24 * 60 * 60, $options['gc_maxlifetime']);
+    }
+
     private function closeActiveSession(): void
     {
         if (session_status() !== PHP_SESSION_ACTIVE) {

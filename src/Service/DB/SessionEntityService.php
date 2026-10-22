@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace SmolCms\Service\DB;
 
+use DateTime;
 use SmolCms\Data\Persistence\SessionEntity;
 
 readonly class SessionEntityService extends EntityService
@@ -27,6 +28,22 @@ readonly class SessionEntityService extends EntityService
             ->withParameters(["sessionId" => $sessionId]);
         $result = $this->execute($qc);
         return !empty($result);
+    }
+
+    /**
+     * Marks the session as active so garbage collection does not expire it.
+     * The creation time doubles as the last-activity timestamp.
+     */
+    public function touchBySessionId(string $sessionId): bool
+    {
+        $session = $this->findOneBySessionId($sessionId);
+        if ($session === null) {
+            return false;
+        }
+
+        $session->setCreated(new DateTime());
+        $this->saveOrUpdate($session);
+        return true;
     }
 
     public function deleteOlderThan(int $seconds): int

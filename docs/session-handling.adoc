@@ -7,8 +7,9 @@ setting.
 
 At startup, a presented session ID is checked against stored sessions before
 it is resumed. A valid resume refreshes the cookie's expiry for another 24
-hours; the session record's creation time is not refreshed, and garbage
-collection uses that timestamp. Session locking is not implemented.
+hours. Reads and writes also refresh the session's stored activity timestamp,
+and garbage collection expires sessions only after 24 hours without activity,
+matching the cookie lifetime. Session locking is not implemented.
 
 The session user snapshot includes `AccessLevel`, the role used for
 authorization. Protected requests reload the current user role from the

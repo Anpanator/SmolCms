@@ -63,6 +63,26 @@ class SessionEntityServiceTest extends FunctionalTestCase
         self::assertNotNull($this->sessionEntityService->findOneBySessionId('session-service-retain'));
     }
 
+    public function testTouchBySessionId_refreshesActivityAndReportsMissingSessions(): void
+    {
+        $session = new SessionEntity(
+            id: null,
+            sessionId: 'session-service-touch',
+            created: new DateTime('2000-01-01 00:00:00'),
+            data: 'data',
+        );
+        $this->sessionEntityService->saveAsNew($session);
+
+        self::assertTrue($this->sessionEntityService->touchBySessionId('session-service-touch'));
+        self::assertFalse($this->sessionEntityService->touchBySessionId('session-service-missing-touch'));
+
+        $touchedSession = $this->sessionEntityService->findOneBySessionId('session-service-touch');
+        self::assertNotNull($touchedSession);
+        $created = $touchedSession->getCreated();
+        self::assertNotNull($created);
+        self::assertGreaterThan(time() - 5, $created->getTimestamp());
+    }
+
     public function testDeleteOlderThan_deletesExpiredSessionsOnly(): void
     {
         $expiredSession = new SessionEntity(

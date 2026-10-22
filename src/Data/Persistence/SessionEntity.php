@@ -18,6 +18,7 @@ class SessionEntity
         #[ValidateStringSizeBytes(max: 64)]
         #[ValidateNotNull]
         private string                               $sessionId,
+        // Also refreshed on activity; garbage collection treats it as the last-seen timestamp.
         private ?DateTime                            $created,
         #[ValidateStringSizeBytes(max: 2 ** 24 - 1)] // 16 MiB
         #[ValidateNotNull]

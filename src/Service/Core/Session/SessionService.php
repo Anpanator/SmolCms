@@ -10,9 +10,13 @@ use SmolCms\Exception\InvalidStateException;
 class SessionService
 {
     public const string SESSION_NAME = 'session';
+    private const int SESSION_LIFETIME = 24 * 60 * 60;
     private const SESSION_OPTIONS = [
         'name' => self::SESSION_NAME,
-        'cookie_lifetime' => 24 * 60 * 60,
+        'cookie_lifetime' => self::SESSION_LIFETIME,
+        // Keep server-side sessions for the same lifetime as the cookie. The
+        // default 1440 seconds would otherwise discard them after 24 minutes.
+        'gc_maxlifetime' => self::SESSION_LIFETIME,
         'cookie_secure' => false, // TODO: Change for live
         'cookie_httponly' => true,
         'cookie_samesite' => 'Strict',

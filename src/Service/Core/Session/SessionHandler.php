@@ -55,6 +55,7 @@ readonly class SessionHandler implements SessionHandlerInterface, SessionUpdateT
         $session = $this->sessionEntityService->findOneBySessionId($id);
         if ($session) {
             $session->setData($data);
+            $session->setCreated(new DateTime());
         } else {
             $session = new SessionEntity(
                 id: null,
@@ -79,7 +80,6 @@ readonly class SessionHandler implements SessionHandlerInterface, SessionUpdateT
 
     public function updateTimestamp(string $id, string $data): bool
     {
-        // TODO: Figure out if this is actually needed
-        return true;
+        return $this->sessionEntityService->touchBySessionId($id);
     }
 }

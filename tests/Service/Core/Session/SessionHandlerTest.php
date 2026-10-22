@@ -57,6 +57,50 @@ class SessionHandlerTest extends FunctionalTestCase
         self::assertSame('second', $updatedSession->getData());
     }
 
+    public function testWrite_RefreshesActivityTimestamp(): void
+    {
+        $sessionId = $this->trackSession('handler-write-touch');
+        $this->sessionEntityService->saveAsNew(new SessionEntity(
+            id: null,
+            sessionId: $sessionId,
+            created: new DateTime('2000-01-01 00:00:00'),
+            data: 'old-data',
+        ));
+
+        self::assertTrue($this->sessionHandler->write($sessionId, 'new-data'));
+
+        $session = $this->sessionEntityService->findOneBySessionId($sessionId);
+        self::assertNotNull($session);
+        self::assertSame('new-data', $session->getData());
+        $created = $session->getCreated();
+        self::assertNotNull($created);
+        self::assertGreaterThan(time() - 5, $created->getTimestamp());
+    }
+
+    public function testUpdateTimestamp_RefreshesActivityTimestamp(): void
+    {
+        $sessionId = $this->trackSession('handler-update-timestamp');
+        $this->sessionEntityService->saveAsNew(new SessionEntity(
+            id: null,
+            sessionId: $sessionId,
+            created: new DateTime('2000-01-01 00:00:00'),
+            data: 'data',
+        ));
+
+        self::assertTrue($this->sessionHandler->updateTimestamp($sessionId, 'data'));
+
+        $session = $this->sessionEntityService->findOneBySessionId($sessionId);
+        self::assertNotNull($session);
+        $created = $session->getCreated();
+        self::assertNotNull($created);
+        self::assertGreaterThan(time() - 5, $created->getTimestamp());
+    }
+
+    public function testUpdateTimestamp_ReturnsFalseForMissingSession(): void
+    {
+        self::assertFalse($this->sessionHandler->updateTimestamp('handler-missing-update', 'data'));
+    }
+
     public function testDestroy_DeletesSession(): void
     {
         $sessionId = $this->trackSession('handler-destroy');
