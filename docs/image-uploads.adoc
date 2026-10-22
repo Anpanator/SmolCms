@@ -25,7 +25,7 @@ moderation queue according to the uploader's role, then removes the original
 when no other image record references it.
 
 Run `php src/app.php --process-images 100` to process a batch; Docker runs the
-same command periodically in the background. If another worker holds the lock
+same command every second in the background. If another worker holds the lock
 file, this worker exits immediately without processing images. Failed images
 remain pending for retry. The original is never served to users. Thumbnails are
 static public files. Accepted-image details and viewing samples are accessible

@@ -31,11 +31,12 @@ do
     fi
 done
 
-# Background worker: process pending image uploads every minute (up to 100 per run).
+# Background worker: process pending image uploads every second (up to 100 per run).
+# The CLI command holds the processing lock, so overlapping runs exit immediately.
 (
     while true; do
         php "$APP_ROOT/src/app.php" --process-images 100 >/dev/null 2>&1 || true
-        sleep 60
+        sleep 1
     done
 ) &
 image_worker_pid=$!
