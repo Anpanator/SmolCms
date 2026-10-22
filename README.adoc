@@ -52,3 +52,10 @@ include::docs/cli-commands.adoc[]
 include::docs/development-rules.adoc[]
 
 include::docs/security-considerations.adoc[]
+
+== API documentation
+
+Endpoints that accept API-key authentication (`Authorization: Bearer <key>`) are
+referenced in link:docs/api/index.adoc[the API documentation]. Only handlers
+whose authorization attribute sets `apiEnabled: true` belong to that reference;
+currently this covers `POST /upload-image`.
