@@ -192,6 +192,56 @@ export function testLayoutAndGridUseCssGrid() {
     }
 }
 
+export function testHomeGridStartsAtTopNextToSidebarColumn() {
+    const fixture = document.getElementById('test-fixture');
+    const layout = document.createElement('div');
+    layout.className = 'layout home-layout';
+    const column = document.createElement('div');
+    column.className = 'home-sidebar-column';
+    const toolbar = document.createElement('div');
+    toolbar.className = 'home-toolbar';
+    const search = document.createElement('form');
+    search.className = 'search-view';
+    search.style.height = '2rem';
+    toolbar.append(search);
+    const sidebar = document.createElement('aside');
+    sidebar.className = 'sidebar';
+    column.append(toolbar, sidebar);
+    const content = document.createElement('section');
+    content.className = 'content';
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+    grid.style.height = '10rem';
+    content.append(grid);
+    layout.append(column, content);
+    fixture.append(layout);
+
+    try {
+        const toolbarRect = toolbar.getBoundingClientRect();
+        const searchRect = search.getBoundingClientRect();
+        const sidebarRect = sidebar.getBoundingClientRect();
+        const contentRect = content.getBoundingClientRect();
+        const gridRect = grid.getBoundingClientRect();
+
+        assertEqual(searchRect.left, sidebarRect.left, 'search should align with the sidebar below it');
+        assertEqual(Math.round(sidebarRect.top - toolbarRect.bottom), 16,
+            'the sidebar should sit below the search with the shared layout gap');
+        assertEqual(gridRect.top, toolbarRect.top,
+            'the thumbnail grid should start at the top next to the search');
+        assertTrue(contentRect.left > sidebarRect.right, 'the grid should keep the content column');
+
+        const rules = collectRules(findMainStylesheet());
+        assertTrue(findRule(rules, '.home-sidebar-column', 'display:flex') !== undefined,
+            'search and sidebar should share a column');
+        assertTrue(findRule(rules, '.home-sidebar-column', 'gap:var(--space-4)') !== undefined,
+            'the sidebar should sit below the search with the shared gap');
+        assertTrue(findRule(rules, '.home-layout > .content', 'grid-area:1/2') !== undefined,
+            'the home content should start at the top of the layout');
+    } finally {
+        layout.remove();
+    }
+}
+
 export function testImageToolbarAlignsWithSidebarAndImageColumns() {
     const fixture = document.getElementById('test-fixture');
     const layout = document.createElement('div');
@@ -356,8 +406,10 @@ export function testImageNavigationAndModActionStylesExist() {
         'previous/next controls should have equal widths');
     assertTrue(findRule(rules, '.image-nav', 'margin-bottom:var(--space-4)') !== undefined, 'navigation should be separated from the sidebar content below it');
     assertTrue(findRule(rules, '.image-nav .button', 'width:100%') !== undefined, 'previous/next controls should fill their equal columns');
-    assertTrue(findRule(rules, '.image-view-image', 'max-height:calc(100dvh-14rem)') !== undefined,
-        'the image should fit entirely in the visible browser area');
+    assertTrue(
+        findRule(rules, '.image-view-image', 'max-height:calc(100dvh-var(--site-header-height)-2*var(--space-4))') !== undefined,
+        'the image should use all viewport height remaining below the header and layout padding',
+    );
     assertTrue(findRule(rules, '.image-view', 'justify-content:flex-start') !== undefined, 'the image should be aligned to the left');
     assertTrue(findRule(rules, '.image-layout > .image-content', 'grid-area:1/2') !== undefined,
         'the image content should start at the top without a toolbar row above it');

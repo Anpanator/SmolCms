@@ -44,6 +44,30 @@ export function isModerationRoute(path) {
     return path === RoutePath.IMAGE_REVIEW || path === RoutePath.TAG_QUEUE;
 }
 
+/**
+ * Publishes the rendered header height so viewport-sized views can subtract it.
+ * The header can wrap when the navigation changes or the window narrows, so a
+ * ResizeObserver keeps the custom property current.
+ *
+ * @param {HTMLElement} header
+ * @param {HTMLElement} root
+ * @returns {{update: () => void, disconnect: () => void}}
+ */
+export function syncHeaderHeight(header, root = document.documentElement) {
+    const update = () => {
+        root.style.setProperty('--site-header-height', `${header.getBoundingClientRect().height}px`);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    return {
+        update,
+        disconnect() {
+            observer.disconnect();
+        },
+    };
+}
+
 async function bootstrap() {
     const appRoot = document.getElementById('app');
     if (!appRoot) {
@@ -77,10 +101,9 @@ async function bootstrap() {
         },
     });
 
-    appRoot.append(
-        el('header', { className: 'site-header', children: headerNav.element }),
-        viewContainer,
-    );
+    const header = el('header', { className: 'site-header', children: headerNav.element });
+    appRoot.append(header, viewContainer);
+    syncHeaderHeight(header);
     router.start();
 }
 

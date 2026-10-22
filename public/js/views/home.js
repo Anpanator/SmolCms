@@ -61,7 +61,7 @@ export function createHomeView({navigate = () => {}, query = new URLSearchParams
         onSearch: (searchTags) => navigate(buildHomePath(1, searchTags)),
     });
     const toolbar = el('div', {
-        className: 'layout-toolbar home-toolbar',
+        className: 'home-toolbar',
         children: search.element,
     });
     const tagView = createTagView([], activeTags);
@@ -87,7 +87,11 @@ export function createHomeView({navigate = () => {}, query = new URLSearchParams
 
     loadImages({ grid, tagView, pagination, page: requestedPage, tags, navigate });
 
-    return el('div', { className: 'layout home-layout', children: [toolbar, sidebar, content] });
+    const sidebarColumn = el('div', {
+        className: 'home-sidebar-column',
+        children: [toolbar, sidebar],
+    });
+    return el('div', { className: 'layout home-layout', children: [sidebarColumn, content] });
 }
 
 function showLoadingTiles(grid) {

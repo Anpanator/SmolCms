@@ -40,6 +40,7 @@
     --quick-tags-sidebar-width: 18rem;
     --max-width: 75rem;
     --gallery-max-width: 100rem;
+    --site-header-height: calc(3.5rem + 1px);
 }
 
 /* ------------------------------------------------------------------ */
@@ -234,6 +235,25 @@ h3 {
 
 .layout-toolbar .search-view {
     margin-bottom: 0;
+}
+
+/* Keep the search above the sidebar while the thumbnail grid starts at the top. */
+.home-sidebar-column {
+    display: flex;
+    flex-direction: column;
+    align-self: start;
+    gap: var(--space-4);
+    min-width: 0;
+}
+
+.home-toolbar .search-view {
+    margin-bottom: 0;
+}
+
+.home-layout > .content {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
 }
 
 .sidebar {
@@ -893,8 +913,8 @@ h3 {
 .image-view-image {
     display: block;
     max-width: 100%;
-    max-height: calc(100vh - 14rem);
-    max-height: calc(100dvh - 14rem);
+    max-height: calc(100vh - var(--site-header-height) - 2 * var(--space-4));
+    max-height: calc(100dvh - var(--site-header-height) - 2 * var(--space-4));
     width: auto;
     height: auto;
     background: var(--color-surface);
@@ -1880,8 +1900,13 @@ h3 {
         display: contents;
     }
 
+    .home-sidebar-column {
+        display: contents;
+    }
+
     .image-layout > .image-content,
-    .image-layout > .quick-tags-sidebar {
+    .image-layout > .quick-tags-sidebar,
+    .home-layout > .content {
         grid-column: 1;
         grid-row: auto;
     }

@@ -1,5 +1,5 @@
 import {assertEqual, assertTrue} from './assert.js';
-import {createRouteMap, isModerationRoute} from '../../public/js/main.js';
+import {createRouteMap, isModerationRoute, syncHeaderHeight} from '../../public/js/main.js';
 import {RoutePath} from '../../public/js/routes.js';
 
 export function testMainRouteRegistryCoversEveryClientPage() {
@@ -29,4 +29,32 @@ export function testMainIdentifiesOnlyModerationRoutes() {
     assertTrue(isModerationRoute(RoutePath.TAG_QUEUE));
     assertTrue(!isModerationRoute(RoutePath.START_PAGE));
     assertTrue(!isModerationRoute(RoutePath.TAGS_PAGE));
+}
+
+export function testMainTracksWrappedHeaderHeight(fixture) {
+    const header = document.createElement('header');
+    header.className = 'site-header';
+    header.style.height = '57px';
+    fixture.append(header);
+
+    const root = document.documentElement;
+    const previousHeight = root.style.getPropertyValue('--site-header-height');
+    const tracking = syncHeaderHeight(header, root);
+    try {
+        assertEqual(root.style.getPropertyValue('--site-header-height'), '57px',
+            'the header height should be published immediately for viewport-sized views');
+
+        header.style.height = '105px';
+        tracking.update();
+        assertEqual(root.style.getPropertyValue('--site-header-height'), '105px',
+            'updates should reflect a wrapped header');
+    } finally {
+        tracking.disconnect();
+        if (previousHeight === '') {
+            root.style.removeProperty('--site-header-height');
+        } else {
+            root.style.setProperty('--site-header-height', previousHeight);
+        }
+        header.remove();
+    }
 }

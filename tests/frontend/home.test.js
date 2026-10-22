@@ -29,8 +29,17 @@ export async function testHomeViewRendersPageTagsAndImageGrid() {
     try {
         assertTrue(view.matches('.layout.home-layout'), 'home should use the .layout grid');
         assertTrue(view.querySelector('.home-toolbar .search-view') !== null, 'home should have a tag search above the layout content');
-        assertEqual(view.querySelector('.sidebar .search-view'), null, 'home sidebar should not contain tag search');
-        assertTrue(view.querySelector('.sidebar .tags') !== null, 'sidebar tag list should exist');
+        const sidebarColumn = view.querySelector('.home-sidebar-column');
+        assertTrue(sidebarColumn !== null, 'search and sidebar should share a column');
+        assertTrue(sidebarColumn.querySelector(':scope > .home-toolbar .search-view') !== null,
+            'the tag search should stay above the sidebar');
+        assertTrue(sidebarColumn.querySelector(':scope > .sidebar') !== null,
+            'the sidebar should sit below the tag search');
+        assertEqual(sidebarColumn.querySelector('.sidebar .search-view'), null,
+            'home sidebar should not contain tag search');
+        assertTrue(sidebarColumn.querySelector('.sidebar .tags') !== null, 'sidebar tag list should exist');
+        assertTrue(view.querySelector(':scope > .content .grid') !== null,
+            'the grid should be a direct layout column so it can start at the top');
         assertEqual(view.querySelector('.quick-tags-sidebar'), null, 'home does not have a quick-tag sidebar');
         assertFalse(view.classList.contains('layout--with-quick-tags'));
         assertEqual(view.querySelectorAll('.tags .tags-item').length, 2, 'the page tags should replace static tags');
