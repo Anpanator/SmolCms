@@ -109,6 +109,41 @@ readonly class UserService extends EntityService
         return $result[0] ?? null;
     }
 
+    /**
+     * @param list<int> $userIds
+     * @return array<int, UserEntity> Keyed by user ID.
+     */
+    public function findByIds(array $userIds): array
+    {
+        if ($userIds === []) {
+            return [];
+        }
+
+        $result = [];
+        foreach (array_chunk(array_values(array_unique($userIds)), 500) as $chunk) {
+            $placeholders = [];
+            $parameters = [];
+            foreach ($chunk as $index => $userId) {
+                $parameterName = 'user_id_' . $index;
+                $placeholders[] = ':' . $parameterName;
+                $parameters[$parameterName] = $userId;
+            }
+
+            $criteria = new QueryCriteria();
+            $criteria->select(UserEntity::class)
+                ->andWhere('id IN (' . implode(', ', $placeholders) . ')')
+                ->withParameters($parameters);
+
+            foreach ($this->execute($criteria) ?? [] as $user) {
+                $userId = $user->getId();
+                if ($userId !== null) {
+                    $result[$userId] = $user;
+                }
+            }
+        }
+        return $result;
+    }
+
     private static function applySearchFilter(QueryCriteria $criteria, string $q): void
     {
         if ($q === '') {

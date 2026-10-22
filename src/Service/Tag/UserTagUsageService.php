@@ -4,18 +4,32 @@ declare(strict_types=1);
 
 namespace SmolCms\Service\Tag;
 
+use DateTime;
 use InvalidArgumentException;
 use PDO;
+use SmolCms\Data\Persistence\UserTagUsageEntity;
+use SmolCms\Service\Core\CaseConverter;
+use SmolCms\Service\DB\EntityAttributeProcessor;
+use SmolCms\Service\DB\EntityService;
+use SmolCms\Service\DB\QueryBuilder;
+use SmolCms\Service\DB\QueryCriteria;
 
 /** Tracks user-driven tag activity and builds each user's quick-tag lists. */
-readonly class UserTagUsageService
+readonly class UserTagUsageService extends EntityService
 {
     private const string EXCLUDED_TAG = 'tagme';
     private const int GLOBAL_LIMIT = 20;
     private const int USER_LIMIT = 10;
 
-    public function __construct(private PDO $pdo)
+    public function __construct(
+        PDO $pdo,
+        CaseConverter $caseConverter,
+        QueryBuilder $queryBuilder,
+        EntityAttributeProcessor $entityAttributeProcessor,
+        private TagService $tagService,
+    )
     {
+        parent::__construct($pdo, $caseConverter, $queryBuilder, $entityAttributeProcessor);
     }
 
     /** Adds one successful user-driven image/tag association to that user's usage. */
@@ -26,14 +40,22 @@ readonly class UserTagUsageService
             return;
         }
 
-        $statement = $this->pdo->prepare(
-            'INSERT INTO user_tag_usage (user_id, tag_id, usage_count, last_used_at) '
-            . 'VALUES (:user_id, :tag_id, 1, CURRENT_TIMESTAMP) '
-            . 'ON CONFLICT(user_id, tag_id) DO UPDATE SET '
-            . 'usage_count = user_tag_usage.usage_count + 1, '
-            . 'last_used_at = CURRENT_TIMESTAMP'
-        );
-        $statement->execute(['user_id' => $userId, 'tag_id' => $tagId]);
+        $this->withinTransaction(function () use ($userId, $tagId): void {
+            $usage = $this->findUsage($userId, $tagId);
+            if ($usage === null) {
+                $this->saveAsNew(new UserTagUsageEntity(
+                    userId: $userId,
+                    tagId: $tagId,
+                    usageCount: 1,
+                    lastUsedAt: new DateTime(),
+                ));
+                return;
+            }
+
+            $usage->setUsageCount($usage->getUsageCount() + 1);
+            $usage->setLastUsedAt(new DateTime());
+            $this->saveUsage($usage);
+        });
     }
 
     /** Records a successful removal, preserving the last time the tag was added. */
@@ -44,14 +66,21 @@ readonly class UserTagUsageService
             return;
         }
 
-        $statement = $this->pdo->prepare(
-            'INSERT INTO user_tag_usage (user_id, tag_id, usage_count, last_used_at) '
-            . 'VALUES (:user_id, :tag_id, 0, NULL) '
-            . 'ON CONFLICT(user_id, tag_id) DO UPDATE SET '
-            . 'usage_count = CASE WHEN user_tag_usage.usage_count > 0 '
-            . 'THEN user_tag_usage.usage_count - 1 ELSE 0 END'
-        );
-        $statement->execute(['user_id' => $userId, 'tag_id' => $tagId]);
+        $this->withinTransaction(function () use ($userId, $tagId): void {
+            $usage = $this->findUsage($userId, $tagId);
+            if ($usage === null) {
+                $this->saveAsNew(new UserTagUsageEntity(
+                    userId: $userId,
+                    tagId: $tagId,
+                    usageCount: 0,
+                    lastUsedAt: null,
+                ));
+                return;
+            }
+
+            $usage->setUsageCount(max(0, $usage->getUsageCount() - 1));
+            $this->saveUsage($usage);
+        });
     }
 
     /**
@@ -63,31 +92,23 @@ readonly class UserTagUsageService
      */
     public function getQuickTags(int $userId): array
     {
-        $global = $this->fetchTags(
-            'SELECT tag.name, category.name AS category '
-            . 'FROM tag '
-            . 'INNER JOIN tag_category AS category ON category.id = tag.category_id '
-            . 'WHERE tag.name <> :excluded_tag COLLATE NOCASE '
-            . 'ORDER BY tag.usage_count DESC, tag.name COLLATE NOCASE, tag.name '
-            . 'LIMIT ' . self::GLOBAL_LIMIT,
-            ['excluded_tag' => self::EXCLUDED_TAG],
-        );
+        $global = $this->tagService->getMostUsedTags(self::GLOBAL_LIMIT, self::EXCLUDED_TAG);
 
-        $mostUsedRows = $this->fetchRows(
-            'SELECT tag.id AS tag_id, tag.name, category.name AS category '
-            . 'FROM user_tag_usage AS user_usage '
-            . 'INNER JOIN tag ON tag.id = user_usage.tag_id '
-            . 'INNER JOIN tag_category AS category ON category.id = tag.category_id '
-            . 'WHERE user_usage.user_id = :user_id '
-            . 'AND user_usage.usage_count > 0 '
-            . 'AND tag.name <> :excluded_tag COLLATE NOCASE '
-            . 'ORDER BY user_usage.usage_count DESC, tag.name COLLATE NOCASE, tag.name '
-            . 'LIMIT ' . self::USER_LIMIT,
-            ['user_id' => $userId, 'excluded_tag' => self::EXCLUDED_TAG],
+        $usageRows = $this->findUsageForUser($userId);
+        $tagSummaries = $this->tagService->getTagSummariesByIds(array_values(array_unique(
+            array_map(static fn(UserTagUsageEntity $usage): int => $usage->getTagId(), $usageRows),
+        )));
+
+        $mostUsedRows = $this->findMostUsed($usageRows, $tagSummaries);
+        $userMostUsed = array_map(
+            static fn(array $row): array => ['name' => $row['name'], 'category' => $row['category']],
+            $mostUsedRows,
         );
-        $userMostUsed = self::formatTags($mostUsedRows);
-        $excludedTagIds = array_map(static fn(array $row): int => (int)$row['tag_id'], $mostUsedRows);
-        $userRecent = $this->findRecentTags($userId, $excludedTagIds);
+        $userRecent = $this->findRecent(
+            $usageRows,
+            $tagSummaries,
+            array_column($mostUsedRows, 'tagId'),
+        );
 
         return [
             'global' => $global,
@@ -107,69 +128,114 @@ readonly class UserTagUsageService
             return null;
         }
 
-        $statement = $this->pdo->prepare('SELECT id FROM tag WHERE name = :name COLLATE NOCASE');
-        $statement->execute(['name' => $normalizedName]);
-        $tagId = $statement->fetchColumn();
-        return $tagId === false ? null : (int)$tagId;
+        return $this->tagService->findTagIdByName($normalizedName);
     }
 
-    /** @param list<int> $excludedTagIds @return list<array{name: string, category: string}> */
-    private function findRecentTags(int $userId, array $excludedTagIds): array
+    private function findUsage(int $userId, int $tagId): ?UserTagUsageEntity
     {
-        $parameters = [
-            'user_id' => $userId,
-            'excluded_tag' => self::EXCLUDED_TAG,
-        ];
-        $excluded = '';
-        if ($excludedTagIds !== []) {
-            $placeholders = [];
-            foreach (array_values($excludedTagIds) as $index => $tagId) {
-                $parameter = 'excluded_tag_' . $index;
-                $placeholders[] = ':' . $parameter;
-                $parameters[$parameter] = $tagId;
+        $criteria = new QueryCriteria();
+        $criteria->select(UserTagUsageEntity::class)
+            ->andWhere('user_id = :user_id')
+            ->andWhere('tag_id = :tag_id')
+            ->withParameters(['user_id' => $userId, 'tag_id' => $tagId])
+            ->maxResults(1);
+        return ($this->execute($criteria) ?? [])[0] ?? null;
+    }
+
+    /** @return list<UserTagUsageEntity> */
+    private function findUsageForUser(int $userId): array
+    {
+        $criteria = new QueryCriteria();
+        $criteria->select(UserTagUsageEntity::class)
+            ->andWhere('user_id = :user_id')
+            ->withParameters(['user_id' => $userId]);
+        return $this->execute($criteria) ?? [];
+    }
+
+    private function saveUsage(UserTagUsageEntity $usage): void
+    {
+        $criteria = new QueryCriteria();
+        $criteria->update(UserTagUsageEntity::class)
+            ->andWhere('user_id = :user_id')
+            ->andWhere('tag_id = :tag_id')
+            ->withParameters([
+                'user_id' => $usage->getUserId(),
+                'tag_id' => $usage->getTagId(),
+                'usage_count' => $usage->getUsageCount(),
+                'last_used_at' => $usage->getLastUsedAt()?->format('Y-m-d H:i:s'),
+            ]);
+        $this->execute($criteria);
+    }
+
+    /**
+     * @param list<UserTagUsageEntity> $usageRows
+     * @param array<int, array{name: string, category: string}> $tagSummaries
+     * @return list<array{tagId: int, name: string, category: string, usageCount: int}>
+     */
+    private function findMostUsed(array $usageRows, array $tagSummaries): array
+    {
+        $rows = [];
+        foreach ($usageRows as $usage) {
+            $summary = $tagSummaries[$usage->getTagId()] ?? null;
+            if ($usage->getUsageCount() < 1
+                || $summary === null
+                || TagService::normalizeTagName($summary['name']) === self::EXCLUDED_TAG) {
+                continue;
             }
-            $excluded = 'AND tag.id NOT IN (' . implode(', ', $placeholders) . ') ';
+            $rows[] = [
+                'tagId' => $usage->getTagId(),
+                'name' => $summary['name'],
+                'category' => $summary['category'],
+                'usageCount' => $usage->getUsageCount(),
+            ];
         }
+        usort($rows, static function (array $a, array $b): int {
+            $countDifference = $b['usageCount'] <=> $a['usageCount'];
+            if ($countDifference !== 0) {
+                return $countDifference;
+            }
+            return strcasecmp($a['name'], $b['name']) ?: strcmp($a['name'], $b['name']);
+        });
 
-        return $this->fetchTags(
-            'SELECT tag.name, category.name AS category '
-            . 'FROM user_tag_usage AS user_usage '
-            . 'INNER JOIN tag ON tag.id = user_usage.tag_id '
-            . 'INNER JOIN tag_category AS category ON category.id = tag.category_id '
-            . 'WHERE user_usage.user_id = :user_id '
-            . 'AND user_usage.usage_count > 0 '
-            . 'AND user_usage.last_used_at IS NOT NULL '
-            . 'AND tag.name <> :excluded_tag COLLATE NOCASE '
-            . $excluded
-            . 'ORDER BY user_usage.last_used_at DESC, tag.name COLLATE NOCASE, tag.name '
-            . 'LIMIT ' . self::USER_LIMIT,
-            $parameters,
-        );
+        return array_slice($rows, 0, self::USER_LIMIT);
     }
 
-    /** @param array<string, mixed> $parameters @return list<array<string, mixed>> */
-    private function fetchRows(string $query, array $parameters): array
+    /**
+     * @param list<UserTagUsageEntity> $usageRows
+     * @param array<int, array{name: string, category: string}> $tagSummaries
+     * @param list<int> $excludedTagIds
+     * @return list<array{name: string, category: string}>
+     */
+    private function findRecent(array $usageRows, array $tagSummaries, array $excludedTagIds): array
     {
-        $statement = $this->pdo->prepare($query);
-        $statement->execute($parameters);
-        return $statement->fetchAll(PDO::FETCH_ASSOC);
-    }
+        $excluded = array_flip($excludedTagIds);
+        $rows = [];
+        foreach ($usageRows as $usage) {
+            $summary = $tagSummaries[$usage->getTagId()] ?? null;
+            if ($usage->getUsageCount() < 1
+                || $usage->getLastUsedAt() === null
+                || $summary === null
+                || TagService::normalizeTagName($summary['name']) === self::EXCLUDED_TAG
+                || isset($excluded[$usage->getTagId()])) {
+                continue;
+            }
+            $rows[] = [
+                'name' => $summary['name'],
+                'category' => $summary['category'],
+                'lastUsedAt' => $usage->getLastUsedAt(),
+            ];
+        }
+        usort($rows, static function (array $a, array $b): int {
+            $timeDifference = $b['lastUsedAt'] <=> $a['lastUsedAt'];
+            if ($timeDifference !== 0) {
+                return $timeDifference;
+            }
+            return strcasecmp($a['name'], $b['name']) ?: strcmp($a['name'], $b['name']);
+        });
 
-    /** @param array<string, mixed> $parameters @return list<array{name: string, category: string}> */
-    private function fetchTags(string $query, array $parameters): array
-    {
-        return self::formatTags($this->fetchRows($query, $parameters));
-    }
-
-    /** @param list<array<string, mixed>> $rows @return list<array{name: string, category: string}> */
-    private static function formatTags(array $rows): array
-    {
         return array_map(
-            static fn(array $row): array => [
-                'name' => (string)$row['name'],
-                'category' => (string)$row['category'],
-            ],
-            $rows,
+            static fn(array $row): array => ['name' => $row['name'], 'category' => $row['category']],
+            array_slice($rows, 0, self::USER_LIMIT),
         );
     }
 }

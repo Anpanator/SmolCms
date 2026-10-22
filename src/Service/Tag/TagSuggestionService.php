@@ -15,6 +15,7 @@ use SmolCms\Service\DB\EntityService;
 use SmolCms\Service\DB\QueryBuilder;
 use SmolCms\Service\DB\QueryCriteria;
 use SmolCms\Service\DB\TagApprovalService;
+use SmolCms\Service\DB\UserService;
 use Throwable;
 use InvalidArgumentException;
 
@@ -27,6 +28,7 @@ readonly class TagSuggestionService extends EntityService
         EntityAttributeProcessor $entityAttributeProcessor,
         private TagService $tagService,
         private TagApprovalService $tagApprovalService,
+        private UserService $userService,
     )
     {
         parent::__construct($pdo, $caseConverter, $queryBuilder, $entityAttributeProcessor);
@@ -88,22 +90,30 @@ readonly class TagSuggestionService extends EntityService
      */
     public function getQueue(): array
     {
-        $statement = $this->pdo->query(
-            'SELECT s.id, s.tag_name, s.image_id, s.user_id, s.created, u.display_name '
-            . 'FROM tag_suggestion s LEFT JOIN user u ON u.id = s.user_id '
-            . 'ORDER BY s.created ASC, s.id ASC'
-        );
+        $criteria = new QueryCriteria();
+        $criteria->select(TagSuggestionEntity::class)
+            ->orderBy('created')
+            ->orderBy('id');
+        $suggestions = $this->execute($criteria) ?? [];
+
+        $userIds = [];
+        foreach ($suggestions as $suggestion) {
+            $userIds[$suggestion->getUserId()] = $suggestion->getUserId();
+        }
+        $users = $this->userService->findByIds(array_values($userIds));
+
         $queue = [];
-        while (($row = $statement->fetch(PDO::FETCH_ASSOC)) !== false) {
+        foreach ($suggestions as $suggestion) {
+            $user = $users[$suggestion->getUserId()] ?? null;
             $queue[] = [
-                'id' => (int)$row['id'],
-                'tagName' => (string)$row['tag_name'],
-                'imageId' => (int)$row['image_id'],
+                'id' => (int)$suggestion->getId(),
+                'tagName' => $suggestion->getTagName(),
+                'imageId' => $suggestion->getImageId(),
                 'suggestedBy' => [
-                    'id' => (int)$row['user_id'],
-                    'displayName' => (string)($row['display_name'] ?? ''),
+                    'id' => $suggestion->getUserId(),
+                    'displayName' => $user?->getDisplayName() ?? '',
                 ],
-                'created' => (new DateTime((string)$row['created']))->format('Y-m-d H:i:s'),
+                'created' => $suggestion->getCreated()->format('Y-m-d H:i:s'),
             ];
         }
         return $queue;

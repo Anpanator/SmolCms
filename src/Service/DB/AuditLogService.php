@@ -5,15 +5,27 @@ declare(strict_types=1);
 namespace SmolCms\Service\DB;
 
 use DateTime;
+use InvalidArgumentException;
 use PDO;
 use SmolCms\Data\Constant\AuditActionType;
 use SmolCms\Data\Persistence\AuditLogEntity;
+use SmolCms\Service\Core\CaseConverter;
 use SmolCms\Service\Tag\TagService;
-use InvalidArgumentException;
 
 readonly class AuditLogService extends EntityService
 {
     private const int PER_PAGE = 30;
+
+    public function __construct(
+        PDO $pdo,
+        CaseConverter $caseConverter,
+        QueryBuilder $queryBuilder,
+        EntityAttributeProcessor $entityAttributeProcessor,
+        private UserService $userService,
+    )
+    {
+        parent::__construct($pdo, $caseConverter, $queryBuilder, $entityAttributeProcessor);
+    }
 
     public function record(int $userId, AuditActionType $actionType, string $context): void
     {
@@ -35,21 +47,21 @@ readonly class AuditLogService extends EntityService
             throw new InvalidArgumentException('Limit must be a positive integer.');
         }
 
-        $statement = $this->pdo->prepare(
-            'SELECT id, action_type, context, created FROM audit_log '
-            . 'WHERE user_id = :user_id ORDER BY created DESC, id DESC LIMIT :limit'
-        );
-        $statement->bindValue(':user_id', $userId, PDO::PARAM_INT);
-        $statement->bindValue(':limit', $limit, PDO::PARAM_INT);
-        $statement->execute();
+        $criteria = new QueryCriteria();
+        $criteria->select(AuditLogEntity::class)
+            ->andWhere('user_id = :user_id')
+            ->withParameters(['user_id' => $userId])
+            ->orderBy('created', QueryCriteria::ORDER_DESC)
+            ->orderBy('id', QueryCriteria::ORDER_DESC)
+            ->maxResults($limit);
 
         $entries = [];
-        while (($row = $statement->fetch(PDO::FETCH_ASSOC)) !== false) {
+        foreach ($this->execute($criteria) ?? [] as $auditLog) {
             $entries[] = [
-                'id' => (int)$row['id'],
-                'actionType' => (int)$row['action_type'],
-                'context' => (string)$row['context'],
-                'time' => (new DateTime((string)$row['created']))->format('Y-m-d H:i:s'),
+                'id' => (int)$auditLog->getId(),
+                'actionType' => $auditLog->getActionType()->value,
+                'context' => $auditLog->getContext(),
+                'time' => $auditLog->getCreated()->format('Y-m-d H:i:s'),
             ];
         }
 
@@ -65,54 +77,41 @@ readonly class AuditLogService extends EntityService
             throw new InvalidArgumentException('Page must be a positive integer.');
         }
 
-        $filterSql = '';
-        $parameters = [];
-        if ($q !== '') {
-            $conditions = [];
-            $numericUserId = self::parseNumericId($q);
-            if ($numericUserId !== null) {
-                $conditions[] = 'l.user_id = :user_id';
-                $parameters['user_id'] = $numericUserId;
-            }
-            $pattern = '%' . TagService::escapeLikePattern($q) . '%';
-            $conditions[] = "u.login_name LIKE :login_query ESCAPE '\\'";
-            $conditions[] = "u.display_name LIKE :display_query ESCAPE '\\'";
-            $parameters['login_query'] = $pattern;
-            $parameters['display_query'] = $pattern;
-            $filterSql = ' WHERE (' . implode(' OR ', $conditions) . ')';
-        }
+        $countCriteria = new QueryCriteria();
+        $countCriteria->select(AuditLogEntity::class);
+        self::applySearchFilter($countCriteria, $q);
+        $total = $this->countResults($countCriteria);
 
-        $countStatement = $this->pdo->prepare(
-            'SELECT COUNT(*) FROM audit_log l INNER JOIN user u ON u.id = l.user_id' . $filterSql
-        );
-        $countStatement->execute($parameters);
-        $total = (int)$countStatement->fetchColumn();
+        $criteria = new QueryCriteria();
+        $criteria->select(AuditLogEntity::class)
+            ->orderBy('id', QueryCriteria::ORDER_DESC)
+            ->maxResults(self::PER_PAGE)
+            ->skipResults(($page - 1) * self::PER_PAGE);
+        self::applySearchFilter($criteria, $q);
+        $auditLogs = $this->execute($criteria) ?? [];
 
-        $statement = $this->pdo->prepare(
-            'SELECT l.id, l.user_id, u.login_name, u.display_name, l.action_type, l.context, l.created '
-            . 'FROM audit_log l INNER JOIN user u ON u.id = l.user_id'
-            . $filterSql
-            . ' ORDER BY l.id DESC LIMIT :limit OFFSET :offset'
-        );
-        foreach ($parameters as $name => $value) {
-            $statement->bindValue(':' . $name, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+        $userIds = [];
+        foreach ($auditLogs as $auditLog) {
+            $userIds[$auditLog->getUserId()] = $auditLog->getUserId();
         }
-        $statement->bindValue(':limit', self::PER_PAGE, PDO::PARAM_INT);
-        $statement->bindValue(':offset', ($page - 1) * self::PER_PAGE, PDO::PARAM_INT);
-        $statement->execute();
+        $users = $this->userService->findByIds(array_values($userIds));
 
         $entries = [];
-        while (($row = $statement->fetch(PDO::FETCH_ASSOC)) !== false) {
+        foreach ($auditLogs as $auditLog) {
+            $user = $users[$auditLog->getUserId()] ?? null;
+            if ($user === null) {
+                continue;
+            }
             $entries[] = [
-                'id' => (int)$row['id'],
+                'id' => (int)$auditLog->getId(),
                 'user' => [
-                    'id' => (int)$row['user_id'],
-                    'loginName' => (string)$row['login_name'],
-                    'displayName' => (string)$row['display_name'],
+                    'id' => (int)$user->getId(),
+                    'loginName' => $user->getLoginName(),
+                    'displayName' => $user->getDisplayName(),
                 ],
-                'actionType' => (int)$row['action_type'],
-                'context' => (string)$row['context'],
-                'time' => (new DateTime((string)$row['created']))->format('Y-m-d H:i:s'),
+                'actionType' => $auditLog->getActionType()->value,
+                'context' => $auditLog->getContext(),
+                'time' => $auditLog->getCreated()->format('Y-m-d H:i:s'),
             ];
         }
 
@@ -122,6 +121,32 @@ readonly class AuditLogService extends EntityService
             'perPage' => self::PER_PAGE,
             'total' => $total,
         ];
+    }
+
+    private static function applySearchFilter(QueryCriteria $criteria, string $q): void
+    {
+        if ($q === '') {
+            // Mirrors the previous INNER JOIN with user.
+            $criteria->andWhere('user_id IN (SELECT id FROM user)');
+            return;
+        }
+
+        $conditions = [];
+        $parameters = [];
+        $numericUserId = self::parseNumericId($q);
+        if ($numericUserId !== null) {
+            $conditions[] = 'id = :user_id';
+            $parameters['user_id'] = $numericUserId;
+        }
+        $pattern = '%' . TagService::escapeLikePattern($q) . '%';
+        $conditions[] = "login_name LIKE :login_query ESCAPE '\\'";
+        $conditions[] = "display_name LIKE :display_query ESCAPE '\\'";
+        $parameters['login_query'] = $pattern;
+        $parameters['display_query'] = $pattern;
+
+        $criteria->andWhere(
+            'user_id IN (SELECT id FROM user WHERE ' . implode(' OR ', $conditions) . ')'
+        )->withParameters($parameters);
     }
 
     private static function parseNumericId(string $q): ?int

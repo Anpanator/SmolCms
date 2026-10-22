@@ -89,6 +89,28 @@ class UserTagUsageServiceTest extends FunctionalTestCase
         self::assertNull($this->findUsage(902, 'tagme'));
     }
 
+    public function testQuickTagsExcludeTagmeEvenWhenAUsageRowExists(): void
+    {
+        $userId = 904;
+        $tagName = 'user-usage-tagme-exclusion-' . bin2hex(random_bytes(4));
+        $this->tagService->createTag($tagName);
+        $tagmeId = $this->tagService->findOrCreateTagId('tagme');
+        $tagId = $this->tagService->findOrCreateTagId($tagName);
+
+        $statement = $this->pdo->prepare(
+            'INSERT INTO user_tag_usage (user_id, tag_id, usage_count, last_used_at) '
+            . 'VALUES (:user_id, :tag_id, :usage_count, CURRENT_TIMESTAMP)'
+        );
+        $statement->execute(['user_id' => $userId, 'tag_id' => $tagmeId, 'usage_count' => 100]);
+        $statement->execute(['user_id' => $userId, 'tag_id' => $tagId, 'usage_count' => 1]);
+
+        $quickTags = $this->userTagUsageService->getQuickTags($userId);
+
+        self::assertNotContains('tagme', array_column($quickTags['userMostUsed'], 'name'));
+        self::assertNotContains('tagme', array_column($quickTags['userRecent'], 'name'));
+        self::assertContains($tagName, array_column($quickTags['userMostUsed'], 'name'));
+    }
+
     /** @return array{usage_count: int|string, last_used_at: string|null}|null */
     private function findUsage(int $userId, string $tagName): ?array
     {

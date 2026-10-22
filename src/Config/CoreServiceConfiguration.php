@@ -260,6 +260,7 @@ class CoreServiceConfiguration
                     CaseConverter::class,
                     QueryBuilder::class,
                     EntityAttributeProcessor::class,
+                    UserService::class,
                 ]
             ),
             new Service(
@@ -280,6 +281,7 @@ class CoreServiceConfiguration
                     EntityAttributeProcessor::class,
                     TagService::class,
                     TagApprovalService::class,
+                    UserService::class,
                 ]
             ),
         ];

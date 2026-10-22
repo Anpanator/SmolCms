@@ -457,6 +457,73 @@ readonly class TagService extends EntityService
     }
 
     /**
+     * Most-used tags with their category names, excluding an optional tag name.
+     *
+     * @return list<array{name: string, category: string}>
+     */
+    public function getMostUsedTags(int $limit, ?string $excludedName = null): array
+    {
+        if ($limit < 1) {
+            return [];
+        }
+
+        $criteria = new QueryCriteria();
+        $criteria->select(TagEntity::class)
+            ->orderBy('usage_count', QueryCriteria::ORDER_DESC)
+            ->orderBy('name COLLATE NOCASE')
+            ->orderBy('name')
+            ->maxResults($limit);
+        if ($excludedName !== null) {
+            $criteria->andWhere('name <> :excluded_name COLLATE NOCASE')
+                ->withParameters(['excluded_name' => $excludedName]);
+        }
+
+        $result = [];
+        foreach ($this->withCategoryNames($this->execute($criteria) ?? []) as $tag) {
+            $result[] = ['name' => $tag['name'], 'category' => $tag['category']];
+        }
+        return $result;
+    }
+
+    /**
+     * @param list<int> $tagIds
+     * @return array<int, array{name: string, category: string}>
+     */
+    public function getTagSummariesByIds(array $tagIds): array
+    {
+        $tags = [];
+        foreach (array_chunk(array_values(array_unique($tagIds)), 500) as $chunk) {
+            array_push($tags, ...$this->findTagsByIds($chunk));
+        }
+        if ($tags === []) {
+            return [];
+        }
+
+        $categoryIds = [];
+        foreach ($tags as $tag) {
+            $categoryIds[$tag->getCategoryId()] = $tag->getCategoryId();
+        }
+        $categoryNames = [];
+        foreach ($this->findCategoriesByIds(array_values($categoryIds)) as $category) {
+            $categoryId = $category->getId();
+            if ($categoryId !== null) {
+                $categoryNames[$categoryId] = $category->getName();
+            }
+        }
+
+        $result = [];
+        foreach ($tags as $tag) {
+            $tagId = $tag->getId();
+            $categoryName = $categoryNames[$tag->getCategoryId()] ?? null;
+            if ($tagId === null || $categoryName === null) {
+                continue;
+            }
+            $result[$tagId] = ['name' => $tag->getName(), 'category' => $categoryName];
+        }
+        return $result;
+    }
+
+    /**
      * Counts tags only across the images on the current image-list page.
      *
      * @param list<int> $imageIds
@@ -510,6 +577,12 @@ readonly class TagService extends EntityService
     {
         $normalizedName = self::normalizeName($tagName);
         return $this->findTag($normalizedName)?->getUsageCount();
+    }
+
+    /** Finds the ID of an existing tag by name without creating it. */
+    public function findTagIdByName(string $tagName): ?int
+    {
+        return $this->findTag(self::normalizeName($tagName))?->getId();
     }
 
     private function findTag(string $name): ?TagEntity

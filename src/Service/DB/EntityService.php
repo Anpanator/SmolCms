@@ -233,6 +233,12 @@ abstract readonly class EntityService
         return null;
     }
 
+    /** Returns the PDO driver name, e.g. "sqlite" or "mysql". */
+    protected function getDriverName(): string
+    {
+        return (string)$this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+    }
+
     protected function fetchResults(PDOStatement $stmt, string $mappingClass): array
     {
         $success = $stmt->execute();

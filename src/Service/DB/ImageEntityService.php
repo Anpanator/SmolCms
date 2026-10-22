@@ -221,7 +221,7 @@ readonly class ImageEntityService extends EntityService
 
     public function findRandomTagmeImage(): ?ImageEntity
     {
-        $driver = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $driver = $this->getDriverName();
         $tagNameCondition = $driver === 'sqlite'
             ? 't.name COLLATE NOCASE = :tag_name'
             : 't.name = :tag_name';
