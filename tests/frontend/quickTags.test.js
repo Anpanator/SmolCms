@@ -1,7 +1,7 @@
 import {assertEqual, assertFalse, assertTrue, settle} from './assert.js';
-import {mockFetch, useFetch} from './mocks.js';
+import {mockFetch, testUser, useFetch} from './mocks.js';
 import {createMessageBox} from '../../public/js/forms.js';
-import {createQuickTagsView} from '../../public/js/quickTags.js';
+import {createQuickTagsToggle, createQuickTagsView} from '../../public/js/quickTags.js';
 
 function makeTags(prefix, count) {
     return Array.from({length: count}, (_, index) => ({
@@ -228,7 +228,7 @@ export async function testQuickTagRefreshFailureKeepsExistingListsAndSuccessMess
     }
 }
 
-export async function testQuickTagButtonsPreventDuplicateRequestsAndShowErrors(fixture) {
+export async function testQuickTagButtonsPreventDuplicateRequestsAndKeepFocus(fixture) {
     let resolveAdd;
     const status = createMessageBox();
     const fetchMock = mockFetch((url) => {
@@ -245,19 +245,116 @@ export async function testQuickTagButtonsPreventDuplicateRequestsAndShowErrors(f
         quickTags.updateImage(7, []);
         await quickTags.load();
         const sky = quickTags.element.querySelector('.quick-tag-button[data-tag-name="sky"]');
+        sky.focus();
         sky.click();
-        assertTrue(sky.disabled, 'buttons should lock while a quick-tag request is pending');
+        assertFalse(sky.disabled, 'a pending quick-tag button should stay focusable');
+        assertEqual(sky.getAttribute('aria-disabled'), 'true', 'pending should use aria-disabled');
+        assertEqual(document.activeElement, sky, 'focus should stay on the triggering tag');
         sky.click();
         assertEqual(fetchMock.calls.filter((call) => call.url === '/api/image/tags').length, 1);
 
         resolveAdd({status: 500, body: null});
         await settle();
         assertFalse(sky.disabled);
+        assertEqual(sky.getAttribute('aria-disabled'), 'false');
+        assertEqual(document.activeElement, sky, 'focus should survive a failed request');
         assertEqual(sky.getAttribute('aria-pressed'), 'false');
         assertFalse(status.hidden);
         assertTrue(status.textContent.includes('went wrong'));
     } finally {
         resolveAdd?.({status: 500, body: null});
+        restore();
+    }
+}
+
+export async function testQuickTagsFocusSurvivesListRefresh(fixture) {
+    const status = createMessageBox();
+    const fetchMock = mockFetch((url) => {
+        if (url === '/api/tags/quick') {
+            return {status: 200, body: {
+                global: [{name: 'sky', category: 'General'}],
+                userMostUsed: [],
+                userRecent: [],
+            }};
+        }
+        if (url === '/api/image/tags') {
+            return {status: 200, body: {applied: ['sky'], unknown: []}};
+        }
+        return {status: 204, body: null};
+    });
+    const restore = useFetch(fetchMock);
+    const quickTags = createQuickTagsView({status});
+    quickTags.element.hidden = false;
+    fixture.append(status, quickTags.element);
+    try {
+        quickTags.updateImage(7, []);
+        await quickTags.load();
+        const sky = quickTags.element.querySelector('.quick-tag-button[data-tag-name="sky"]');
+        sky.focus();
+        sky.click();
+        await settle();
+
+        assertEqual(
+            document.activeElement?.dataset?.tagName,
+            'sky',
+            'the refreshed list should keep focus on the triggering tag',
+        );
+        assertEqual(document.activeElement.getAttribute('aria-pressed'), 'true');
+    } finally {
+        restore();
+    }
+}
+
+export async function testQuickTagsToggleKeepsFocusAndBlocksDuplicateRequestsWhilePending(fixture) {
+    let enabled = false;
+    let resolveSetting;
+    const session = {
+        getUser: () => testUser(),
+        getQuickTagsEnabled: () => enabled,
+        setQuickTagsEnabled: (value) => { enabled = value; },
+    };
+    const status = createMessageBox();
+    const quickTags = createQuickTagsView({status});
+    const layout = document.createElement('div');
+    fixture.append(status, layout, quickTags.element);
+    const toggle = createQuickTagsToggle({session, quickTags, layout, status});
+    layout.append(toggle);
+    const fetchMock = mockFetch((url) => {
+        if (url === '/api/session/quick-tags') {
+            return new Promise((resolve) => { resolveSetting = resolve; });
+        }
+        if (url === '/api/tags/quick') {
+            return {status: 200, body: {
+                global: [{name: 'sky', category: 'General'}],
+                userMostUsed: [],
+                userRecent: [],
+            }};
+        }
+        return {status: 204, body: null};
+    });
+    const restore = useFetch(fetchMock);
+    try {
+        toggle.focus();
+        toggle.click();
+        assertFalse(toggle.disabled, 'a pending toggle should stay focusable');
+        assertEqual(toggle.getAttribute('aria-disabled'), 'true', 'pending should use aria-disabled');
+        assertEqual(document.activeElement, toggle, 'focus should stay on the toggle');
+        toggle.click();
+        assertEqual(
+            fetchMock.calls.filter((call) => call.url === '/api/session/quick-tags').length,
+            1,
+            'a pending toggle should ignore duplicate clicks',
+        );
+
+        resolveSetting({status: 200, body: {quickTagsEnabled: true}});
+        await settle();
+        assertFalse(toggle.disabled);
+        assertEqual(toggle.getAttribute('aria-disabled'), 'false');
+        assertEqual(document.activeElement, toggle, 'the toggle should keep focus after loading');
+        assertFalse(quickTags.element.hidden);
+        assertEqual(toggle.getAttribute('aria-expanded'), 'true');
+    } finally {
+        resolveSetting?.({status: 200, body: {quickTagsEnabled: false}});
         restore();
     }
 }

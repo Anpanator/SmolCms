@@ -115,12 +115,28 @@ export function createConfirmDialog({message = '', confirmLabel = 'Confirm', can
         modal.close();
     }
 
+    function handleKeyDown(event) {
+        if (event.key !== 'Enter' || event.repeat || event.defaultPrevented
+            || activeModals[activeModals.length - 1] !== modal.element) {
+            return;
+        }
+        const target = event.target;
+        if (target instanceof Element
+            && target.closest('button, a, input, textarea, select, [contenteditable="true"]') !== null) {
+            return;
+        }
+        event.preventDefault();
+        finish(true);
+    }
+
     modal.element.addEventListener('modalclose', () => {
+        document.removeEventListener('keydown', handleKeyDown);
         if (!settled) {
             settled = true;
             settleResult(false);
         }
     }, {once: true});
+    document.addEventListener('keydown', handleKeyDown);
     cancelButton.addEventListener('click', () => finish(false));
     confirmButton.addEventListener('click', () => finish(true));
 
