@@ -1,0 +1,397 @@
+= SmolCms API
+:toc: macro
+:icons: font
+
+This document is a standalone reference for the SmolCms HTTP API endpoints that
+accept an API key. It describes the credential itself, the request conventions
+shared by those endpoints, and every API-key-enabled endpoint in detail,
+including exhaustive request-field and error tables. Architecture notes live in
+the other `docs/*.adoc` files; this file is not included by `README.adoc` and is
+meant to be read on its own.
+
+toc::[]
+
+== Scope of this reference
+
+The endpoint catalog contains exactly those handlers whose `#[Authenticated]`
+attribute sets `apiEnabled: true`. The flag defaults to `false`; enabling it is
+what allows a handler to be called with `Authorization: Bearer <key>` when no
+session user is present. At the time of writing exactly one handler opts in:
+
+* `POST /upload-image`
+  (`ImageUploadController::postAction`, route `RouteEnum::UPLOAD_IMAGE`).
+
+All other endpoints, including login, registration, profile and settings,
+session state, image queries, tagging, review, and the session-only API-key
+management endpoints, are not `apiEnabled`: they do not accept an API key and
+are out of scope here. They are intentionally not listed, and their absence does
+not imply that they can be called with an API key.
+
+== Authentication
+
+An `apiEnabled` handler accepts either of two credentials:
+
+. A session cookie issued by `POST /login` (the browser and SPA path).
+. An `Authorization: Bearer <key>` header (the server-to-server path).
+
+The session is resolved first, and the API key is consulted only when no session
+identity exists. A request carrying both is therefore processed as the session
+user; the `Authorization` header is ignored entirely in that case, even if it is
+malformed or belongs to a different account. Side effects of such a request are
+not marked as API-key-authenticated (see the audit notes below).
+
+A request authenticated only by API key does not start or resume a PHP session
+and receives no session cookie. `SessionService::resumeSession()` starts a
+session only when a `session` cookie is already present.
+
+=== API key format and storage
+
+|===
+| Property | Value
+
+| Length | Exactly 64 characters.
+| Alphabet | Lowercase hexadecimal (`0-9`, `a-f`), generated from 32 random
+  bytes with `bin2hex(random_bytes(32))`.
+| Header | `Authorization: Bearer <key>`.
+| Stored form | Unsalted SHA-256 hex hash in `api_key.key_hash`.
+| Expiry | None.
+| Scopes | None; a key can call every `apiEnabled` endpoint its owner may call.
+| Last used | Not recorded.
+|===
+
+The `api_key` table has columns `id`, `user_id` (`UNIQUE`, so a user has at most
+one key), `key_hash` (`UNIQUE`), and `created`. Generating a key replaces the
+previous row, so regeneration invalidates the old key immediately.
+
+=== Header parsing
+
+`ApiKeyAuthenticationService` performs these steps:
+
+. Look up the request header whose name equals `Authorization`
+  case-insensitively.
+. Trim the value and match it against `/^Bearer\s+([a-f0-9]{64})$/iD`. The
+  scheme is case-insensitive (`Bearer`, `bearer`, and other spellings are
+  accepted), one or more whitespace characters must follow it, and the key must
+  be exactly 64 hexadecimal characters. Anything else, including trailing extra
+  text, does not match.
+. Hash the matched key with SHA-256 and look it up in `api_key`. The hash is
+  computed over the characters exactly as sent.
+
+Because the hash is computed over the literal text, keys are effectively
+case-sensitive: the `i` flag lets `A-F` through the pattern, but an uppercase
+spelling of a lowercase issued key does not reproduce the stored hash and is
+treated as unknown. Always copy the key exactly as issued.
+
+=== Failure behavior
+
+|===
+| Situation | Status | Notes
+
+| No session identity and no `Authorization` header | `401` | The request is
+  treated as anonymous.
+| Header present but malformed | `401` | Wrong scheme, no whitespace after the
+  scheme, wrong length, non-hex characters, or trailing text.
+| Well-formed key not found | `401` | Unknown or already replaced keys look the
+  same as malformed ones.
+| Key found, but the owner row was deleted | `403` | Orphaned key. The session,
+  if any, is not destroyed.
+| Owner's current access level is below the endpoint minimum | `403` | The
+  level is read from the database on every request.
+| A session identity exists but its user row was deleted | `403` | This is the
+  session path; the session is destroyed.
+|===
+
+Authorization does not inspect the owner's `state` column. A key owned by a
+user who is `disabled` or `banned` still authenticates and still passes the
+access-level check; only login and session-based flows consider that state. An
+access-level change applies to API clients on their next request, with no
+caching or token refresh step.
+
+=== Key lifecycle
+
+API keys are issued only while signed in: `POST /api/profile/api-key`
+(requires `WIZARD`, returns `201` with the new plaintext key) and
+`DELETE /api/profile/api-key` are session-only profile endpoints and are not
+`apiEnabled`, so a Bearer header alone cannot manage a key and gets `401`. The
+prerequisite for API access is therefore a `WIZARD` browser session; the key is
+shown when generated, and regenerating it replaces the old row, so the previous
+key stops working immediately. Users below `WIZARD` cannot create a key.
+
+=== Audit context
+
+Uploads performed through this API are recorded like session uploads, with one
+difference: when the Bearer key supplied the identity, `;via=api` is appended to
+the `IMAGE_UPLOADED` context. The resulting value is `image_id=<id>;via=api`.
+When a session identity was present, the session path wins and the suffix is
+absent even though a key was sent.
+
+== Request conventions
+
+=== Origin checks and CORS
+
+There is no CORS support: the application emits no `Access-Control-Allow-*`
+headers and performs no preflight handling. Cross-origin browser calls therefore
+fail regardless of a valid key. Every response also carries
+`Cross-Origin-Resource-Policy: same-site`.
+
+For `POST`, `PUT`, and `DELETE`, a same-origin pre-controller check runs before
+authentication:
+
+* If `Sec-Fetch-Site` is present and does not equal `same-origin`
+  (case-insensitive after trimming), the request is rejected with `403`.
+* If `Origin` is present and its host differs from the request host, the request
+  is rejected with `403`. Scheme and port are ignored; only the host is
+  compared. A malformed `Origin` value has no parsable host and is rejected too.
+* If neither header is present, the check passes. Typical server-to-server HTTP
+  clients and `curl` send neither by default.
+
+Because this runs before authorization, a rejected cross-origin request gets
+`403` even when it carries a valid API key.
+
+=== Error responses and bodies
+
+Application-generated error responses have empty bodies. There is no JSON error
+envelope, no error code, and no message; clients must map the status code to a
+user-facing message. For the endpoint in this document, the only JSON response
+is the success body described below; `400`, `401`, `403`, `404`, `413`, and
+`500` from the application all have empty bodies. A `500` in a development
+deployment with `display_errors` enabled may contain a PHP stack trace instead.
+
+An unmatched path or method returns framework `404`. There is no
+`405 Method Not Allowed`. Note that `GET /upload-image` is registered as an SPA
+page route and serves the HTML shell with `200`, not JSON; only the `POST`
+method is this endpoint.
+
+== `POST /upload-image`
+
+Uploads one or more images. The handler is `ImageUploadController::postAction`,
+the route constant is `RouteEnum::UPLOAD_IMAGE`, and authorization is
+`#[Authenticated(AccessLevel::NOVICE, apiEnabled: true)]`. `NOVICE` is the
+lowest level in `AccessLevel`, so the level check mainly verifies that the key
+owner still exists; a level of `NOVICE` or higher passes.
+
+The call is synchronous for the original bytes and the database record. Display
+variants are generated later, by a separate worker.
+
+=== Request
+
+`POST /upload-image` with `Content-Type: multipart/form-data`. The multipart
+body is the only input; query parameters and JSON fields are not read.
+
+|===
+| Part | Kind | Required | Constraints
+
+| `image` | file | One of `image` or `image[]` | A single upload entry in the
+  standard PHP `$_FILES` shape.
+| `image[]` | file array | One of `image` or `image[]` | The same entry shape,
+  repeated once per file. The bundled SPA uses this spelling.
+| (any other part) | text or file | No | Ignored. The handler reads no metadata,
+  caption, tag, or status field.
+|===
+
+Send either spelling, not both. At least one file is required, and at most 10
+files are accepted per request (`ImageUploadValidator::MAX_FILES = 10`). A
+request with no files, or with no `image` part at all, fails with `400` after
+authentication. A JSON, URL-encoded, or otherwise non-multipart body contains no
+file entries and fails the same way; this endpoint has no JSON request schema.
+
+Each entry must be a real SAPI upload with `name`, `tmp_name`, `type`, `error`,
+and `size` values. PHP presents multi-file inputs as column-oriented arrays; the
+application normalizes them into per-file entries. A missing `tmp_name` column,
+a non-array column, or keys that do not line up across the columns is rejected
+with `400`.
+
+=== Per-file validation
+
+Every file in the batch must satisfy all of the following. Validation is
+all-or-nothing: if any single file fails, no file from the request is stored.
+
+|===
+| Check | Rule | Failure
+
+| SAPI upload | `tmp_name` must be a real uploaded file according to
+  `is_uploaded_file()`. A local filesystem path is rejected. | `400`
+| Upload status | `error` must be `UPLOAD_ERR_OK`; other codes map as shown in
+  the next table. A missing or non-integer code counts as unknown. | `400`,
+  `413`, or `500`
+| Content type | The image type is detected from the file content signature,
+  never from the client-supplied `name` or `type`. Accepted types are PNG,
+  JPEG, AVIF, and WebP; anything else is rejected. | `400`
+| Dimensions | `getimagesize()` must succeed. Width and height must both be
+  positive, each at most 16,384 pixels, and `width * height` at most
+  20,000,000 pixels. | `400`
+| Byte size | No application-level limit. Deployment PHP and web-server limits
+  apply instead; see below. | `413` from PHP or the web server
+|===
+
+=== PHP upload error codes
+
+|===
+| `error` value | Meaning | Response
+
+| `UPLOAD_ERR_OK` (0) | The file arrived completely. | Continue validation.
+| `UPLOAD_ERR_INI_SIZE` (1) | Larger than `upload_max_filesize`. | `413`
+| `UPLOAD_ERR_FORM_SIZE` (2) | Larger than the form's `MAX_FILE_SIZE`. | `413`
+| `UPLOAD_ERR_PARTIAL` (3) | Only part of the file was uploaded. | `400`
+| `UPLOAD_ERR_NO_FILE` (4) | No file was uploaded. | `400`
+| `UPLOAD_ERR_NO_TMP_DIR` (6) | The temporary directory is missing. | `500`
+| `UPLOAD_ERR_CANT_WRITE` (7) | Writing the temporary file failed. | `500`
+| `UPLOAD_ERR_EXTENSION` (8) | A PHP extension stopped the upload. | `500`
+| Unknown or missing code | Not a recognized upload status. | `400`
+|===
+
+=== Deployment body-size limits
+
+The application does not impose a byte-size limit, but the shipped deployment
+does: `docker/php-dev.ini` and `docker/php-prod.ini` set
+`upload_max_filesize = 100M` and `post_max_size = 100M`, and
+`docker/nginx.conf` sets `client_max_body_size 100m`. These are configuration
+values, not application constants; manual hosts must set compatible limits.
+
+Consequences worth knowing:
+
+* A total request body above `post_max_size` makes PHP discard the body, so
+  `$_FILES` is empty and the application answers `400`, not `413`.
+* nginx may reject an oversized body itself with `413` and an HTML page before
+  PHP runs. That response does not follow the empty-body convention.
+* A single file above `upload_max_filesize` arrives as `UPLOAD_ERR_INI_SIZE` and
+  maps to `413`.
+
+=== Success response
+
+A successful call returns `201 Created`, the header
+`Content-Type: application/json`, and exactly this body:
+
+[source,json]
+----
+{"message":"Image uploaded successfully."}
+----
+
+The message is identical whether one file or ten files were uploaded. The
+response carries no image IDs, count, checksums, paths, or per-file results, so
+a client cannot correlate the call with individual records from the response
+alone.
+
+=== Side effects
+
+A successful call stores each file and creates one image record per file:
+
+* The record is owned by the authenticated user and starts in `pending` status.
+* It stores the SHA-256 checksum of the original bytes, the detected width and
+  height, the byte size, and the detected format extension.
+* The stored original is content-addressed; its file name is
+  `<sha-256>.<extension>` with the extension `png`, `jpeg`, `avif`, or `webp`
+  (note `jpeg`, not `jpg`). The client-supplied filename is ignored.
+* The `tagme` tag is attached to the new image.
+* An `IMAGE_UPLOADED` audit entry is written with context `image_id=<id>`. When
+  the identity came from the Bearer key, `;via=api` is appended, producing
+  `image_id=<id>;via=api`.
+
+A `201` only confirms that the originals and their pending records exist.
+Thumbnails, viewing samples, and download variants are produced later by the
+asynchronous `php src/app.php --process-images` worker. At response time the
+image is not approved, has no variant files, and is not publicly visible.
+
+Validation is all-or-nothing, but the storage pass is sequential and not
+transactional. If a later file in the batch fails while being decoded or stored,
+files already written for that request remain stored and the call returns `500`.
+Clients should treat a `500` as possibly partially applied.
+
+=== Error responses
+
+Failures occur in this order: same-origin check, authentication, user lookup and
+access check, then upload validation, then storage. Later checks are not reached
+when an earlier one applies, which is why an unauthenticated request with no
+files returns `401` rather than `400`.
+
+|===
+| Status | Condition | Body
+
+| `401` | No session identity and no usable Bearer header: absent, malformed,
+  not exactly 64 hex characters, or unknown. This includes unauthenticated
+  requests that also lack files. | Empty
+| `403` | Same-origin pre-check rejection. May occur before authentication, so a
+  valid key does not help. | Empty
+| `403` | Key owner row no longer exists (orphaned key); no session is
+  destroyed. Alternatively, the owner's current access level is below `NOVICE`.
+  | Empty
+| `400` | Zero files, the `image` part missing, or a non-multipart body such as
+  JSON. Also malformed `$_FILES` entries, mismatched multi-file column keys, a
+  missing or non-string `name`/`tmp_name`, or more than 10 files. | Empty
+| `400` | An upload error code of `UPLOAD_ERR_NO_FILE`, `UPLOAD_ERR_PARTIAL`, or
+  an unknown code; a non-SAPI upload path; `getimagesize()` failure or a
+  dimension limit violation; or content not recognized as PNG, JPEG, AVIF, or
+  WebP. | Empty
+| `413` | A per-file `UPLOAD_ERR_INI_SIZE` or `UPLOAD_ERR_FORM_SIZE`. A web
+  server may also return its own `413` for an oversized body. | Empty from the
+  application; possibly HTML from nginx
+| `500` | `UPLOAD_ERR_NO_TMP_DIR`, `UPLOAD_ERR_CANT_WRITE`, or
+  `UPLOAD_ERR_EXTENSION`; the temporary file became unreadable after validation;
+  image decoding failed; or storing a file, saving the record, attaching the
+  tag, or writing the audit entry failed. | Empty
+| `404` | The path or method does not match a route. There is no `405`. See the
+  note above about `GET /upload-image` serving the SPA shell. | Empty
+|===
+
+=== Examples
+
+Upload a single image with an API key:
+
+[source,shell]
+----
+curl --silent --show-error --include \
+  --request POST https://example.com/upload-image \
+  --header "Authorization: Bearer <64-hex-api-key>" \
+  --form "image=@photo.png"
+----
+
+A successful call prints the status line, the JSON content type, and the fixed
+body:
+
+[source,shell]
+----
+HTTP/2 201
+content-type: application/json
+
+{"message":"Image uploaded successfully."}
+----
+
+Upload several images in one request by repeating the `image[]` part, up to ten
+files:
+
+[source,shell]
+----
+curl --silent --show-error --include \
+  --request POST https://example.com/upload-image \
+  --header "Authorization: Bearer <64-hex-api-key>" \
+  --form "image[]=@first.png" \
+  --form "image[]=@second.webp" \
+  --form "image[]=@third.jpeg"
+----
+
+To use an existing browser session instead of a key, omit the header and send
+the session cookie with `--cookie "session=<session-id>"`. Do not add an
+`Origin` or non-`same-origin` `Sec-Fetch-Site` header to a server-to-server
+call; either can turn the request into a `403` before authentication.
+
+An unknown, replaced, or malformed key is rejected before validation, and the
+response has no body:
+
+[source,shell]
+----
+curl --silent --show-error --output /dev/null \
+  --write-out "%{http_code}\n" \
+  --request POST https://example.com/upload-image \
+  --header "Authorization: Bearer <64-hex-api-key>" \
+  --form "image[]=@photo.png"
+# 401
+----
+
+== Maintenance note
+
+This reference enumerates exactly the handlers whose `#[Authenticated]`
+attribute (`SmolCms\Service\Core\Attribute\Authenticated`) sets
+`apiEnabled: true`; currently that is only `POST /upload-image`. When a handler
+starts opting in, add a matching endpoint section here with its request fields,
+constraints, response, side effects, and error matrix in the same change. Do not
+list session-only handlers in the endpoint catalog.
