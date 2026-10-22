@@ -3,12 +3,22 @@
 
 An unmatched route returns `404`. `BadRequestException` becomes `400`; other
 exceptions from the pre-controller chain or controller become `500`. These
-framework error responses normally have empty bodies, but PHP's
-`display_errors` setting can cause an exception stack trace to be included.
+framework responses (`400`, `401`, `403`, `404`, and `500`) have empty bodies
+by default; PHP's `display_errors` setting can expose an exception stack trace.
 
 Exceptions are logged: bad requests at informational level and other failures
 as errors. Validation details are retained in the log, not returned as an API
 message. The SPA uses status codes for user-facing errors.
+
+For `application/json` requests, `RequestFactory` decodes `php://input` into
+POST parameters. Malformed or non-array JSON yields no mapped POST parameters;
+validated handlers reject missing required fields with `400`.
+
+Common success statuses are `200` for `POST /login` and `POST /settings`, and
+`201` for `POST /register` and `POST /upload-image`. `GET /api/session` returns
+a `user` field (`null` or an object with `id`, `displayName`, and
+`accessLevel`) plus a boolean `quickTagsEnabled`. `POST /logout` returns `204`
+with no body.
 
 `JsonResponse` JSON-encodes response data and sets the JSON content type. A
 `null` payload leaves the body empty (for example, `204 No Content`); protected

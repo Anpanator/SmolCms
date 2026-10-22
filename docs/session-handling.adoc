@@ -14,3 +14,6 @@ The session user snapshot includes `AccessLevel`, the role used for
 authorization. Protected requests reload the current user role from the
 database, rather than trusting the snapshot alone; see
 <<_precontrolleraction_chain>>.
+
+Quick-tags visibility is also session-scoped: it defaults to off and is reset
+when a user logs in (see <<_frontend_single_page_application>>).

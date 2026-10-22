@@ -1,10 +1,11 @@
 [#_cli_commands]
 == CLI Commands
 
-Commands run through `php src/app.php`. Non-flag values following an executable
-command are passed as its arguments. `--reset` and `--noconfirm` are modifiers,
-not executors: `--reset` changes `--init-db`, while `--noconfirm` suppresses
-confirmation prompts. A modifier by itself runs no command.
+Commands run through `php src/app.php`. Non-flag values following a command are
+passed as its arguments. Run `php src/app.php` without a command to print the
+full `Available commands:` list. `--reset` modifies `--init-db`, while
+`--noconfirm` suppresses confirmation prompts; modifiers do not run commands
+by themselves.
 
 |===
 | Command | Description
@@ -12,10 +13,6 @@ confirmation prompts. A modifier by itself runs no command.
 | `--generate-migration "<description>"`
 | Creates an empty, timestamped SQL migration file in `private/sql`; edit it
 before applying migrations.
-
-| `--generate-js-integrity`
-| Refreshes Subresource Integrity attributes for local scripts in the HTML
-shell. Docker image builds run it automatically.
 
 | `--migrations`
 | Applies pending, non-empty `.sql` migrations in filename order and records
@@ -27,13 +24,6 @@ prompt can be skipped with `--noconfirm`.
 `--reset` to drop and recreate its tables; this destructive operation prompts
 unless `--noconfirm` is supplied.
 
-| `--process-images [batch-size]`
-| Processes pending uploads into image variants; the batch defaults to 100.
-Docker also runs a background worker periodically.
-
-| `--noconfirm`, `--reset`
-| Modifiers for migration confirmation and database initialization; they do
-not execute by themselves.
 |===
 
 For example, create and apply a migration:

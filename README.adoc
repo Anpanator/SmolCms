@@ -4,8 +4,9 @@
 
 SmolCms is a small PHP learning project with a vanilla-JavaScript SPA, JSON
 API, user accounts, SQLite persistence by default, image uploads, tagging,
-and moderation. It requires PHP 8.5 or newer and the extensions declared in
-`composer.json`; the MySQL schema is a reference, not a parity guarantee.
+API-key upload access, quick tags, and moderation. It requires PHP 8.5 or newer
+and the extensions declared in `composer.json`; the MySQL schema is a reference,
+not a parity guarantee.
 
 The repository has no `LICENSE` file or `license` field in `composer.json`;
 review licensing before reuse.

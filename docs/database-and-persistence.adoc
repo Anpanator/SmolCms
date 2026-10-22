@@ -1,8 +1,12 @@
 == Database and persistence
 
 SQLite is the default runtime database. Its schema covers users and sessions,
-content and migration tracking, images, tags/categories and image-tag links,
-tag suggestions and approvals, and a limited image-tag audit log.
+hashed API keys (`api_key`), content and migration tracking, images,
+tags/categories and image-tag links, per-user quick-tag usage
+(`user_tag_usage`), and tag suggestions and approvals. The audit log records
+tag additions, removals, and deletions, plus image uploads and deletions.
+`user_tag_usage` increments counts and updates recency for newly attached tags;
+removals decrement counts to a zero floor without changing the last-use time.
 `TagService` coordinates tags, categories, image associations, and usage
 counts; suggestion and approval records are handled by the tag-suggestion
 services.

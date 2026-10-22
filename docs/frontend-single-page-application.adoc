@@ -17,18 +17,43 @@ editor. User names in image metadata and internal moderation tools link to
 their public profiles when the user ID is available.
 
 `api.js`, `router.js`, and `session.js` handle HTTP, history navigation, and
-session state. Page modules live in `views/`; shared UI helpers include
-`paginatedTable.js`, `moderationQueue.js`, `imageMetadata.js`, `tagLinks.js`,
-and `searchForm.js`. `accessLevel.js` exports `hasAccessLevel()`, and
-`validation.js` mirrors backend field rules for client feedback.
+session state. The SPA uses same-origin requests and the browser's HttpOnly
+session cookie for authentication; `ApiError.status` carries HTTP failures to
+views, which map status codes to user-facing messages. Page modules live in
+`views/`; shared helpers include `paginatedTable.js`, `moderationQueue.js`,
+`imageMetadata.js`, `tagLinks.js`, and `searchForm.js`. `accessLevel.js` exports
+`hasAccessLevel()`, and `validation.js` mirrors backend field rules for faster
+feedback.
 
 === Upload and moderation behavior
 
 The upload view sends each selected file sequentially as multipart field
-`image[]`. The home view lists accepted-image thumbnails; the image view loads metadata and a protected sample, with a download link labeled *Download*.
+`image[]`. The home view shows accepted-image thumbnails and any pending-review
+images visible to the viewer; pending-review tiles use distinct
+`tile-unapproved` styling. The image view loads metadata and a protected
+sample, with a download link labeled *Download*.
 Image and tag moderation queues act on the currently selected item: Approve
 and Reject submit that selection, and a success message remains visible rather
 than auto-dismissing.
+
+=== Quick tags and layout
+
+Image and Tagme queue views can show a right-hand Quick tags sidebar with up to
+20 globally most-used tags on the left and up to 10 user-most-used plus 10
+user-recent tags on the right. Buttons add or remove tags from the current
+image without confirmation, immediately updating its regular tag list; the
+`tagme` system tag is excluded from suggestions. The lists are fetched when
+enabled, including when a view opens with the setting already enabled. A toggle
+below the main tag list controls the sidebar; it is off by default, stored in
+the session, and reset on login. `GET /api/tags/quick` supplies the lists,
+`POST /api/session/quick-tags` changes the setting, and `GET /api/session`
+includes `quickTagsEnabled`.
+
+Home, image, and Tagme gallery pages use a wider content area. Image and Tagme
+pages add a third column only while Quick tags are enabled; otherwise the main
+content uses that space. The Tags management page uses the two-column workspace
+shared with audit log and user management, with the tag table on the left and
+search, create-tag, and create-category tools on the right.
 
 Client-page deep links work on reload because their `GET` routes return the
 same HTML shell. API errors are handled by status code; exception bodies are

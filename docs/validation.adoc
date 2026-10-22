@@ -8,7 +8,7 @@ property. Null is allowed unless a rule such as `ValidateNotNull` rejects it.
 
 [source,php]
 ----
-readonly class ProfileRequest extends ValidatedRequest
+readonly class UserSettingsUpdateRequest extends ValidatedRequest
 {
     public function __construct(
         Request $rawRequest,

@@ -17,6 +17,7 @@ new Service(
         RestrictDirectoryAccessStartupAction::class,
         RegisterSessionHandlerStartupAction::class,
         ResumeSessionStartupAction::class,
+        SetCrossOriginResourcePolicyStartupAction::class,
         MyStartupAction::class,
     ],
 ),

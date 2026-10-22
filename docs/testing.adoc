@@ -25,3 +25,9 @@ test class, while sessions are cleared between tests.
 PHPUnit's `executionOrder` is `defects`; dependency resolution is configured
 separately. The suite treats warnings, notices, output, risky tests, and other
 PHPUnit issues as failures.
+
+Use `#[Mock(...)]` and `#[Stub(...)]` properties typed as `Type|MockObject`;
+functional tests use `#[Autowire]` and call `parent::setUpBeforeClass()` before
+`registerTestServices(...)`. Keep test-created files under `private/init`,
+`private/sql`, or `private/upload`; upload tests stub `ImageUploadValidator`
+because `is_uploaded_file()` cannot pass in in-process requests.

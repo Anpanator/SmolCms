@@ -2,7 +2,10 @@
 
 . `src/app.php` loads `constants.php`, `config.php`, and Composer's autoloader,
   then builds the service graph and resolves `ApplicationCore`.
-. `ApplicationCore::init()` restricts PHP file access, registers the database-backed session handler, and resumes a valid session.
+. `ApplicationCore::init()` restricts PHP file access, registers the
+  database-backed session handler, and resumes a valid session. Then
+  `SetCrossOriginResourcePolicyStartupAction` sets
+  `Cross-Origin-Resource-Policy: same-site`.
 . CLI invocations run the selected command. HTTP requests are built from the
   request environment and matched to a route by both path and HTTP method.
 . Before a handler runs, the pre-controller chain checks request origin,

@@ -11,6 +11,13 @@ these limitations before deploying it:
   self-updates, changes to users at or above the actor's level, and grants of
   roles at or above that level. The app does not enforce stored `disabled` or
   `banned` states.
+* Users at `WIZARD` level or higher can generate an API key from their profile
+  via `POST /api/profile/api-key` (201); the plaintext is shown once, only its
+  SHA-256 hash is stored, and regeneration replaces the previous key.
+  `#[Authenticated(..., apiEnabled: true)]` opts a handler into
+  `Authorization: Bearer <key>` authentication; it is off by default, and only
+  `POST /upload-image` currently opts in. API-key-authenticated uploads use the usual access
+  check and add `via=api` to the `IMAGE_UPLOADED` audit context.
 * State-changing requests have no CSRF token. For `POST`, `PUT`, and `DELETE`,
   the pre-controller check rejects non-`same-origin` `Sec-Fetch-Site` values
   or an `Origin` whose host differs from the request host, when those headers
@@ -33,7 +40,8 @@ these limitations before deploying it:
 * The filesystem allowlist is defense in depth; it does not replace OS
   permissions or prevent check-then-use races and native filesystem bypasses.
 * Duplicate registration returns `409`, which can reveal whether a login name
-  exists. The audit log currently records image-tag changes only.
+  exists. The audit log records tag additions, removals, and deletions, plus
+  image uploads and deletions.
 * The shell's generated SRI hash pins its `main.js` entry script; imported
   modules are not individually pinned. Docker development enables
   `display_errors`; its `prod` image target disables display errors but is not

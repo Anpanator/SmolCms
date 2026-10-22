@@ -4,13 +4,15 @@ The default pre-controller chain runs the same-origin check, authorization,
 request mapping, then validation. An action can stop the chain with a
 `Response`; otherwise the controller handler runs.
 
-`#[Authenticated(...)]` declares a handler's minimum `AccessLevel`. Anonymous
-requests receive `401`, and authenticated users below the required level
-receive `403`. Requirements vary by feature: some routes require `FELLOW` or
-`MOD`, and permitted users can manage roles through the UI. For every
-protected request, authorization reloads the user's role from the database
-and refreshes the role in the session snapshot, so an old session cannot
-preserve a changed role.
+`#[Authenticated(...)]` declares a handler's minimum `AccessLevel`.
+`apiEnabled: true` opts a handler into Bearer API-key authentication; otherwise
+the handler uses session authentication (see <<_security_considerations>>).
+Anonymous requests receive `401`, and authenticated users below the required
+level receive `403`. Requirements vary by feature: some routes require
+`FELLOW` or `MOD`, and permitted users can manage roles through the UI. For
+every protected request, authorization reloads the user's role from the
+database and refreshes the role in the session snapshot, so an old session
+cannot preserve a changed role.
 
 Request mapping supplies either the original `Request` or a readonly
 `ValidatedRequest`; validation then checks its property attributes. Mapping or

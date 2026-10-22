@@ -17,6 +17,10 @@ originals remain private, thumbnails are public static files, and sample and
 download variants are private and delivered only through authenticated
 internal Nginx locations (see <<_image_uploads>>).
 
+For local smoke testing, run `./deploy.sh` to rebuild and replace the
+`smolcms-dev` container, then verify changes against that deployment. See
+link:docker/README.md[Docker images] for the container workflow.
+
 === Non-Docker PHP-FPM deployments
 
 On a manual host, ensure PHP-FPM can write the runtime data directories. A
@@ -24,7 +28,6 @@ systemd `ProtectSystem` policy can make an application installed under `/usr`
 read-only; use `private/references/php-fpm-override.conf` as a starting point
 and include every writable path used by the deployment, including logs.
 
-The bare-metal reference host may configure PHP errors at
-`/var/log/php_errors.log`; that host-level path must exist and be writable by
+On a manual host, configure PHP errors to a host-selected log file writable by
 PHP-FPM. Docker instead configures PHP to log under
 `private/logs/php-error.log`.
