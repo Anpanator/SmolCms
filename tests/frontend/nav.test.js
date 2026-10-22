@@ -1,7 +1,7 @@
 import {assertEqual, assertTrue, settle} from './assert.js';
 import {mockFetch, sessionResponse, testUser, useFetch} from './mocks.js';
 import {createSession} from '../../public/js/session.js';
-import {createFooterNav, createHeaderNav} from '../../public/js/nav.js';
+import {createHeaderNav} from '../../public/js/nav.js';
 
 /**
  * Creates a session loaded once through a mocked fetch. `handler` receives
@@ -117,20 +117,6 @@ export async function testProfileAndSettingsLinksAreActiveInsideAccountDropdown(
                 expectedHref,
             );
         }
-    } finally {
-        restore();
-    }
-}
-
-export async function testFooterNavMirrorsSession() {
-    const { session, restore } = await createLoadedSession(() => sessionResponse(testUser()));
-    try {
-        const footer = createFooterNav({ session });
-        const links = [...footer.element.querySelectorAll('a.nav-link')].map((link) => link.getAttribute('href'));
-        assertEqual(JSON.stringify(links), JSON.stringify(['/', '/upload-image', '/tagme']));
-
-        footer.setActive('/upload-image');
-        assertEqual(footer.element.querySelector('a.nav-link.active')?.getAttribute('href'), '/upload-image');
     } finally {
         restore();
     }
@@ -268,21 +254,6 @@ export async function testModQueueLinkHiddenBelowModerators() {
     try {
         const nav = createHeaderNav({ session, navigate: () => {} });
         assertEqual(nav.element.querySelector('a.nav-link[href="/review"]'), null, 'novices must not see the Mod Queue link');
-    } finally {
-        restore();
-    }
-}
-
-export async function testFooterNavHasNoModQueueLinkForModerators() {
-    const { session, restore } = await createLoadedSession(() => sessionResponse(testUser({ accessLevel: 500 })));
-    try {
-        const footer = createFooterNav({ session });
-        const links = [...footer.element.querySelectorAll('a.nav-link')].map((link) => link.getAttribute('href'));
-        assertEqual(
-            JSON.stringify(links),
-            JSON.stringify(['/', '/upload-image', '/tagme']),
-            'the footer navigation must not gain a Mod Queue link',
-        );
     } finally {
         restore();
     }

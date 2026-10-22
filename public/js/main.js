@@ -2,7 +2,7 @@
  * SPA entry point. This is the only module that performs work at import
  * time (it is loaded by the shell as <script type="module">).
  */
-import {createFooterNav, createHeaderNav} from './nav.js';
+import {createHeaderNav} from './nav.js';
 import {createRouter} from './router.js';
 import {createSession} from './session.js';
 import {el} from './dom.js';
@@ -59,7 +59,6 @@ async function bootstrap() {
     }
 
     const headerNav = createHeaderNav({ session, navigate });
-    const footerNav = createFooterNav({ session });
 
     const viewContainer = el('main', { className: 'view-container' });
     const routes = createRouteMap({session, navigate});
@@ -75,14 +74,12 @@ async function bootstrap() {
                 viewContainer.querySelector('.review-page')?.focus({preventScroll: true});
             }
             headerNav.setActive(path);
-            footerNav.setActive(path);
         },
     });
 
     appRoot.append(
         el('header', { className: 'site-header', children: headerNav.element }),
         viewContainer,
-        el('footer', { className: 'site-footer', children: footerNav.element }),
     );
     router.start();
 }

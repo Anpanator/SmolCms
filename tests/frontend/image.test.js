@@ -62,6 +62,10 @@ export async function testImageViewRendersSampleImageInLayout() {
         assertTrue(toolbar !== null, 'image view should have a toolbar above its content');
         assertTrue(toolbar.querySelector('.search-view') !== null, 'tag search should live in the image toolbar');
         assertEqual(toolbar.querySelector('.image-nav'), null, 'previous/next controls should not share the toolbar');
+        assertTrue(view.querySelector('.image-sidebar-column .image-toolbar') === toolbar,
+            'the search toolbar should share the sidebar column');
+        assertTrue(view.querySelector('.image-sidebar-column .sidebar') !== null,
+            'the sidebar should sit in the same column as the search');
         assertTrue(view.querySelector('.sidebar .image-nav') !== null, 'previous/next controls should live in the sidebar');
         assertEqual(view.querySelector('.sidebar .search-view'), null, 'the image sidebar should not contain tag search');
         assertTrue(view.querySelector('.sidebar .tags') !== null, 'sidebar tag list should exist');

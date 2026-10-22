@@ -2,7 +2,7 @@
  * SmolCms SPA stylesheet.
  * Organized in sections: custom properties, base reset, layout shell,
  * top navigation with hover dropdowns, sidebar, content grid, image
- * display view, moderation queue, footer, pages/forms, buttons and messages.
+ * display view, moderation queue, pages/forms, buttons and messages.
  */
 
 /* ------------------------------------------------------------------ */
@@ -100,7 +100,7 @@ h3 {
 }
 
 /* ------------------------------------------------------------------ */
-/* Shell layout: header / main / footer                                */
+/* Shell layout: header / main                                         */
 /* ------------------------------------------------------------------ */
 
 .site-header {
@@ -109,18 +109,11 @@ h3 {
     box-shadow: var(--shadow);
 }
 
-.site-footer {
-    margin-top: auto;
-    background: var(--color-surface);
-    border-top: 1px solid var(--color-border);
-}
-
 /* ------------------------------------------------------------------ */
 /* Top navigation + pure CSS hover dropdowns                           */
 /* ------------------------------------------------------------------ */
 
-.top-nav,
-.bottom-nav {
+.top-nav {
     max-width: var(--max-width);
     margin: 0 auto;
     padding: var(--space-2) var(--space-4);
@@ -868,26 +861,27 @@ h3 {
 /* ------------------------------------------------------------------ */
 
 /* Keep the search above the sidebar while the image starts at the top. */
-.image-layout > .image-toolbar {
-    grid-column: 1;
-    grid-row: 1;
-    display: block;
+.image-sidebar-column {
+    display: flex;
+    flex-direction: column;
+    align-self: start;
+    gap: var(--space-4);
+    min-width: 0;
 }
 
-.image-layout > .image-sidebar {
-    grid-column: 1;
-    grid-row: 2;
+.image-toolbar .search-view {
+    margin-bottom: 0;
 }
 
 .image-layout > .image-content {
     grid-column: 2;
-    grid-row: 1 / span 2;
+    grid-row: 1;
     align-self: start;
 }
 
 .image-layout > .quick-tags-sidebar {
     grid-column: 3;
-    grid-row: 1 / span 2;
+    grid-row: 1;
 }
 
 .image-view {
@@ -1874,23 +1868,6 @@ h3 {
 }
 
 /* ------------------------------------------------------------------ */
-/* Footer                                                              */
-/* ------------------------------------------------------------------ */
-
-.bottom-nav .nav-list {
-    justify-content: center;
-}
-
-.bottom-nav .nav-link {
-    color: var(--color-muted);
-    font-size: 0.9rem;
-}
-
-.bottom-nav .nav-link.active {
-    color: var(--color-accent-contrast);
-}
-
-/* ------------------------------------------------------------------ */
 /* Small screens                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -1899,8 +1876,10 @@ h3 {
         grid-template-columns: 1fr;
     }
 
-    .image-layout > .image-toolbar,
-    .image-layout > .image-sidebar,
+    .image-sidebar-column {
+        display: contents;
+    }
+
     .image-layout > .image-content,
     .image-layout > .quick-tags-sidebar {
         grid-column: 1;

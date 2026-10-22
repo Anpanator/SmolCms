@@ -60,7 +60,7 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
         children: [nextButton, previousButton],
     });
     const toolbar = el('div', {
-        className: 'layout-toolbar image-toolbar',
+        className: 'image-toolbar',
         children: [search.element],
     });
     const deleteButton = hasAccessLevel(session.getUser(), AccessLevel.MOD) ? createDeleteButton() : null;
@@ -93,8 +93,12 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
         className: 'content image-content',
         children: [status, imageDetails.imageHolder],
     });
+    const sidebarColumn = el('div', {
+        className: 'image-sidebar-column',
+        children: [toolbar, sidebar],
+    });
     const state = {navigate, imageDetails, tagList, status};
-    page.append(toolbar, sidebar, content, quickTags.element);
+    page.append(sidebarColumn, content, quickTags.element);
 
     page.addEventListener('keydown', handleKeyboard);
     queueMicrotask(() => {

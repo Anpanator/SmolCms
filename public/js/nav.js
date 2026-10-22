@@ -1,5 +1,5 @@
 /**
- * Header and footer navigation, rendered from session state.
+ * Header navigation, rendered from session state.
  *
  * Anonymous: Home / Login / Register.
  * Logged in: Home / Upload Image / Tagme / user display name (hover dropdown with
@@ -149,50 +149,6 @@ export function createHeaderNav({ session, navigate }) {
             items.push(buildAccountDropdown(user));
         }
         list.replaceChildren(...items);
-    }
-
-    render(session.getUser());
-
-    return {
-        element: nav,
-        setActive(path) {
-            activePath = path;
-            render(session.getUser());
-        },
-        destroy: unsubscribe,
-    };
-}
-
-/**
- * Footer navigation with session-aware page links; account actions stay in the header dropdown.
- *
- * @param {{ session: *, navigate?: Function }} deps
- * @returns {{ element: HTMLElement, setActive: (path: string) => void, destroy: () => void }}
- */
-export function createFooterNav({ session }) {
-    const nav = el('nav', { className: 'bottom-nav', attributes: { 'aria-label': 'Footer navigation' } });
-    const list = el('ul', { className: 'nav-list' });
-    nav.append(list);
-
-    let activePath = null;
-    const unsubscribe = session.subscribe(() => render(session.getUser()));
-
-    function render(user) {
-        const links = user
-            ? [
-                [RoutePath.START_PAGE, 'Home'],
-                [RoutePath.UPLOAD_IMAGE, 'Upload Image'],
-                [RoutePath.TAGME_QUEUE, 'Tagme'],
-            ]
-            : [
-                [RoutePath.START_PAGE, 'Home'],
-                [RoutePath.LOGIN, 'Login'],
-                [RoutePath.REGISTER, 'Register'],
-            ];
-        list.replaceChildren(...links.map(([path, label]) => el('li', {
-            className: 'nav-item',
-            children: navLink(path, label, activePath),
-        })));
     }
 
     render(session.getUser());

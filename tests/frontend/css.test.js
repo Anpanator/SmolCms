@@ -197,9 +197,10 @@ export function testImageToolbarAlignsWithSidebarAndImageColumns() {
     const layout = document.createElement('div');
     layout.className = 'layout image-layout';
     const toolbar = document.createElement('div');
-    toolbar.className = 'layout-toolbar image-toolbar';
+    toolbar.className = 'image-toolbar';
     const search = document.createElement('form');
     search.className = 'search-view';
+    search.style.height = '2rem';
     toolbar.append(search);
 
     const sidebar = document.createElement('aside');
@@ -215,14 +216,18 @@ export function testImageToolbarAlignsWithSidebarAndImageColumns() {
     navigation.append(next, previous);
     sidebar.append(navigation);
 
+    const sidebarColumn = document.createElement('div');
+    sidebarColumn.className = 'image-sidebar-column';
+    sidebarColumn.append(toolbar, sidebar);
+
     const content = document.createElement('section');
     content.className = 'content image-content';
     const image = document.createElement('img');
     image.className = 'image-view-image';
     image.style.width = '2rem';
-    image.style.height = '2rem';
+    image.style.height = '20rem';
     content.append(image);
-    layout.append(toolbar, sidebar, content);
+    layout.append(sidebarColumn, content);
     fixture.append(layout);
 
     try {
@@ -239,7 +244,8 @@ export function testImageToolbarAlignsWithSidebarAndImageColumns() {
         assertTrue(navigationRect.left >= sidebarRect.left && navigationRect.right <= sidebarRect.right,
             'navigation should sit inside the sidebar');
         assertEqual(imageRect.top, toolbarRect.top, 'the image should start where the search bar starts');
-        assertTrue(toolbarRect.bottom < sidebarRect.top, 'the search should sit above the sidebar');
+        assertEqual(Math.round(sidebarRect.top - toolbarRect.bottom), 16,
+            'a tall image must not push the sidebar down');
         assertTrue(contentRect.left > sidebarRect.right, 'the image should remain in the content column');
         assertEqual(nextRect.width, previousRect.width, 'previous/next controls should have the same width');
         assertEqual(nextRect.height, previousRect.height, 'previous/next controls should have the same height');
@@ -355,10 +361,20 @@ export function testImageNavigationAndModActionStylesExist() {
     assertTrue(findRule(rules, '.image-view', 'justify-content:flex-start') !== undefined, 'the image should be aligned to the left');
     assertTrue(findRule(rules, '.image-layout > .image-content', 'grid-area:1/2') !== undefined,
         'the image content should start at the top without a toolbar row above it');
-    assertTrue(findRule(rules, '.image-layout > .image-toolbar', 'grid-area:1/1') !== undefined,
-        'tag search should stay in the sidebar column');
+    assertTrue(findRule(rules, '.image-sidebar-column', 'display:flex') !== undefined,
+        'tag search and the sidebar should share a top-aligned column');
+    assertTrue(findRule(rules, '.image-sidebar-column', 'gap:var(--space-4)') !== undefined,
+        'the sidebar should sit directly below the search');
+    assertTrue(findRule(rules, '.image-toolbar .search-view', 'margin-bottom:0') !== undefined,
+        'the search spacing should come from the sidebar column gap');
     assertTrue(findRule(rules, '.mod-actions', 'display:flex') !== undefined, 'the mod actions section should have a styled layout');
     assertTrue(findRule(rules, '.button--danger') !== undefined, 'the delete action should reuse the danger button style');
+}
+
+export function testSiteFooterStylesAreRemoved() {
+    const rules = collectRules(findMainStylesheet());
+    assertTrue(findRule(rules, '.site-footer') === undefined, 'the site footer should be removed');
+    assertTrue(findRule(rules, '.bottom-nav') === undefined, 'the footer navigation should be removed');
 }
 
 function assertNotEqualString(actual, expected, message) {
