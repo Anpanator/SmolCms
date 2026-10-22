@@ -49,7 +49,6 @@ final readonly class ProcessImagesExecutor implements CliCommandExecutor
         // Non-blocking exclusive lock so that only one worker processes images at a time.
         if (!flock($lock, LOCK_EX | LOCK_NB)) {
             fclose($lock);
-            echo "Another worker is already processing images.\n";
             return;
         }
 

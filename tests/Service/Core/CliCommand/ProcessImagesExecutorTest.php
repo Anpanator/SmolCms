@@ -118,7 +118,6 @@ class ProcessImagesExecutorTest extends SimpleTestCase
         // If the lock had leaked, the second run would have been a clean no-op instead.
         self::assertIsString($output);
         self::assertStringContainsString('Processed 0 image(s).', $output);
-        self::assertStringNotContainsString('Another worker is already processing images.', $output);
         self::assertFileDoesNotExist($this->lockFilePath);
     }
 
@@ -162,7 +161,7 @@ class ProcessImagesExecutorTest extends SimpleTestCase
                 ->method('processBatch')
                 ->seal();
 
-            $this->expectOutputString("Another worker is already processing images.\n");
+            $this->expectOutputString('');
             $this->createTestee($this->imageProcessingService)->execute(['100'], true);
         } finally {
             flock($lock, LOCK_UN);
