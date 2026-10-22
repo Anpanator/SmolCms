@@ -179,6 +179,54 @@ export function testLayoutAndGridUseCssGrid() {
     }
 }
 
+export function testImageToolbarAlignsWithSidebarAndImageColumns() {
+    const fixture = document.getElementById('test-fixture');
+    const layout = document.createElement('div');
+    layout.className = 'layout image-layout';
+    const toolbar = document.createElement('div');
+    toolbar.className = 'layout-toolbar image-toolbar';
+    const search = document.createElement('form');
+    search.className = 'search-view';
+    const navigation = document.createElement('nav');
+    navigation.className = 'image-nav';
+    const previous = document.createElement('button');
+    previous.className = 'button';
+    previous.textContent = 'Previous';
+    const next = document.createElement('button');
+    next.className = 'button';
+    next.textContent = 'Next';
+    navigation.append(previous, next);
+    toolbar.append(search, navigation);
+
+    const sidebar = document.createElement('aside');
+    sidebar.className = 'sidebar';
+    const content = document.createElement('section');
+    content.className = 'content';
+    const image = document.createElement('img');
+    image.className = 'image-view-image';
+    image.style.width = '2rem';
+    image.style.height = '2rem';
+    content.append(image);
+    layout.append(toolbar, sidebar, content);
+    fixture.append(layout);
+
+    try {
+        const toolbarRect = toolbar.getBoundingClientRect();
+        const searchRect = search.getBoundingClientRect();
+        const navigationRect = navigation.getBoundingClientRect();
+        const sidebarRect = sidebar.getBoundingClientRect();
+        const imageRect = image.getBoundingClientRect();
+        const contentRect = content.getBoundingClientRect();
+
+        assertEqual(searchRect.left, sidebarRect.left, 'search should align with the sidebar below it');
+        assertEqual(navigationRect.left, contentRect.left, 'navigation should align with the image below it');
+        assertEqual(sidebarRect.top, imageRect.top, 'the sidebar should start at the same height as the image');
+        assertTrue(toolbarRect.bottom < sidebarRect.top, 'the search/navigation row should be above the image and sidebar');
+    } finally {
+        layout.remove();
+    }
+}
+
 export function testTileImageCoversTheTile() {
     const fixture = document.getElementById('test-fixture');
     const tile = document.createElement('a');
@@ -247,7 +295,11 @@ export function testImageTagEditingAndTagmeControlsHaveStyles() {
 
 export function testImageNavigationAndModActionStylesExist() {
     const rules = collectRules(findMainStylesheet());
-    assertTrue(findRule(rules, '.image-nav', 'display:flex') !== undefined, 'previous/next controls should share a row below the image');
+    assertTrue(findRule(rules, '.layout-toolbar', 'grid-column:1/-1') !== undefined, 'the toolbars should span above the layout columns');
+    assertTrue(findRule(rules, '.layout-toolbar', 'grid-template-columns:subgrid') !== undefined, 'toolbar controls should align with the sidebar and content columns');
+    assertTrue(findRule(rules, '.layout-toolbar .search-view', 'margin-bottom:0') !== undefined, 'toolbar search should align with adjacent controls');
+    assertTrue(findRule(rules, '.image-nav', 'display:flex') !== undefined, 'previous/next controls should share a row above the image');
+    assertTrue(findRule(rules, '.image-nav', 'margin-top:') === undefined, 'navigation should not retain the old below-image spacing');
     assertTrue(findRule(rules, '.image-nav .button') !== undefined, 'previous/next controls should share the row width');
     assertTrue(findRule(rules, '.mod-actions', 'display:flex') !== undefined, 'the mod actions section should have a styled layout');
     assertTrue(findRule(rules, '.button--danger') !== undefined, 'the delete action should reuse the danger button style');

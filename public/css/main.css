@@ -219,6 +219,19 @@ h3 {
     padding: var(--space-4);
 }
 
+.layout-toolbar {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    align-items: start;
+    column-gap: var(--space-4);
+    row-gap: var(--space-3);
+}
+
+.layout-toolbar .search-view {
+    margin-bottom: 0;
+}
+
 .sidebar {
     align-self: start;
     background: var(--color-surface);
@@ -838,7 +851,6 @@ h3 {
 .image-nav {
     display: flex;
     gap: var(--space-2);
-    margin-top: var(--space-3);
 }
 
 .image-nav .button {
