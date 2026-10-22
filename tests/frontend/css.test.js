@@ -117,6 +117,18 @@ export function testImageTileAndReviewStylesExist() {
     assertTrue(findRule(rules, '.image-download') !== undefined, 'the download link should be styled');
 }
 
+export function testProfileApiKeyActionRowStylesExist() {
+    const rules = collectRules(findMainStylesheet());
+    const actionsRule = findRule(rules, '.profile-api-key-actions', 'display:flex');
+    assertTrue(actionsRule !== undefined, 'API key buttons should share a flex row');
+    assertTrue(actionsRule.text.includes('flex-wrap:wrap'), 'the API key action row should wrap on narrow screens');
+    assertTrue(actionsRule.text.includes('gap:var(--space-2)'), 'the API key action row should use the shared spacing');
+    assertTrue(
+        findRule(rules, '.profile-api-key-actions [hidden]', 'display:none') !== undefined,
+        'hidden API key actions should not be displayed even when they carry the button class',
+    );
+}
+
 export function testImageMetadataSeparatorUsesBorderColorAndSidebarPadding() {
     const fixture = document.getElementById('test-fixture');
     const sidebar = document.createElement('aside');

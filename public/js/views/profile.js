@@ -134,6 +134,10 @@ function createApiKeySection({navigate}) {
         attributes: {type: 'button', hidden: 'hidden'},
         children: 'Delete API key',
     });
+    const actions = el('div', {
+        className: 'profile-api-key-actions',
+        children: [generateButton, deleteButton],
+    });
     let localKeyStateChanged = false;
 
     function setHasApiKey(hasApiKey, fromProfile = false) {
@@ -224,8 +228,7 @@ function createApiKeySection({navigate}) {
                 className: 'profile-api-key-note',
                 children: 'The key is shown only once and grants API access to endpoints enabled for API keys.',
             }),
-            generateButton,
-            deleteButton,
+            actions,
             message,
             keyOutput,
         ],

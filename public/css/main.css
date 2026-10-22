@@ -1451,6 +1451,16 @@ h3 {
     border-radius: var(--radius);
 }
 
+.profile-api-key-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.profile-api-key-actions [hidden] {
+    display: none;
+}
+
 .profile-api-key-title {
     font-size: 1.2rem;
 }

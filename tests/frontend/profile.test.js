@@ -124,6 +124,66 @@ export async function testProfileApiKeyControlsShowGenerateWithoutDeleteWhenNoKe
     }
 }
 
+export async function testProfileApiKeyButtonsShareOneActionRow(fixture) {
+    const {session, restore} = await createLoggedInSession(testUser({accessLevel: 400}));
+    try {
+        const view = createProfileView({session, navigate: () => {}});
+        fixture.append(view);
+        await settle();
+
+        const actions = view.querySelector('.profile-api-key-actions');
+        const generateButton = view.querySelector('.profile-api-key-generate-button');
+        const deleteButton = view.querySelector('.profile-api-key-delete-button');
+        assertTrue(actions !== null, 'API key controls should be grouped in an action row');
+        assertEqual(generateButton?.parentElement, actions, 'the generate button should live in the action row');
+        assertEqual(deleteButton?.parentElement, actions, 'the delete button should live in the action row');
+        assertEqual(actions?.children[0], generateButton, 'generate/rotate should be the first action');
+        assertEqual(actions?.children[1], deleteButton, 'delete should follow generate/rotate');
+        assertEqual(getComputedStyle(actions).display, 'flex', 'the action row should use a flex layout');
+    } finally {
+        restore();
+    }
+}
+
+export async function testProfileApiKeyDeleteButtonDisplayFollowsKeyState(fixture) {
+    const withoutKey = await createLoggedInSession(testUser({accessLevel: 400}));
+    try {
+        const view = createProfileView({session: withoutKey.session, navigate: () => {}});
+        fixture.append(view);
+        await settle();
+
+        const deleteButton = view.querySelector('.profile-api-key-delete-button');
+        assertTrue(deleteButton?.hidden, 'users without a key should not see the delete button');
+        assertEqual(
+            getComputedStyle(deleteButton).display,
+            'none',
+            'the delete button should not be displayed without a key',
+        );
+        view.remove();
+    } finally {
+        withoutKey.restore();
+    }
+
+    const withKey = await createLoggedInSession(testUser({accessLevel: 400}), {
+        status: 200,
+        body: {approvedTagSuggestions: 3, recentUploads: [], hasApiKey: true},
+    });
+    try {
+        const view = createProfileView({session: withKey.session, navigate: () => {}});
+        fixture.append(view);
+        await settle();
+
+        const deleteButton = view.querySelector('.profile-api-key-delete-button');
+        assertTrue(deleteButton !== null && !deleteButton.hidden, 'users with a key should see its delete button');
+        assertTrue(
+            getComputedStyle(deleteButton).display !== 'none',
+            'the delete button should be displayed when a key exists',
+        );
+    } finally {
+        withKey.restore();
+    }
+}
+
 export async function testProfileGeneratesAndShowsApiKeyOnce() {
     const {session, fetchMock, restore} = await createLoggedInSession(testUser({accessLevel: 400}));
     try {
