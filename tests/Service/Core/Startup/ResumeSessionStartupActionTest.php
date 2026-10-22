@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace SmolCms\Test\Service\Core\Startup;
 
+use ReflectionProperty;
 use SmolCms\Service\Core\Session\SessionHandler;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
@@ -35,6 +36,27 @@ class ResumeSessionStartupActionTest extends FunctionalTestCase
         }
         $_COOKIE = $this->originalCookie;
         parent::tearDown();
+    }
+
+    public function testRunAction_WithoutCookieDoesNotStartSessionOrEmitCookie(): void
+    {
+        $emitterProperty = new ReflectionProperty(SessionService::class, 'cookieEmitter');
+        $previousEmitter = $emitterProperty->getValue($this->sessionService);
+        $emittedCookies = [];
+        $this->sessionService->setCookieEmitter(
+            static function (string $name, string $value, array $options) use (&$emittedCookies): void {
+                $emittedCookies[] = ['name' => $name, 'value' => $value, 'options' => $options];
+            },
+        );
+        try {
+            $action = new ResumeSessionStartupAction($this->sessionService, $this->sessionHandler);
+            $action->runAction();
+        } finally {
+            $emitterProperty->setValue($this->sessionService, $previousEmitter);
+        }
+
+        self::assertSame([], $emittedCookies);
+        self::assertSame(PHP_SESSION_NONE, session_status());
     }
 
     public function testRunAction_DiscardsStaleCookieWithoutStartingSession(): void

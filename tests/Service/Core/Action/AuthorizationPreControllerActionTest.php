@@ -217,6 +217,12 @@ class AuthorizationPreControllerActionTest extends SimpleTestCase
         $this->sessionService
             ->expects(self::never())
             ->method('destroySession');
+        $this->sessionService
+            ->expects(self::never())
+            ->method('startSession');
+        $this->sessionService
+            ->expects(self::never())
+            ->method('resumeSession');
 
         $result = $this->action->process($request, $controller, 'apiRestrictedFellow', $handlerArguments);
 

@@ -20,6 +20,7 @@ namespace SmolCms\Test\Service\Factory {
     use SmolCms\Data\Constant\HttpContentType;
     use SmolCms\Data\Constant\HttpHeader;
     use SmolCms\Data\Constant\HttpMethod;
+    use SmolCms\Service\Core\Session\SessionService;
     use SmolCms\Service\Factory\RequestFactory;
     use SmolCms\Service\Factory\UrlFactory;
     use SmolCms\TestUtils\Attributes\Mock;
@@ -53,6 +54,9 @@ namespace SmolCms\Test\Service\Factory {
         private array $originalFiles;
         private array $originalHeaders;
 
+        /** @var array<string, mixed> */
+        private array $originalCookie;
+
         protected function setUp(): void
         {
             parent::setUp();
@@ -61,6 +65,7 @@ namespace SmolCms\Test\Service\Factory {
             $this->originalPost = $_POST;
             $this->originalFiles = $_FILES;
             $this->originalHeaders = RequestFactoryHeaderShim::get();
+            $this->originalCookie = $_COOKIE;
             $this->requestFactory = new RequestFactory($this->urlFactory);
         }
 
@@ -70,6 +75,7 @@ namespace SmolCms\Test\Service\Factory {
             $_GET = $this->originalGet;
             $_POST = $this->originalPost;
             $_FILES = $this->originalFiles;
+            $_COOKIE = $this->originalCookie;
             RequestFactoryHeaderShim::set($this->originalHeaders);
             parent::tearDown();
         }
@@ -136,6 +142,25 @@ namespace SmolCms\Test\Service\Factory {
             self::assertSame($postParams, $request->postParams);
             self::assertSame($getParams, $request->getParams);
             self::assertSame($files, $request->files);
+        }
+
+        public function testBuildRequestFromGlobals_mapsAuthorizationWithoutInventingCookieHeader(): void
+        {
+            $_COOKIE[SessionService::SESSION_NAME] = 'cookie-that-must-not-become-a-header';
+            $headers = [HttpHeader::AUTHORIZATION->value => 'Bearer ' . str_repeat('a', 64)];
+            $this->setRequestGlobals(method: 'POST', headers: $headers);
+            $this->expectUrl('http://example.com/resource?from=uri');
+
+            $request = $this->requestFactory->buildRequestFromGlobals();
+
+            self::assertSame($headers, $request->headers);
+            self::assertFalse(
+                array_any(
+                    array_keys($request->headers),
+                    static fn(string|int $name): bool => is_string($name) && strcasecmp($name, 'Cookie') === 0,
+                ),
+                'RequestFactory must not turn the session cookie into a Cookie request header.',
+            );
         }
 
         public function testBuildRequestFromGlobals_rejectsUnsupportedHttpMethod(): void
