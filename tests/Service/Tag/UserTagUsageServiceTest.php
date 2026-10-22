@@ -69,8 +69,41 @@ class UserTagUsageServiceTest extends FunctionalTestCase
             'name',
         );
 
-        self::assertContains($attachedTagNames[10], $recentTagNames);
+        self::assertCount(10, $recentTagNames);
         self::assertNotContains($removedTagName, $recentTagNames);
+        foreach ($recentTagNames as $recentTagName) {
+            self::assertContains($recentTagName, $attachedTagNames);
+        }
+    }
+
+    public function testRecentListIsOrderedByRecencyMayOverlapMostUsedAndExcludesRemovedTags(): void
+    {
+        $userId = 905;
+        $prefix = 'user-usage-recency-' . bin2hex(random_bytes(4)) . '-';
+        $overlapTagName = $prefix . 'overlap';
+        $middleTagName = $prefix . 'middle';
+        $newestTagName = $prefix . 'newest';
+        $removedTagName = $prefix . 'removed';
+        foreach ([$overlapTagName, $middleTagName, $newestTagName, $removedTagName] as $tagName) {
+            self::assertNotNull($this->tagService->createTag($tagName));
+        }
+
+        $this->insertUserTagUsage($userId, $overlapTagName, 5, '2026-10-22 12:00:00');
+        $this->insertUserTagUsage($userId, $middleTagName, 2, '2026-10-22 12:05:00');
+        $this->insertUserTagUsage($userId, $newestTagName, 1, '2026-10-22 12:10:00');
+        $this->insertUserTagUsage($userId, $removedTagName, 0, '2026-10-22 13:00:00');
+
+        $quickTags = $this->userTagUsageService->getQuickTags($userId);
+
+        self::assertSame(
+            [$overlapTagName, $middleTagName, $newestTagName],
+            array_column($quickTags['userMostUsed'], 'name'),
+        );
+        self::assertSame(
+            [$newestTagName, $middleTagName, $overlapTagName],
+            array_column($quickTags['userRecent'], 'name'),
+        );
+        self::assertContains($overlapTagName, array_column($quickTags['userRecent'], 'name'));
     }
 
     public function testRemovingWithoutPriorUsageCreatesZeroRowAndTagmeIsNeverTracked(): void
@@ -109,6 +142,21 @@ class UserTagUsageServiceTest extends FunctionalTestCase
         self::assertNotContains('tagme', array_column($quickTags['userMostUsed'], 'name'));
         self::assertNotContains('tagme', array_column($quickTags['userRecent'], 'name'));
         self::assertContains($tagName, array_column($quickTags['userMostUsed'], 'name'));
+        self::assertContains($tagName, array_column($quickTags['userRecent'], 'name'));
+    }
+
+    private function insertUserTagUsage(int $userId, string $tagName, int $usageCount, string $lastUsedAt): void
+    {
+        $statement = $this->pdo->prepare(
+            'INSERT INTO user_tag_usage (user_id, tag_id, usage_count, last_used_at) '
+            . 'VALUES (:user_id, :tag_id, :usage_count, :last_used_at)'
+        );
+        $statement->execute([
+            'user_id' => $userId,
+            'tag_id' => $this->tagService->findOrCreateTagId($tagName),
+            'usage_count' => $usageCount,
+            'last_used_at' => $lastUsedAt,
+        ]);
     }
 
     /** @return array{usage_count: int|string, last_used_at: string|null}|null */
