@@ -61,7 +61,8 @@ export async function testImageViewRendersSampleImageInLayout() {
         const toolbar = view.querySelector('.image-toolbar');
         assertTrue(toolbar !== null, 'image view should have a toolbar above its content');
         assertTrue(toolbar.querySelector('.search-view') !== null, 'tag search should live in the image toolbar');
-        assertTrue(toolbar.querySelector('.image-nav') !== null, 'previous/next controls should share the toolbar');
+        assertEqual(toolbar.querySelector('.image-nav'), null, 'previous/next controls should not share the toolbar');
+        assertTrue(view.querySelector('.sidebar .image-nav') !== null, 'previous/next controls should live in the sidebar');
         assertEqual(view.querySelector('.sidebar .search-view'), null, 'the image sidebar should not contain tag search');
         assertTrue(view.querySelector('.sidebar .tags') !== null, 'sidebar tag list should exist');
         assertTrue(view.querySelector('.quick-tags-sidebar')?.hidden, 'quick tags should be hidden by default');
@@ -227,11 +228,11 @@ export async function testImageViewHotkeysKeepWorkingAfterQuickTagsAreShown(fixt
         assertEqual(document.activeElement, toggle, 'showing quick tags must not drop page focus');
         assertFalse(toggle.disabled, 'the toggle should remain focusable after loading');
 
-        assertTrue(pressKey(toggle, 'ArrowRight').defaultPrevented, 'hotkeys should still reach the image view');
+        assertTrue(pressKey(toggle, 'ArrowLeft').defaultPrevented, 'hotkeys should still reach the image view');
         await settle();
         assertTrue(
             fetchMock.calls.some((call) => call.url === '/api/image/neighbor?id=7&direction=next'),
-            'ArrowRight should still request the next image',
+            'ArrowLeft should still request the next image',
         );
         assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/image?id=12']));
     } finally {
@@ -821,21 +822,27 @@ export async function testImageViewControlsAreDisabledWithoutALoadedImage() {
     }
 }
 
-export async function testImageViewToolbarPlacesNavigationAboveTheLoadedImage() {
+export async function testImageViewSidebarPlacesNavigationBeforeTheLoadedImage() {
     const {view, restore} = await createView(() => detailResponse());
     try {
-        const toolbar = view.querySelector('.image-toolbar');
-        const nav = toolbar?.querySelector('.image-nav');
+        const sidebar = view.querySelector('.sidebar');
+        const nav = sidebar?.querySelector('.image-nav');
         const image = view.querySelector('.content img.image-view-image');
-        assertTrue(toolbar !== null, 'the image toolbar should exist');
-        assertTrue(nav !== null, 'image navigation should share the toolbar with tag search');
-        assertTrue(toolbar.querySelector('.search-view') !== null, 'tag search should share the toolbar with navigation');
+        assertTrue(sidebar !== null, 'the image sidebar should exist');
+        assertTrue(nav !== null, 'image navigation should live in the sidebar');
+        assertTrue(view.querySelector('.image-toolbar .image-nav') === null,
+            'navigation should be moved out of the toolbar');
         assertTrue(
             (nav.compareDocumentPosition(image) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
             'previous/next controls should precede the image',
         );
-        assertFalse(view.querySelector('.image-nav-previous').disabled, 'previous should be available for a loaded image');
+
+        const buttons = [...nav.querySelectorAll('.button')];
+        assertEqual(buttons.length, 2, 'navigation should have two controls');
+        assertTrue(buttons[0].classList.contains('image-nav-next'), 'next should come first');
+        assertTrue(buttons[1].classList.contains('image-nav-previous'), 'previous should come second');
         assertFalse(view.querySelector('.image-nav-next').disabled, 'next should be available for a loaded image');
+        assertFalse(view.querySelector('.image-nav-previous').disabled, 'previous should be available for a loaded image');
     } finally {
         restore();
     }
@@ -958,19 +965,19 @@ export async function testImageViewArrowKeysNavigateToPreviousAndNextImages() {
         assertTrue(pressKey(view, 'ArrowRight', {repeat: true}).defaultPrevented, 'repeated arrows should still suppress scrolling');
         assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/neighbor')).length, 0,
             'a repeated arrow should not start navigation');
-        assertTrue(pressKey(view, 'ArrowRight').defaultPrevented, 'right should be handled as next');
+        assertTrue(pressKey(view, 'ArrowRight').defaultPrevented, 'right should be handled as previous');
         await settle();
-        assertTrue(pressKey(view, 'ArrowLeft').defaultPrevented, 'left should be handled as previous');
+        assertTrue(pressKey(view, 'ArrowLeft').defaultPrevented, 'left should be handled as next');
         await settle();
 
         assertEqual(
             JSON.stringify(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/neighbor')).map((call) => call.url)),
             JSON.stringify([
-                '/api/image/neighbor?id=7&direction=next',
                 '/api/image/neighbor?id=7&direction=previous',
+                '/api/image/neighbor?id=7&direction=next',
             ]),
         );
-        assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/image?id=12', '/image?id=3']));
+        assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/image?id=3', '/image?id=12']));
     } finally {
         restore();
     }
@@ -1067,10 +1074,10 @@ export async function testImageViewHotkeysDoNotRepeatWhileNavigationIsPending() 
         return {status: 200, body: null};
     });
     try {
-        assertTrue(pressKey(view, 'ArrowRight').defaultPrevented);
+        assertTrue(pressKey(view, 'ArrowLeft').defaultPrevented);
         const pendingCalls = fetchMock.calls.filter((call) => call.url.startsWith('/api/image/neighbor'));
         assertEqual(pendingCalls.length, 1);
-        assertTrue(pressKey(view, 'ArrowLeft').defaultPrevented, 'pending arrows should not scroll the page');
+        assertTrue(pressKey(view, 'ArrowRight').defaultPrevented, 'pending arrows should not scroll the page');
         pressKey(view, 'Delete');
         assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/neighbor')).length, 1);
         assertEqual(document.querySelector('.modal-backdrop'), null, 'pending navigation should block delete hotkeys');

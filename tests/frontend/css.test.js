@@ -200,19 +200,21 @@ export function testImageToolbarAlignsWithSidebarAndImageColumns() {
     toolbar.className = 'layout-toolbar image-toolbar';
     const search = document.createElement('form');
     search.className = 'search-view';
-    const navigation = document.createElement('nav');
-    navigation.className = 'image-nav';
-    const previous = document.createElement('button');
-    previous.className = 'button';
-    previous.textContent = 'Previous';
-    const next = document.createElement('button');
-    next.className = 'button';
-    next.textContent = 'Next';
-    navigation.append(previous, next);
-    toolbar.append(search, navigation);
+    toolbar.append(search);
 
     const sidebar = document.createElement('aside');
     sidebar.className = 'sidebar';
+    const navigation = document.createElement('nav');
+    navigation.className = 'image-nav';
+    const next = document.createElement('button');
+    next.className = 'button';
+    next.textContent = 'Next';
+    const previous = document.createElement('button');
+    previous.className = 'button';
+    previous.textContent = 'Previous';
+    navigation.append(next, previous);
+    sidebar.append(navigation);
+
     const content = document.createElement('section');
     content.className = 'content';
     const image = document.createElement('img');
@@ -232,9 +234,11 @@ export function testImageToolbarAlignsWithSidebarAndImageColumns() {
         const contentRect = content.getBoundingClientRect();
 
         assertEqual(searchRect.left, sidebarRect.left, 'search should align with the sidebar below it');
-        assertEqual(navigationRect.left, contentRect.left, 'navigation should align with the image below it');
+        assertTrue(navigationRect.left >= sidebarRect.left && navigationRect.right <= sidebarRect.right,
+            'navigation should sit inside the sidebar');
         assertEqual(sidebarRect.top, imageRect.top, 'the sidebar should start at the same height as the image');
         assertTrue(toolbarRect.bottom < sidebarRect.top, 'the search/navigation row should be above the image and sidebar');
+        assertTrue(contentRect.left > sidebarRect.right, 'the image should remain in the content column');
     } finally {
         layout.remove();
     }
@@ -337,9 +341,12 @@ export function testImageNavigationAndModActionStylesExist() {
     assertTrue(findRule(rules, '.layout-toolbar', 'grid-column:1/-1') !== undefined, 'the toolbars should span above the layout columns');
     assertTrue(findRule(rules, '.layout-toolbar', 'grid-template-columns:subgrid') !== undefined, 'toolbar controls should align with the sidebar and content columns');
     assertTrue(findRule(rules, '.layout-toolbar .search-view', 'margin-bottom:0') !== undefined, 'toolbar search should align with adjacent controls');
-    assertTrue(findRule(rules, '.image-nav', 'display:flex') !== undefined, 'previous/next controls should share a row above the image');
-    assertTrue(findRule(rules, '.image-nav', 'margin-top:') === undefined, 'navigation should not retain the old below-image spacing');
+    assertTrue(findRule(rules, '.image-nav', 'display:flex') !== undefined, 'previous/next controls should share a row in the sidebar');
+    assertTrue(findRule(rules, '.image-nav', 'margin-bottom:var(--space-4)') !== undefined, 'navigation should be separated from the sidebar content below it');
     assertTrue(findRule(rules, '.image-nav .button') !== undefined, 'previous/next controls should share the row width');
+    assertTrue(findRule(rules, '.image-view-image', 'max-height:calc(100dvh-14rem)') !== undefined,
+        'the image should fit entirely in the visible browser area');
+    assertTrue(findRule(rules, '.image-view', 'justify-content:center') !== undefined, 'the image should be centered in its content column');
     assertTrue(findRule(rules, '.mod-actions', 'display:flex') !== undefined, 'the mod actions section should have a styled layout');
     assertTrue(findRule(rules, '.button--danger') !== undefined, 'the delete action should reuse the danger button style');
 }

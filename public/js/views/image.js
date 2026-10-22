@@ -52,16 +52,16 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
     let navigationPending = false;
     let deletePending = false;
 
-    const previousButton = createNavButton('image-nav-previous', 'Previous', 'previous');
     const nextButton = createNavButton('image-nav-next', 'Next', 'next');
+    const previousButton = createNavButton('image-nav-previous', 'Previous', 'previous');
     const imageNav = el('nav', {
         className: 'image-nav',
         attributes: {'aria-label': 'Adjacent images'},
-        children: [previousButton, nextButton],
+        children: [nextButton, previousButton],
     });
     const toolbar = el('div', {
         className: 'layout-toolbar image-toolbar',
-        children: [search.element, imageNav],
+        children: [search.element],
     });
     const deleteButton = hasAccessLevel(session.getUser(), AccessLevel.MOD) ? createDeleteButton() : null;
     const modActions = deleteButton === null ? null : el('section', {
@@ -81,6 +81,7 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
     const sidebar = el('aside', {
         className: 'sidebar',
         children: [
+            imageNav,
             el('h2', {className: 'sidebar-title', children: 'Tags'}),
             tagList.element,
             quickTagsToggle,
@@ -164,7 +165,7 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
             if (event.repeat || navigationPending || currentImage === null) {
                 return;
             }
-            void goToNeighbor(event.key === 'ArrowRight' ? 'next' : 'previous');
+            void goToNeighbor(event.key === 'ArrowLeft' ? 'next' : 'previous');
             return;
         }
 

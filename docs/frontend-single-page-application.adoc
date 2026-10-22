@@ -31,7 +31,9 @@ The upload view sends each selected file sequentially as multipart field
 `image[]`. The home view shows accepted-image thumbnails and any pending-review
 images visible to the viewer; pending-review tiles use distinct
 `tile-unapproved` styling. The image view loads metadata and a protected
-sample, with a download link labeled *Download*.
+sample, with a download link labeled *Download*. The sample is scaled to fit
+entirely within the visible browser area; previous/next controls live in the
+sidebar, with next first and `ArrowLeft`/`ArrowRight` mapped to next/previous.
 Image and tag moderation queues act on the currently selected item: Approve
 and Reject submit that selection, and a success message remains visible rather
 than auto-dismissing. Deleting an image asks for confirmation: Enter confirms
