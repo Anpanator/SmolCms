@@ -68,7 +68,7 @@ class RequestBoundaryValidationTest extends SimpleTestCase
     {
         $displayName = str_repeat('D', 69);
         $mapped = $this->mapAndValidate(
-            $this->createRequest(['displayName' => $displayName, 'accessLevel' => 100]),
+            $this->createRequest(['displayName' => $displayName, 'accessLevel' => 100], ['id' => '1']),
             'updateAction',
         );
 
@@ -80,7 +80,7 @@ class RequestBoundaryValidationTest extends SimpleTestCase
     {
         $this->expectException(BadRequestException::class);
         $this->mapAndValidate(
-            $this->createRequest(['displayName' => str_repeat('D', 70), 'accessLevel' => 100]),
+            $this->createRequest(['displayName' => str_repeat('D', 70), 'accessLevel' => 100], ['id' => '1']),
             'updateAction',
         );
     }
@@ -95,12 +95,13 @@ class RequestBoundaryValidationTest extends SimpleTestCase
     }
 
     /** @param array<string, mixed> $postParams */
-    private function createRequest(array $postParams): Request
+    private function createRequest(array $postParams, ?array $getParams = null): Request
     {
         return new Request(
             url: new Url(protocol: 'https', host: 'example.test', path: '/api/test'),
             method: HttpMethod::POST,
             postParams: $postParams,
+            getParams: $getParams,
         );
     }
 }

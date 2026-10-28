@@ -6,7 +6,8 @@ namespace SmolCms\Controller;
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\AuditActionType;
 use SmolCms\Data\Constant\HttpStatus;
-use SmolCms\Data\Request\Request;
+use SmolCms\Data\Request\EmptyRequest;
+use SmolCms\Data\Request\IdRequest;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Attribute\Authenticated;
@@ -29,37 +30,33 @@ readonly class ImageDeleteQueueController
     }
 
     #[Authenticated(AccessLevel::MOD)]
-    public function queueAction(Request $request): Response
+    public function queueAction(EmptyRequest $request): Response
     {
         return new JsonResponse(['images' => $this->imageReviewService->getDeletionQueue()]);
     }
 
     #[Authenticated(AccessLevel::MOD)]
-    public function restoreAction(Request $request): Response
+    public function restoreAction(IdRequest $request): Response
     {
         return $this->processAction(
-            $request,
+            (int)$request->id,
             $this->imageReviewService->restore(...),
             AuditActionType::IMAGE_RESTORED,
         );
     }
 
     #[Authenticated(AccessLevel::MOD)]
-    public function deleteAction(Request $request): Response
+    public function deleteAction(IdRequest $request): Response
     {
         return $this->processAction(
-            $request,
+            (int)$request->id,
             $this->imageReviewService->deleteQueued(...),
             AuditActionType::IMAGE_DELETED,
         );
     }
 
-    private function processAction(Request $request, callable $action, AuditActionType $auditActionType): Response
+    private function processAction(int $id, callable $action, AuditActionType $auditActionType): Response
     {
-        $id = self::parseImageId(($request->getParams ?? [])['id'] ?? null);
-        if ($id === null) {
-            return new Response(HttpStatus::BAD_REQUEST);
-        }
         if (!$action($id)) {
             return new Response(HttpStatus::NOT_FOUND);
         }
@@ -70,14 +67,5 @@ readonly class ImageDeleteQueueController
         }
 
         return new JsonResponse(status: HttpStatus::NO_CONTENT);
-    }
-
-    private static function parseImageId(mixed $id): ?int
-    {
-        if (!is_string($id) || !ctype_digit($id)) {
-            return null;
-        }
-        $intId = (int)$id;
-        return $intId > 0 ? $intId : null;
     }
 }

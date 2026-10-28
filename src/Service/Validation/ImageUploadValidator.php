@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SmolCms\Service\Validation;
 
 use SmolCms\Data\Constant\HttpStatus;
+use SmolCms\Data\Request\ImageUploadRequest;
 use SmolCms\Data\Request\Request;
 use SmolCms\Service\Image\ImageDimensions;
 
@@ -18,7 +19,7 @@ readonly class ImageUploadValidator
      * The PHP upload `error` code decides over generic structural failures, so an
      * oversized upload surfaces as PAYLOAD_TOO_LARGE instead of an anonymous BAD_REQUEST.
      */
-    public function getStatus(Request $request): HttpStatus
+    public function getStatus(Request|ImageUploadRequest $request): HttpStatus
     {
         $files = $this->getFiles($request);
         if ($files === [] || count($files) > self::MAX_FILES) {
@@ -63,7 +64,7 @@ readonly class ImageUploadValidator
      *
      * @return array<int, array<string, mixed>>
      */
-    public function getFiles(Request $request): array
+    public function getFiles(Request|ImageUploadRequest $request): array
     {
         if ($request->files === null || !array_key_exists('image', $request->files)) {
             return [];

@@ -6,8 +6,8 @@ namespace SmolCms\Controller;
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\DTO\SessionUserData;
+use SmolCms\Data\Request\EmptyRequest;
 use SmolCms\Data\Request\LoginRequest;
-use SmolCms\Data\Request\Request;
 use SmolCms\Data\Request\SetQuickTagsRequest;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
@@ -50,7 +50,7 @@ readonly class AuthController
         return new JsonResponse(['user' => $this->serializeUser($sessionUserData)]);
     }
 
-    public function getSessionAction(Request $request): Response
+    public function getSessionAction(EmptyRequest $request): Response
     {
         $userData = $this->sessionService->getUserData();
 
@@ -71,7 +71,7 @@ readonly class AuthController
         return new JsonResponse(['quickTagsEnabled' => $this->sessionService->getQuickTagsEnabled()]);
     }
 
-    public function logoutAction(Request $request): Response
+    public function logoutAction(EmptyRequest $request): Response
     {
         $this->sessionService->destroySession();
         return new JsonResponse(status: HttpStatus::NO_CONTENT);

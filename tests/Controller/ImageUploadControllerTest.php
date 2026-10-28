@@ -14,6 +14,7 @@ use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Constant\ImageStatus;
+use SmolCms\Data\Request\ImageUploadRequest;
 use SmolCms\Data\Request\Request;
 use SmolCms\Service\Core\Session\SessionHandler;
 use SmolCms\Service\Core\Session\SessionService;
@@ -30,7 +31,7 @@ use SmolCms\TestUtils\LoginWithAccessLevel;
 
 readonly class TestImageUploadValidator extends ImageUploadValidator
 {
-    public function getStatus(Request $request): HttpStatus
+    public function getStatus(Request|ImageUploadRequest $request): HttpStatus
     {
         return HttpStatus::OK;
     }

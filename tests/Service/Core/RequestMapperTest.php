@@ -7,6 +7,8 @@ namespace SmolCms\Test\Service\Core;
 use RuntimeException;
 use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\HttpMethod;
+use SmolCms\Data\Request\Attribute\FromQuery;
+use SmolCms\Data\Request\EmptyRequest;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Request\ValidatedRequest;
 use SmolCms\Exception\BadRequestException;
@@ -99,6 +101,39 @@ class RequestMapperTest extends SimpleTestCase
         self::assertSame($files, $result->files);
     }
 
+    public function testMapRequest_mapsQueryOnlyParameterFromQueryString(): void
+    {
+        $request = $this->createRequest(
+            postParams: ['id' => 'post-id'],
+            getParams: ['id' => 'query-id'],
+        );
+
+        $result = $this->requestMapper->mapRequest($request, new TestController(), 'queryAction');
+
+        self::assertInstanceOf(QueryOnlyTestRequest::class, $result);
+        self::assertSame('query-id', $result->id);
+    }
+
+    public function testMapRequest_mapsEmptyRequestUsingInheritedConstructor(): void
+    {
+        $request = $this->createRequest();
+
+        $result = $this->requestMapper->mapRequest($request, new TestController(), 'emptyAction');
+
+        self::assertInstanceOf(EmptyRequest::class, $result);
+        self::assertSame($request, $result->rawRequest);
+    }
+
+    public function testMapRequestIgnoresFilesWhenRequestTypeDoesNotDeclareFiles(): void
+    {
+        $request = $this->createRequest(files: ['image' => ['name' => 'image.jpg']]);
+
+        $result = $this->requestMapper->mapRequest($request, new TestController(), 'emptyAction');
+
+        self::assertInstanceOf(EmptyRequest::class, $result);
+        self::assertSame($request, $result->rawRequest);
+    }
+
     public function testMapRequest_throwsBadRequestExceptionOnTypeError(): void
     {
         $request = $this->createRequest(postParams: []);
@@ -176,6 +211,17 @@ readonly class FilesTestRequest extends ValidatedRequest
     }
 }
 
+readonly class QueryOnlyTestRequest extends ValidatedRequest
+{
+    public function __construct(
+        Request $rawRequest,
+        #[FromQuery]
+        public ?string $id,
+    ) {
+        parent::__construct($rawRequest);
+    }
+}
+
 class PlainObject
 {
 }
@@ -195,6 +241,14 @@ class TestController
     }
 
     public function filesAction(FilesTestRequest $request): void
+    {
+    }
+
+    public function queryAction(QueryOnlyTestRequest $request): void
+    {
+    }
+
+    public function emptyAction(EmptyRequest $request): void
     {
     }
 

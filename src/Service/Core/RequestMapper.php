@@ -6,6 +6,7 @@ namespace SmolCms\Service\Core;
 use ReflectionClass;
 use ReflectionException;
 use RuntimeException;
+use SmolCms\Data\Request\Attribute\FromQuery;
 use SmolCms\Data\Request\Request;
 use SmolCms\Data\Request\ValidatedRequest;
 use SmolCms\Exception\BadRequestException;
@@ -30,7 +31,7 @@ readonly class RequestMapper
      * Scans the passed handler method for parameters extending the ValidatedRequest class and maps request parameters
      * of the same name into it.
      *
-     * POST parameters have priority when there are naming conflicts with GET parameters.
+     * POST parameters have priority over GET parameters unless a constructor parameter uses #[FromQuery].
      *
      * If the handler method has a parameter of the type Request (which contains raw data), it will not map anything
      * and instead return the unmapped request object that was passed to it.
@@ -72,14 +73,18 @@ readonly class RequestMapper
             if ($name === self::RAW_REQUEST_PARAM_NAME) {
                 continue;
             }
-            // POST params have higher priority in case of name conflicts
+            if ($name === 'files') {
+                $mappedParams[$name] = $request->files;
+                continue;
+            }
+            if ($paramToMap->getAttributes(FromQuery::class) !== []) {
+                $mappedParams[$name] = $request->getParams[$name] ?? null;
+                continue;
+            }
+            // POST params have higher priority in case of name conflicts, unless FromQuery attribute was set.
             $mappedParams[$name] = $request->postParams[$name] ?? $request->getParams[$name] ?? null;
         }
 
-        // Add files if present in the request
-        if ($request->files !== null) {
-            $mappedParams['files'] = $request->files;
-        }
         $class = $refClassOfClassToMap->getName();
         try {
             $mappedRequest = new $class(...$mappedParams);

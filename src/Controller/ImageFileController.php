@@ -7,7 +7,7 @@ use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Constant\ImageStatus;
-use SmolCms\Data\Request\Request;
+use SmolCms\Data\Request\ImageFileRequest;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Attribute\Authenticated;
 use SmolCms\Service\Core\Session\SessionService;
@@ -27,8 +27,6 @@ readonly class ImageFileController
      * Stored image file names are `<sha-256 hex checksum>.<extension>`.
      * The extension list covers every image variant that can be served.
      */
-    private const FILE_NAME_PATTERN = '/^[a-f0-9]{64}\.(avif|webp|jpeg|png)$/';
-
     private const CONTENT_TYPES = [
         'avif' => 'image/avif',
         'webp' => 'image/webp',
@@ -44,10 +42,10 @@ readonly class ImageFileController
     {
     }
 
-    public function sampleAction(Request $request): Response
+    public function sampleAction(ImageFileRequest $request): Response
     {
         return $this->serveFile(
-            $request,
+            $request->name,
             findEntity: fn(string $name) => $this->imageEntityService->findOneBySampleFilename($name),
             baseDir: IMAGE_SAMPLE_DIR,
             internalLocation: '/internal/img/sample/',
@@ -56,10 +54,10 @@ readonly class ImageFileController
     }
 
     #[Authenticated(AccessLevel::NOVICE)]
-    public function downloadAction(Request $request): Response
+    public function downloadAction(ImageFileRequest $request): Response
     {
         return $this->serveFile(
-            $request,
+            $request->name,
             findEntity: fn(string $name) => $this->imageEntityService->findOneByDownloadFilename($name),
             baseDir: IMAGE_DOWNLOAD_DIR,
             internalLocation: '/internal/img/dl/',
@@ -68,18 +66,13 @@ readonly class ImageFileController
     }
 
     private function serveFile(
-        Request  $request,
+        string   $name,
         callable $findEntity,
         string   $baseDir,
         string   $internalLocation,
         bool     $asAttachment,
     ): Response
     {
-        $name = ($request->getParams ?? [])['name'] ?? '';
-        if (!is_string($name) || preg_match(self::FILE_NAME_PATTERN, $name) !== 1) {
-            return new Response(HttpStatus::BAD_REQUEST);
-        }
-
         $entity = $findEntity($name);
         if ($entity === null) {
             // Unknown name: reveal nothing about stored image names.

@@ -8,10 +8,12 @@ use InvalidArgumentException;
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\AuditActionType;
 use SmolCms\Data\Constant\HttpStatus;
-use SmolCms\Data\Request\Request;
+use SmolCms\Data\Request\EmptyRequest;
 use SmolCms\Data\Request\TagCategoryCreateRequest;
 use SmolCms\Data\Request\TagCreateRequest;
 use SmolCms\Data\Request\TagDeleteRequest;
+use SmolCms\Data\Request\TagListRequest;
+use SmolCms\Data\Request\TagSuggestionSearchRequest;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Attribute\Authenticated;
@@ -31,31 +33,21 @@ readonly class TagApiController
     {
     }
 
-    public function getSuggestionsAction(Request $request): Response
+    public function getSuggestionsAction(TagSuggestionSearchRequest $request): Response
     {
-        $query = ($request->getParams ?? [])['q'] ?? '';
-        if (!is_string($query)) {
-            return new Response(HttpStatus::BAD_REQUEST);
-        }
-
-        return new JsonResponse(['tags' => $this->tagService->suggestTags($query)]);
+        return new JsonResponse(['tags' => $this->tagService->suggestTags($request->q ?? '')]);
     }
 
     #[Authenticated(AccessLevel::MOD)]
-    public function getListAction(Request $request): Response
+    public function getListAction(TagListRequest $request): Response
     {
-        $params = $request->getParams ?? [];
-        $page = self::parsePage($params['page'] ?? null);
-        $query = $params['q'] ?? '';
-        if ($page === null || !is_string($query)) {
-            return new Response(HttpStatus::BAD_REQUEST);
-        }
-
+        $page = $request->page === null ? 1 : (int)$request->page;
+        $query = $request->q ?? '';
         return new JsonResponse($this->tagService->browseTags($page, $query));
     }
 
     #[Authenticated(AccessLevel::NOVICE)]
-    public function getQuickTagsAction(Request $request): Response
+    public function getQuickTagsAction(EmptyRequest $request): Response
     {
         $user = $this->sessionService->getUserData();
         if ($user === null) {
@@ -81,7 +73,7 @@ readonly class TagApiController
     }
 
     #[Authenticated(AccessLevel::MOD)]
-    public function getCategoriesAction(Request $request): Response
+    public function getCategoriesAction(EmptyRequest $request): Response
     {
         return new JsonResponse(['categories' => $this->tagService->getCategoryNames()]);
     }
@@ -122,28 +114,5 @@ readonly class TagApiController
         }
 
         return new JsonResponse(status: HttpStatus::NO_CONTENT);
-    }
-
-    private static function parsePage(mixed $page): ?int
-    {
-        if ($page === null) {
-            return 1;
-        }
-        if (!is_string($page) || !ctype_digit($page)) {
-            return null;
-        }
-
-        $digits = ltrim($page, '0');
-        if ($digits === '') {
-            return null;
-        }
-        $maximum = (string)(intdiv(PHP_INT_MAX, 100) + 1);
-        if (strlen($digits) > strlen($maximum)
-            || (strlen($digits) === strlen($maximum) && strcmp($digits, $maximum) > 0)) {
-            return null;
-        }
-
-        $parsedPage = (int)$digits;
-        return $parsedPage > 0 ? $parsedPage : null;
     }
 }

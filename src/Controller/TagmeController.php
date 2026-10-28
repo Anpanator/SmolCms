@@ -6,7 +6,7 @@ namespace SmolCms\Controller;
 
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpStatus;
-use SmolCms\Data\Request\Request;
+use SmolCms\Data\Request\EmptyRequest;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Attribute\Authenticated;
@@ -23,7 +23,7 @@ readonly class TagmeController
     }
 
     #[Authenticated(AccessLevel::NOVICE)]
-    public function getRandomAction(Request $request): Response
+    public function getRandomAction(EmptyRequest $request): Response
     {
         $image = $this->imageEntityService->findRandomTagmeImage();
         if ($image === null || $image->getId() === null) {

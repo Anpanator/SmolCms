@@ -5,7 +5,9 @@ namespace SmolCms\Controller;
 
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpStatus;
-use SmolCms\Data\Request\Request;
+use SmolCms\Data\Request\IdRequest;
+use SmolCms\Data\Request\ImageListRequest;
+use SmolCms\Data\Request\ImageNeighborRequest;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Session\SessionService;
@@ -14,8 +16,6 @@ use SmolCms\Service\Image\ImageQueryService;
 
 readonly class ImageApiController
 {
-    private const NEIGHBOR_DIRECTIONS = ['next', 'previous'];
-
     public function __construct(
         private ImageQueryService $imageQueryService,
         private ImageAccessPolicy $imageAccessPolicy,
@@ -24,14 +24,10 @@ readonly class ImageApiController
     {
     }
 
-    public function getImageListAction(Request $request): Response
+    public function getImageListAction(ImageListRequest $request): Response
     {
-        $params = $request->getParams ?? [];
-        $page = self::parsePage($params['page'] ?? null);
-        $tags = self::parseTags($params['tags'] ?? null);
-        if ($page === null || $tags === null) {
-            return new Response(HttpStatus::BAD_REQUEST);
-        }
+        $page = $request->page === null ? 1 : (int)$request->page;
+        $tags = self::parseTags($request->tags);
 
         $user = $this->sessionService->getUserData();
         $canViewAllPending = $user !== null && $user->accessLevel->value >= AccessLevel::MOD->value;
@@ -43,12 +39,9 @@ readonly class ImageApiController
         ));
     }
 
-    public function getImageDetailAction(Request $request): Response
+    public function getImageDetailAction(IdRequest $request): Response
     {
-        $id = self::parseImageId(($request->getParams ?? [])['id'] ?? null);
-        if ($id === null) {
-            return new Response(HttpStatus::BAD_REQUEST);
-        }
+        $id = (int)$request->id;
 
         $user = $this->sessionService->getUserData();
         $image = $this->imageAccessPolicy->findImage($id);
@@ -71,14 +64,10 @@ readonly class ImageApiController
         return new JsonResponse(['image' => $detail]);
     }
 
-    public function getImageNeighborAction(Request $request): Response
+    public function getImageNeighborAction(ImageNeighborRequest $request): Response
     {
-        $params = $request->getParams ?? [];
-        $id = self::parseImageId($params['id'] ?? null);
-        $direction = $params['direction'] ?? null;
-        if ($id === null || !is_string($direction) || !in_array($direction, self::NEIGHBOR_DIRECTIONS, true)) {
-            return new Response(HttpStatus::BAD_REQUEST);
-        }
+        $id = (int)$request->id;
+        $direction = $request->direction;
 
         $user = $this->sessionService->getUserData();
         $image = $this->imageAccessPolicy->findImage($id);
@@ -101,46 +90,11 @@ readonly class ImageApiController
         )]);
     }
 
-    private static function parseImageId(mixed $id): ?int
-    {
-        if (!is_string($id) || !ctype_digit($id)) {
-            return null;
-        }
-        $intId = (int)$id;
-        return $intId > 0 ? $intId : null;
-    }
-
-    private static function parsePage(mixed $page): ?int
-    {
-        if ($page === null) {
-            return 1;
-        }
-        if (!is_string($page) || !ctype_digit($page)) {
-            return null;
-        }
-
-        $digits = ltrim($page, '0');
-        if ($digits === '') {
-            return null;
-        }
-        $maximum = (string)(intdiv(PHP_INT_MAX, 25) + 1);
-        if (strlen($digits) > strlen($maximum)
-            || (strlen($digits) === strlen($maximum) && strcmp($digits, $maximum) > 0)) {
-            return null;
-        }
-
-        $parsedPage = (int)$digits;
-        return $parsedPage > 0 ? $parsedPage : null;
-    }
-
-    /** @return list<string>|null */
-    private static function parseTags(mixed $tags): ?array
+    /** @return list<string> */
+    private static function parseTags(?string $tags): array
     {
         if ($tags === null) {
             return [];
-        }
-        if (!is_string($tags)) {
-            return null;
         }
 
         $uniqueTags = [];

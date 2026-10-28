@@ -6,7 +6,8 @@ namespace SmolCms\Controller;
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpHeader;
 use SmolCms\Data\Constant\HttpStatus;
-use SmolCms\Data\Request\Request;
+use SmolCms\Data\Request\EmptyRequest;
+use SmolCms\Data\Request\ImageUploadRequest;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Attribute\Authenticated;
@@ -26,7 +27,7 @@ readonly class ImageUploadController
     }
 
     #[CorsEnabled]
-    public function optionsAction(Request $request): Response
+    public function optionsAction(EmptyRequest $request): Response
     {
         return new Response(
             status: HttpStatus::NO_CONTENT,
@@ -36,9 +37,8 @@ readonly class ImageUploadController
 
     #[CorsEnabled]
     #[Authenticated(AccessLevel::NOVICE, apiEnabled: true)]
-    public function postAction(Request $request): Response
+    public function postAction(ImageUploadRequest $request): Response
     {
-        // TODO: Move this type of validation to attribute, and receive ValidatedRequest instead?
         $validationStatus = $this->imageUploadValidator->getStatus($request);
         if ($validationStatus !== HttpStatus::OK) {
             return new Response($validationStatus);

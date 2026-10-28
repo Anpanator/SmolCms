@@ -6,7 +6,7 @@ namespace SmolCms\Controller;
 
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpStatus;
-use SmolCms\Data\Request\Request;
+use SmolCms\Data\Request\UserListRequest;
 use SmolCms\Data\Request\UserManagementUpdateRequest;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
@@ -25,15 +25,10 @@ readonly class UserManagementController
     }
 
     #[Authenticated(AccessLevel::MOD)]
-    public function getListAction(Request $request): Response
+    public function getListAction(UserListRequest $request): Response
     {
-        $params = $request->getParams ?? [];
-        $page = self::parsePage($params['page'] ?? null);
-        $query = $params['q'] ?? '';
-        if ($page === null || !is_string($query)) {
-            return new Response(HttpStatus::BAD_REQUEST);
-        }
-
+        $page = $request->page === null ? 1 : (int)$request->page;
+        $query = $request->q ?? '';
         $result = $this->userService->searchUsers($page, $query);
         $result['users'] = array_map(
             static fn(array $user): array => [
@@ -51,17 +46,9 @@ readonly class UserManagementController
     #[Authenticated(AccessLevel::MOD)]
     public function updateAction(UserManagementUpdateRequest $request): Response
     {
-        $id = self::parseId(($request->rawRequest->getParams ?? [])['id'] ?? null);
-        if ($id === null) {
-            return new Response(HttpStatus::BAD_REQUEST);
-        }
-        $displayName = $request->displayName ?? '';
-        $requestedAccessLevel = $request->accessLevel === null
-            ? null
-            : AccessLevel::tryFrom($request->accessLevel);
-        if ($requestedAccessLevel === null) {
-            return new Response(HttpStatus::BAD_REQUEST);
-        }
+        $id = (int)$request->id;
+        $displayName = $request->displayName;
+        $requestedAccessLevel = AccessLevel::from($request->accessLevel);
 
         $target = $this->userService->findOneById($id);
         if ($target === null) {
@@ -109,40 +96,4 @@ readonly class UserManagementController
         ]);
     }
 
-    private static function parsePage(mixed $page): ?int
-    {
-        if ($page === null) {
-            return 1;
-        }
-        if (!is_string($page) || !ctype_digit($page)) {
-            return null;
-        }
-        $digits = ltrim($page, '0');
-        if ($digits === '') {
-            return null;
-        }
-        $maximum = (string)(intdiv(PHP_INT_MAX, 30) + 1);
-        if (strlen($digits) > strlen($maximum)
-            || (strlen($digits) === strlen($maximum) && strcmp($digits, $maximum) > 0)) {
-            return null;
-        }
-        return (int)$digits;
-    }
-
-    private static function parseId(mixed $id): ?int
-    {
-        if (!is_string($id) || !ctype_digit($id)) {
-            return null;
-        }
-        $digits = ltrim($id, '0');
-        if ($digits === '') {
-            return null;
-        }
-        $maximum = (string)PHP_INT_MAX;
-        if (strlen($digits) > strlen($maximum)
-            || (strlen($digits) === strlen($maximum) && strcmp($digits, $maximum) > 0)) {
-            return null;
-        }
-        return (int)$digits;
-    }
 }

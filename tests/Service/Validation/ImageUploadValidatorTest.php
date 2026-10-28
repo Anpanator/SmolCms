@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use SmolCms\Data\Business\Url;
 use SmolCms\Data\Constant\HttpMethod;
 use SmolCms\Data\Constant\HttpStatus;
+use SmolCms\Data\Request\ImageUploadRequest;
 use SmolCms\Data\Request\Request;
 use SmolCms\Service\Validation\ImageUploadValidator;
 use SmolCms\TestUtils\SimpleTestCase;
@@ -97,6 +98,20 @@ class ImageUploadValidatorTest extends SimpleTestCase
 
         self::assertSame(HttpStatus::OK, $this->validator->getStatus($request));
         self::assertSame([self::VALID_IMAGE_PATH], $checkedPaths);
+    }
+
+    public function testGetStatusAndGetFiles_acceptImageUploadRequest(): void
+    {
+        $this->validator = new ImageUploadValidatorWithPredicate(
+            static fn(string $path): bool => $path === self::VALID_IMAGE_PATH,
+        );
+        $rawRequest = $this->createUploadRequest(['tmp_name' => self::VALID_IMAGE_PATH]);
+        $files = $rawRequest->files;
+        self::assertNotNull($files);
+        $request = new ImageUploadRequest(rawRequest: $rawRequest, files: $files);
+
+        self::assertSame([$files['image']], $this->validator->getFiles($request));
+        self::assertSame(HttpStatus::OK, $this->validator->getStatus($request));
     }
 
     public function testGetStatus_validMultipleUploads_returnsOk(): void

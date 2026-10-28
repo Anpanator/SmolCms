@@ -6,7 +6,7 @@ namespace SmolCms\Controller;
 
 use SmolCms\Data\Constant\HttpContentType;
 use SmolCms\Data\Constant\HttpHeader;
-use SmolCms\Data\Request\Request;
+use SmolCms\Data\Request\EmptyRequest;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Asset\AssetService;
 
@@ -18,7 +18,7 @@ readonly class IndexController
     {
     }
 
-    public function getAction(Request $request): Response
+    public function getAction(EmptyRequest $request): Response
     {
         return new Response(
             content: $this->assetService->getHtmlShell(),

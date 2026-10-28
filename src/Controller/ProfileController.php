@@ -6,7 +6,8 @@ namespace SmolCms\Controller;
 
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\HttpStatus;
-use SmolCms\Data\Request\Request;
+use SmolCms\Data\Request\EmptyRequest;
+use SmolCms\Data\Request\IdRequest;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Service\Core\Attribute\Authenticated;
@@ -34,7 +35,7 @@ readonly class ProfileController
     }
 
     #[Authenticated(AccessLevel::NOVICE)]
-    public function getAction(Request $request): Response
+    public function getAction(EmptyRequest $request): Response
     {
         $user = $this->sessionService->getUserData();
         if ($user === null) {
@@ -48,7 +49,7 @@ readonly class ProfileController
     }
 
     #[Authenticated(AccessLevel::WIZARD)]
-    public function generateApiKeyAction(Request $request): Response
+    public function generateApiKeyAction(EmptyRequest $request): Response
     {
         $user = $this->sessionService->getUserData();
         if ($user === null) {
@@ -58,7 +59,7 @@ readonly class ProfileController
     }
 
     #[Authenticated(AccessLevel::WIZARD)]
-    public function deleteApiKeyAction(Request $request): Response
+    public function deleteApiKeyAction(EmptyRequest $request): Response
     {
         $user = $this->sessionService->getUserData();
         if ($user === null) {
@@ -70,15 +71,12 @@ readonly class ProfileController
         return new JsonResponse(status: HttpStatus::NO_CONTENT);
     }
 
-    public function getUserAction(Request $request): Response
+    public function getUserAction(IdRequest $request): Response
     {
         $sessionUser = $this->sessionService->getUserData();
         $viewer = $sessionUser === null ? null : $this->userService->findOneById($sessionUser->id);
 
-        $userId = self::parsePositiveId($request->getParams['id'] ?? null);
-        if ($userId === null) {
-            return new Response(HttpStatus::BAD_REQUEST);
-        }
+        $userId = (int)$request->id;
 
         $user = $this->userService->findOneById($userId);
         if ($user === null) {
@@ -109,25 +107,5 @@ readonly class ProfileController
                 ? $this->auditLogService->getRecentEntriesForUser($targetId, self::RECENT_UPLOADS_LIMIT)
                 : [],
         ]);
-    }
-
-    private static function parsePositiveId(mixed $id): ?int
-    {
-        if (!is_string($id) || !ctype_digit($id)) {
-            return null;
-        }
-
-        $digits = ltrim($id, '0');
-        if ($digits === '') {
-            return null;
-        }
-
-        $maximum = (string)PHP_INT_MAX;
-        if (strlen($digits) > strlen($maximum)
-            || (strlen($digits) === strlen($maximum) && strcmp($digits, $maximum) > 0)) {
-            return null;
-        }
-
-        return (int)$digits;
     }
 }

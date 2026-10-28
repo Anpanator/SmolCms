@@ -8,10 +8,8 @@ use InvalidArgumentException;
 use SmolCms\Data\Constant\AccessLevel;
 use SmolCms\Data\Constant\AuditActionType;
 use SmolCms\Data\Constant\HttpStatus;
-use SmolCms\Data\Constant\TagInputLimits;
 use SmolCms\Data\Request\ImageTagRemoveRequest;
 use SmolCms\Data\Request\ImageTagsRequest;
-use SmolCms\Data\Request\Request;
 use SmolCms\Data\Response\JsonResponse;
 use SmolCms\Data\Response\Response;
 use SmolCms\Exception\TagmeRemovalBlockedException;
@@ -37,11 +35,8 @@ readonly class ImageTagController
     #[Authenticated(AccessLevel::NOVICE)]
     public function addAction(ImageTagsRequest $request): Response
     {
-        $imageId = $request->imageId ?? 0;
-        $tagNames = self::parseTagNames($request->tags ?? '');
-        if ($tagNames === null) {
-            return new Response(HttpStatus::BAD_REQUEST);
-        }
+        $imageId = $request->imageId;
+        $tagNames = self::parseTagNames($request->tags);
         $user = $this->sessionService->getUserData();
         if ($user === null) {
             return new Response(HttpStatus::UNAUTHORIZED);
@@ -73,8 +68,8 @@ readonly class ImageTagController
     #[Authenticated(AccessLevel::NOVICE)]
     public function removeAction(ImageTagRemoveRequest $request): Response
     {
-        $imageId = $request->imageId ?? 0;
-        $tagName = $request->tag ?? '';
+        $imageId = $request->imageId;
+        $tagName = $request->tag;
         $user = $this->sessionService->getUserData();
         if ($user === null) {
             return new Response(HttpStatus::UNAUTHORIZED);
@@ -109,14 +104,9 @@ readonly class ImageTagController
         return new JsonResponse(status: HttpStatus::NO_CONTENT);
     }
 
-    /** @return list<string>|null */
-    private static function parseTagNames(string $tags): ?array
+    /** @return list<string> */
+    private static function parseTagNames(string $tags): array
     {
-        if (mb_strlen($tags, 'UTF-8') > TagInputLimits::MAX_TAG_LIST_LENGTH
-            || substr_count($tags, ',') + 1 > TagInputLimits::MAX_TAG_COUNT) {
-            return null;
-        }
-
         $tagNames = [];
         foreach (explode(',', $tags) as $tagName) {
             $tagName = trim($tagName);
@@ -124,6 +114,6 @@ readonly class ImageTagController
                 $tagNames[] = $tagName;
             }
         }
-        return $tagNames === [] ? null : $tagNames;
+        return $tagNames;
     }
 }
