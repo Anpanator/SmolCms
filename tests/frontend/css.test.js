@@ -129,6 +129,32 @@ export function testProfileApiKeyActionRowStylesExist() {
     );
 }
 
+export function testAnchorButtonsKeepContrastingTextOnHover() {
+    const rules = collectRules(findMainStylesheet());
+
+    for (const variant of ['.button--primary:hover', '.button--danger:hover']) {
+        const rule = findRule(rules, variant);
+        assertTrue(rule !== undefined, `${variant} should be styled`);
+        assertTrue(rule.text.includes('color:var(--color-accent-contrast)'),
+            `${variant} must keep contrasting text instead of inheriting the plain link hover color`);
+        assertTrue(rule.text.includes('text-decoration:none'), `${variant} must not underline`);
+    }
+
+    const fixture = document.getElementById('test-fixture');
+    const download = document.createElement('a');
+    download.className = 'button button--primary image-download';
+    download.href = '/api/image/download?name=test.webp';
+    download.textContent = 'Download';
+    fixture.append(download);
+    try {
+        const contrast = getComputedStyle(document.documentElement).getPropertyValue('--color-accent-contrast').trim();
+        assertEqual(getComputedStyle(download).color, hexToRgbString(contrast),
+            'the download link should use the contrasting button text color');
+    } finally {
+        download.remove();
+    }
+}
+
 export function testImageMetadataSeparatorUsesBorderColorAndSidebarPadding() {
     const fixture = document.getElementById('test-fixture');
     const sidebar = document.createElement('aside');

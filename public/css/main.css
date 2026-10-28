@@ -1776,6 +1776,8 @@ h3 {
 .button--primary:hover,
 .button--primary:focus-visible {
     background: var(--color-accent-strong);
+    color: var(--color-accent-contrast);
+    text-decoration: none;
 }
 
 .button:disabled,
@@ -1792,6 +1794,8 @@ h3 {
 .button--danger:hover,
 .button--danger:focus-visible {
     background: color-mix(in srgb, var(--color-danger) 80%, black);
+    color: var(--color-accent-contrast);
+    text-decoration: none;
 }
 
 .button--link {
