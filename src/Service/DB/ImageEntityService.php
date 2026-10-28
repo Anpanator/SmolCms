@@ -47,20 +47,56 @@ readonly class ImageEntityService extends EntityService
     /**
      * @param ImageStatus $status
      * @param int|null $limit
+     * @param bool $includeDeleted Whether images queued for deletion are included
      * @return array<ImageEntity>
      */
-    public function findByStatus(ImageStatus $status, ?int $limit = null): array
+    public function findByStatus(ImageStatus $status, ?int $limit = null, bool $includeDeleted = false): array
     {
         $qc = new QueryCriteria();
         $qc->select(ImageEntity::class)
             ->andWhere('status = :status')
             ->withParameters(['status' => $status->value])
             ->orderBy('upload_date');
+        if (!$includeDeleted) {
+            $qc->andWhere('deleted_at IS NULL');
+        }
         if ($limit !== null) {
             $qc->maxResults($limit);
         }
         $result = $this->execute($qc);
         return $result ?? [];
+    }
+
+    /**
+     * Images waiting for moderation, oldest first. Images that a moderator has
+     * already queued for deletion are no longer part of the review queue.
+     *
+     * @return array<ImageEntity>
+     */
+    public function findReviewQueue(): array
+    {
+        $qc = new QueryCriteria();
+        $qc->select(ImageEntity::class)
+            ->andWhere('status = :status')
+            ->andWhere('deleted_at IS NULL')
+            ->withParameters(['status' => ImageStatus::PENDING_REVIEW->value])
+            ->orderBy('upload_date');
+        return $this->execute($qc) ?? [];
+    }
+
+    /**
+     * Images queued for deletion, most recently queued first.
+     *
+     * @return array<ImageEntity>
+     */
+    public function findDeletionQueue(): array
+    {
+        $qc = new QueryCriteria();
+        $qc->select(ImageEntity::class)
+            ->andWhere('deleted_at IS NOT NULL')
+            ->orderBy('deleted_at', QueryCriteria::ORDER_DESC)
+            ->orderBy('id', QueryCriteria::ORDER_DESC);
+        return $this->execute($qc) ?? [];
     }
 
     /**
@@ -131,6 +167,7 @@ readonly class ImageEntityService extends EntityService
         $qc->select(ImageEntity::class)
             ->andWhere('user_id = :user_id')
             ->andWhere('thumb_filename IS NOT NULL')
+            ->andWhere('deleted_at IS NULL')
             ->andWhere('status IN (' . implode(', ', $statusPlaceholders) . ')')
             ->withParameters($parameters)
             ->orderBy('upload_date', QueryCriteria::ORDER_DESC)
@@ -203,6 +240,7 @@ readonly class ImageEntityService extends EntityService
             ->maxResults(1);
 
         $parameters = ['from_id' => $fromId];
+        $qc->andWhere('deleted_at IS NULL');
         if (!$canAccessAll) {
             $qc->andWhere($viewerId === null
                 ? 'status = :accepted_status'
@@ -230,6 +268,7 @@ readonly class ImageEntityService extends EntityService
         $criteria = new QueryCriteria();
         $criteria->select(ImageEntity::class)
             ->andWhere('(status = :accepted_status OR status = :pending_review_status)')
+            ->andWhere('deleted_at IS NULL')
             ->andWhere(
                 'id IN (SELECT it.image_id FROM image_tag it '
                 . 'INNER JOIN tag t ON t.id = it.tag_id '
@@ -332,7 +371,8 @@ readonly class ImageEntityService extends EntityService
     private static function applyAcceptedFilter(QueryCriteria $qc, array $tagNames): void
     {
         $parameters = ['status' => ImageStatus::ACCEPTED->value];
-        $qc->andWhere('status = :status');
+        $qc->andWhere('status = :status')
+            ->andWhere('deleted_at IS NULL');
         if ($tagNames === []) {
             $qc->withParameters($parameters);
             return;
@@ -377,6 +417,7 @@ readonly class ImageEntityService extends EntityService
             $parameters['pending_review_status'] = ImageStatus::PENDING_REVIEW->value;
             $qc->andWhere('(status = :accepted_status OR ' . $pendingCondition . ')');
         }
+        $qc->andWhere('deleted_at IS NULL');
 
         if ($tagNames !== []) {
             $placeholders = [];

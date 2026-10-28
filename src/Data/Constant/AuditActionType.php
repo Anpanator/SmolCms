@@ -11,4 +11,6 @@ enum AuditActionType: int
     case TAG_DELETED = 3;
     case IMAGE_DELETED = 4;
     case IMAGE_UPLOADED = 5;
+    case IMAGE_RESTORED = 6;
+    case IMAGE_QUEUED_FOR_DELETION = 7;
 }

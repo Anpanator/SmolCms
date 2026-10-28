@@ -19,6 +19,8 @@ const ACTION_NAMES = new Map([
     [3, 'Tag deleted'],
     [4, 'Image deleted'],
     [5, 'Image uploaded'],
+    [6, 'Image restored'],
+    [7, 'Image queued for deletion'],
 ]);
 
 /**

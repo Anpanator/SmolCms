@@ -3,8 +3,11 @@
 SQLite is the default runtime database. Its schema covers users and sessions,
 hashed API keys (`api_key`), content and migration tracking, images,
 tags/categories and image-tag links, per-user quick-tag usage
-(`user_tag_usage`), and tag suggestions and approvals. The audit log records
-tag additions, removals, and deletions, plus image uploads and deletions.
+(`user_tag_usage`), and tag suggestions and approvals. Images carry a nullable
+`deleted_at` marker while they are waiting in the delete queue; the row and its
+files stay intact until a moderator deletes the image permanently. The audit log
+records tag additions, removals, and deletions, plus image uploads, deletions,
+delete-queue entries, and restores from the delete queue.
 `user_tag_usage` increments counts and updates recency for newly attached tags;
 removals decrement counts to a zero floor without changing the last-use time.
 "Your recent" quick tags are the user's most recently applied tags that are

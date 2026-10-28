@@ -26,6 +26,7 @@ class ImageEntity
         private ?int          $height = null,
         private ?string       $format = null,
         private ?int          $fileSize = null,
+        private ?DateTime     $deletedAt = null,
     )
     {
     }
@@ -158,5 +159,36 @@ class ImageEntity
     public function setFileSize(?int $fileSize): void
     {
         $this->fileSize = $fileSize;
+    }
+
+    /**
+     * Timestamp of when a moderator moved the image to the delete queue, or
+     * null while the image is part of the regular collection.
+     */
+    public function getDeletedAt(): ?DateTime
+    {
+        return $this->deletedAt;
+    }
+
+    public function setDeletedAt(?DateTime $deletedAt): void
+    {
+        $this->deletedAt = $deletedAt;
+    }
+
+    public function isDeleted(): bool
+    {
+        return $this->deletedAt !== null;
+    }
+
+    /** Hides the image from every regular view and queues it for deletion. */
+    public function queueForDeletion(): void
+    {
+        $this->deletedAt = new DateTime();
+    }
+
+    /** Returns the queued image to the regular collection. */
+    public function restoreFromDeletionQueue(): void
+    {
+        $this->deletedAt = null;
     }
 }

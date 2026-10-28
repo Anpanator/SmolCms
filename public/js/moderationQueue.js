@@ -5,7 +5,9 @@ import {isAuthError} from './forms.js';
  * @param {{
  *   fetchQueue: () => Promise<Array<*>>,
  *   fetchDetails: (item: *, imageId: *) => Promise<object|null>,
- *   submitAction: (action: 'approve'|'reject', item: *) => Promise<*>,
+ *   submitAction: (action: string, item: *) => Promise<*>,
+ *   primaryAction?: string,
+ *   secondaryAction?: string,
  *   getItemId?: (item: *) => *,
  *   getImageId?: (item: *) => *,
  *   renderQueue?: (state: {items: Array<*>, selected: *, selectById: (id: *) => void}) => void,
@@ -18,8 +20,8 @@ import {isAuthError} from './forms.js';
  *   onDetailsError?: (error: *, item: *) => void,
  *   onUnauthorized?: (error: *) => void,
  *   onClearStatus?: () => void,
- *   onActionSuccess?: (action: 'approve'|'reject', item: *) => void,
- *   onActionError?: (error: *, action: 'approve'|'reject', item: *) => void,
+ *   onActionSuccess?: (action: string, item: *) => void,
+ *   onActionError?: (error: *, action: string, item: *) => void,
  *   setActionsDisabled?: (disabled: boolean) => void,
  *   shouldCacheDetails?: (details: object, item: *) => boolean,
  *   shouldEvictDetails?: (item: *, remainingItems: Array<*>) => boolean,
@@ -29,6 +31,8 @@ export function createModerationQueue({
     fetchQueue,
     fetchDetails,
     submitAction,
+    primaryAction = 'approve',
+    secondaryAction = 'reject',
     getItemId = (item) => item?.id,
     getImageId = (item) => item?.id,
     renderQueue = () => {},
@@ -245,14 +249,14 @@ export function createModerationQueue({
             case 'Enter':
                 event.preventDefault();
                 if (!event.repeat) {
-                    act('approve');
+                    act(primaryAction);
                 }
                 break;
             case 'Delete':
             case 'Backspace':
                 event.preventDefault();
                 if (!event.repeat) {
-                    act('reject');
+                    act(secondaryAction);
                 }
                 break;
         }

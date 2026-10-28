@@ -36,9 +36,11 @@ entirely within the visible browser area; previous/next controls live in the
 sidebar, with next first and `ArrowLeft`/`ArrowRight` mapped to next/previous.
 Image and tag moderation queues act on the currently selected item: Approve
 and Reject submit that selection, and a success message remains visible rather
-than auto-dismissing. Deleting an image asks for confirmation: Enter confirms
-and Escape cancels. A successful deletion opens the previous visible neighbor
-with history replacement, or the home page when no previous image exists.
+than auto-dismissing. The Mod Actions delete button and the `Delete` hotkey move
+the image to the Delete Queue immediately, without a confirmation dialog; a
+successful delete opens the previous visible neighbor with history replacement,
+or the home page when no previous image exists. The Delete Queue page uses the
+same layout as the Mod Queue and offers Restore and permanent Delete actions.
 
 === Quick tags and layout
 

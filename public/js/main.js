@@ -14,6 +14,7 @@ import {createNotFoundView} from './views/notFound.js';
 import {createRegisterView} from './views/register.js';
 import {createProfileView} from './views/profile.js';
 import {createUserProfileView} from './views/userProfile.js';
+import {createDeleteQueueView} from './views/deleteQueue.js';
 import {createReviewView} from './views/review.js';
 import {createTagQueueView} from './views/tagQueue.js';
 import {createUploadView} from './views/upload.js';
@@ -34,6 +35,7 @@ export function createRouteMap({session, navigate}) {
         [RoutePath.TAGME_QUEUE]: (context) => createTagmeView({session, ...context}),
         [RoutePath.IMAGE_REVIEW]: (context) => createReviewView({session, navigate, ...context}),
         [RoutePath.TAG_QUEUE]: (context) => createTagQueueView({session, navigate, ...context}),
+        [RoutePath.DELETE_QUEUE]: (context) => createDeleteQueueView({session, navigate, ...context}),
         [RoutePath.TAGS_PAGE]: (context) => createTagsView({session, navigate, ...context}),
         [RoutePath.USER_MANAGEMENT]: (context) => createUsersView({session, navigate, ...context}),
         [RoutePath.AUDIT_LOG]: (context) => createAuditLogView({session, navigate, ...context}),
@@ -41,7 +43,8 @@ export function createRouteMap({session, navigate}) {
 }
 
 export function isModerationRoute(path) {
-    return path === RoutePath.IMAGE_REVIEW || path === RoutePath.TAG_QUEUE;
+    return path === RoutePath.IMAGE_REVIEW || path === RoutePath.TAG_QUEUE
+        || path === RoutePath.DELETE_QUEUE;
 }
 
 /**

@@ -235,6 +235,69 @@ class ImageApiControllerTest extends FunctionalTestCase
         );
     }
 
+    public function testGetImageListAction_ExcludesQueuedImagesForAnonymousAndModerators(): void
+    {
+        $markerTag = 'queued-list-' . bin2hex(random_bytes(5));
+        $this->tagService->createTag($markerTag);
+        $queued = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+            deletedAt: new DateTime('2026-10-20 09:00:00'),
+        );
+        $this->tagService->attachTagToImage($queued->getId(), $markerTag);
+
+        $anonymousResponse = $this->simulateListRequest(['tags' => $markerTag]);
+        $this->assertSame(HttpStatus::OK, $anonymousResponse->getStatus());
+        $anonymousBody = json_decode((string)$anonymousResponse->getContent(), true, JSON_THROW_ON_ERROR);
+        $this->assertSame(0, $anonymousBody['total']);
+        $this->assertSame([], $anonymousBody['images']);
+
+        $this->loginUserWithAccessLevel(
+            'queued-list-mod-' . bin2hex(random_bytes(4)),
+            'Queued List Moderator',
+            AccessLevel::MOD,
+        );
+        $moderatorResponse = $this->simulateListRequest(['tags' => $markerTag]);
+        $this->assertSame(HttpStatus::OK, $moderatorResponse->getStatus());
+        $moderatorBody = json_decode((string)$moderatorResponse->getContent(), true, JSON_THROW_ON_ERROR);
+        $this->assertSame(0, $moderatorBody['total']);
+        $this->assertSame([], $moderatorBody['images']);
+    }
+
+    public function testGetImageDetailAction_QueuedImageIsOnlyVisibleToModerators(): void
+    {
+        $this->loginUser('queued-detail-owner-' . bin2hex(random_bytes(4)), 'Queued Detail Owner');
+        $owner = $this->sessionService->getUserData();
+        self::assertNotNull($owner);
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $owner->id,
+            status: ImageStatus::ACCEPTED,
+            deletedAt: new DateTime('2026-10-20 09:00:00'),
+        );
+
+        $ownerResponse = $this->simulateDetailRequest((string)$image->getId());
+        $this->assertSame(HttpStatus::FORBIDDEN, $ownerResponse->getStatus());
+
+        $this->sessionService->destroySession();
+        $anonymousResponse = $this->simulateDetailRequest((string)$image->getId());
+        $this->assertSame(HttpStatus::FORBIDDEN, $anonymousResponse->getStatus());
+
+        $this->loginUserWithAccessLevel(
+            'queued-detail-mod-' . bin2hex(random_bytes(4)),
+            'Queued Detail Moderator',
+            AccessLevel::MOD,
+        );
+        $moderatorResponse = $this->simulateDetailRequest((string)$image->getId());
+        $this->assertSame(HttpStatus::OK, $moderatorResponse->getStatus());
+        $this->assertSame('accepted', json_decode(
+            (string)$moderatorResponse->getContent(),
+            true,
+            JSON_THROW_ON_ERROR,
+        )['image']['status']);
+    }
+
     public function testGetImageDetailAction_AnonymousCanAccessAcceptedImage(): void
     {
         $this->loginUser('anonymous-image-detail-owner-' . bin2hex(random_bytes(4)), 'Anonymous Detail Owner');
@@ -488,6 +551,39 @@ class ImageApiControllerTest extends FunctionalTestCase
         self::assertSame(
             ['id' => $accepted->getId()],
             json_decode((string)$previousResponse->getContent(), true, JSON_THROW_ON_ERROR),
+        );
+    }
+
+    public function testGetImageNeighborAction_ModeratorSkipsQueuedImages(): void
+    {
+        $this->loginUserWithAccessLevel(
+            'neighbor-queue-mod-' . bin2hex(random_bytes(4)),
+            'Neighbor Queue Moderator',
+            AccessLevel::MOD,
+        );
+        $first = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+        );
+        ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+            deletedAt: new DateTime('2026-10-20 09:00:00'),
+        );
+        $last = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+        );
+
+        $nextResponse = $this->simulateNeighborRequest((string)$first->getId(), 'next');
+        $this->assertSame(HttpStatus::OK, $nextResponse->getStatus());
+        $this->assertSame(
+            ['id' => $last->getId()],
+            json_decode((string)$nextResponse->getContent(), true, JSON_THROW_ON_ERROR),
+            'images queued for deletion are only reachable through the delete queue',
         );
     }
 

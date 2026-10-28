@@ -88,7 +88,7 @@ readonly class ImageFileController
 
         $userData = $this->sessionService->getUserData();
         if ($userData === null) {
-            if ($entity->getStatus() !== ImageStatus::ACCEPTED) {
+            if ($entity->getStatus() !== ImageStatus::ACCEPTED || $entity->isDeleted()) {
                 return new Response(HttpStatus::FORBIDDEN);
             }
         } elseif (!$this->imageAccessPolicy->canAccess($entity, $userData->accessLevel, $userData->id)) {

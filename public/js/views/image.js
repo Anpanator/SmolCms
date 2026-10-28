@@ -2,15 +2,15 @@
  * Image display view: shows the viewing image for a single image together
  * with its metadata and editable tags. Deep-linkable via /image?id=<id>.
  * Navigation between adjacent images and the Mod Actions (delete) section
- * are enforced by the server; inaccessible images are skipped.
+ * are enforced by the server; inaccessible images are skipped. Deleting an
+ * image moves it to the delete queue without a confirmation dialog.
  * Importing this module has no side effects.
  */
 import {get, postJson} from '../api.js';
 import {AccessLevel, hasAccessLevel} from '../accessLevel.js';
 import {el} from '../dom.js';
-import {clearMessage, createMessageBox, messageForStatus, showMessage} from '../forms.js';
+import {createMessageBox, messageForStatus, showMessage} from '../forms.js';
 import {createImageDetails, formatFileSize} from '../imageDetails.js';
-import {createConfirmDialog} from '../modal.js';
 import {createQuickTagsToggle, createQuickTagsView} from '../quickTags.js';
 import {createSearchView, normalizeTags} from '../search.js';
 import {RoutePath} from '../routes.js';
@@ -212,14 +212,6 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
         deletePending = true;
         refreshControls();
         try {
-            const dialog = createConfirmDialog({
-                message: `Delete image #${image.id}? This action cannot be undone.`,
-                confirmLabel: 'Delete image',
-            });
-            if (!(await dialog.result)) {
-                return;
-            }
-            clearMessage(status);
             const previousId = await findPreviousImageId(image.id);
             await postJson(`${DELETE_URL}?id=${image.id}`);
             navigate(

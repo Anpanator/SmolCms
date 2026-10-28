@@ -102,6 +102,22 @@ class TagmeControllerTest extends FunctionalTestCase
         self::assertSame(HttpStatus::NOT_FOUND, $this->simulateRandomRequest()->getStatus());
     }
 
+    public function testRandomTagmeImageSkipsQueuedImages(): void
+    {
+        $this->clearTagmeImages();
+        $this->loginUser('tagme-queued-user-' . bin2hex(random_bytes(5)), 'Tagme Queued User');
+        $userId = $this->sessionService->getUserData()->id;
+        $queued = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            $userId,
+            status: ImageStatus::ACCEPTED,
+            deletedAt: new \DateTime('2026-10-20 09:00:00'),
+        );
+        $this->tagService->attachTagToImage($queued->getId(), 'tagme');
+
+        self::assertSame(HttpStatus::NOT_FOUND, $this->simulateRandomRequest()->getStatus());
+    }
+
     private function simulateRandomRequest(): Response
     {
         return $this->simulateRequest(new Request(
@@ -113,7 +129,7 @@ class TagmeControllerTest extends FunctionalTestCase
     private function clearTagmeImages(): void
     {
         foreach (ImageStatus::cases() as $status) {
-            foreach ($this->imageEntityService->findByStatus($status) as $image) {
+            foreach ($this->imageEntityService->findByStatus($status, includeDeleted: true) as $image) {
                 if ($image->getId() !== null) {
                     $this->tagService->detachTagFromImage($image->getId(), 'tagme');
                 }

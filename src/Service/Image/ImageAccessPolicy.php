@@ -35,6 +35,10 @@ final readonly class ImageAccessPolicy
 
     public function canAccess(ImageEntity $image, AccessLevel $accessLevel, ?int $userId = null): bool
     {
+        if ($image->isDeleted()) {
+            return $accessLevel->value >= AccessLevel::MOD->value;
+        }
+
         if ($accessLevel->value >= AccessLevel::MOD->value
             || $image->getStatus() === ImageStatus::ACCEPTED) {
             return true;
@@ -51,6 +55,10 @@ final readonly class ImageAccessPolicy
 
     public function canAccessImageDetail(ImageEntity $image, AccessLevel $accessLevel, ?int $userId = null): bool
     {
+        if ($image->isDeleted()) {
+            return $accessLevel->value >= AccessLevel::MOD->value;
+        }
+
         if ($accessLevel->value >= AccessLevel::MOD->value
             || $image->getStatus() === ImageStatus::ACCEPTED) {
             return true;

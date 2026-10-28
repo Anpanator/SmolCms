@@ -25,6 +25,7 @@ class ImageEntityServiceTest extends FunctionalTestCase
         ?DateTime $uploadDate = null,
         int $userId = 1,
         ?string $thumbFilename = null,
+        ?DateTime $deletedAt = null,
     ): ImageEntity
     {
         return new ImageEntity(
@@ -41,6 +42,7 @@ class ImageEntityServiceTest extends FunctionalTestCase
             height: 50,
             format: 'png',
             fileSize: 1234,
+            deletedAt: $deletedAt,
         );
     }
 
@@ -288,6 +290,141 @@ class ImageEntityServiceTest extends FunctionalTestCase
             0,
             [ImageStatus::ACCEPTED],
         ));
+    }
+
+    public function testDeletedAtRoundTripsAndFindByStatusExcludesQueuedImagesByDefault(): void
+    {
+        $deletedAt = new DateTime('2026-02-03 04:05:06');
+        $queued = $this->makeEntity(status: ImageStatus::ACCEPTED, deletedAt: $deletedAt);
+        $active = $this->makeEntity(status: ImageStatus::ACCEPTED);
+        $this->imageEntityService->saveAsNew($queued);
+        $this->imageEntityService->saveAsNew($active);
+
+        $reloaded = $this->imageEntityService->findOneById($queued->getId());
+        self::assertNotNull($reloaded);
+        self::assertSame('2026-02-03 04:05:06', $reloaded->getDeletedAt()?->format('Y-m-d H:i:s'));
+
+        $visibleIds = array_map(
+            static fn(ImageEntity $image) => $image->getId(),
+            $this->imageEntityService->findByStatus(ImageStatus::ACCEPTED),
+        );
+        self::assertContains($active->getId(), $visibleIds);
+        self::assertNotContains($queued->getId(), $visibleIds);
+
+        $allIds = array_map(
+            static fn(ImageEntity $image) => $image->getId(),
+            $this->imageEntityService->findByStatus(ImageStatus::ACCEPTED, includeDeleted: true),
+        );
+        self::assertContains($queued->getId(), $allIds);
+        self::assertContains($active->getId(), $allIds);
+    }
+
+    public function testDeletionQueueOrdersQueuedImagesByDeletionDateNewestFirst(): void
+    {
+        $older = $this->makeEntity(status: ImageStatus::ACCEPTED, deletedAt: new DateTime('2026-01-01 10:00:00'));
+        $newer = $this->makeEntity(status: ImageStatus::PENDING_REVIEW, deletedAt: new DateTime('2026-02-01 10:00:00'));
+        $active = $this->makeEntity(status: ImageStatus::ACCEPTED);
+        foreach ([$older, $newer, $active] as $image) {
+            $this->imageEntityService->saveAsNew($image);
+        }
+
+        $queuedIds = array_map(
+            static fn(ImageEntity $image) => $image->getId(),
+            $this->imageEntityService->findDeletionQueue(),
+        );
+        self::assertSame(
+            [$newer->getId(), $older->getId()],
+            array_values(array_filter(
+                $queuedIds,
+                static fn(?int $id): bool => in_array($id, [$older->getId(), $newer->getId()], true),
+            )),
+        );
+        self::assertNotContains($active->getId(), $queuedIds);
+    }
+
+    public function testVisibleAcceptedAndRecentQueriesExcludeQueuedImages(): void
+    {
+        $viewerId = 7777;
+        $markerTag = 'queued-images-' . bin2hex(random_bytes(4));
+        $this->tagService->createTag($markerTag);
+        $active = $this->makeEntity(
+            status: ImageStatus::ACCEPTED,
+            uploadDate: new DateTime('2026-01-01 10:00:00'),
+            userId: $viewerId,
+            thumbFilename: 'active-thumb.avif',
+        );
+        $queued = $this->makeEntity(
+            status: ImageStatus::ACCEPTED,
+            uploadDate: new DateTime('2026-01-02 10:00:00'),
+            userId: $viewerId,
+            thumbFilename: 'queued-thumb.avif',
+            deletedAt: new DateTime('2026-01-03 10:00:00'),
+        );
+        $ownQueuedPendingReview = $this->makeEntity(
+            status: ImageStatus::PENDING_REVIEW,
+            uploadDate: new DateTime('2026-01-04 10:00:00'),
+            userId: $viewerId,
+            thumbFilename: 'queued-pending-thumb.avif',
+            deletedAt: new DateTime('2026-01-05 10:00:00'),
+        );
+        foreach ([$active, $queued, $ownQueuedPendingReview] as $image) {
+            $this->imageEntityService->saveAsNew($image);
+            $this->tagService->attachTagToImage($image->getId(), $markerTag);
+        }
+        $this->tagService->attachTagToImage($queued->getId(), 'tagme');
+        $this->tagService->attachTagToImage($ownQueuedPendingReview->getId(), 'tagme');
+
+        self::assertSame(1, $this->imageEntityService->countVisible([$markerTag]));
+        self::assertSame(
+            [$active->getId()],
+            array_map(
+                static fn(ImageEntity $image) => $image->getId(),
+                $this->imageEntityService->findVisiblePage(10, 0, [$markerTag], $viewerId, true),
+            ),
+        );
+        self::assertSame(1, $this->imageEntityService->countAccepted([$markerTag]));
+        self::assertSame(
+            [$active->getId()],
+            array_map(
+                static fn(ImageEntity $image) => $image->getId(),
+                $this->imageEntityService->findAcceptedPage(10, 0, [$markerTag]),
+            ),
+        );
+        self::assertSame(
+            [$active->getId()],
+            array_map(
+                static fn(ImageEntity $image) => $image->getId(),
+                $this->imageEntityService->findRecentByUser(
+                    $viewerId,
+                    10,
+                    [ImageStatus::PENDING_REVIEW, ImageStatus::ACCEPTED],
+                ),
+            ),
+        );
+        self::assertNull($this->imageEntityService->findRandomTagmeImage());
+    }
+
+    public function testAccessibleNeighborIdsSkipQueuedImagesForEveryViewer(): void
+    {
+        $first = $this->makeEntity(status: ImageStatus::ACCEPTED, uploadDate: new DateTime('2026-02-01 10:00:00'));
+        $queued = $this->makeEntity(
+            status: ImageStatus::ACCEPTED,
+            uploadDate: new DateTime('2026-02-01 11:00:00'),
+            deletedAt: new DateTime('2026-02-02 10:00:00'),
+        );
+        $last = $this->makeEntity(status: ImageStatus::ACCEPTED, uploadDate: new DateTime('2026-02-01 12:00:00'));
+        foreach ([$first, $queued, $last] as $image) {
+            $this->imageEntityService->saveAsNew($image);
+        }
+
+        self::assertSame(
+            $last->getId(),
+            $this->imageEntityService->findNextAccessibleId($first->getId(), null, true),
+        );
+        self::assertSame(
+            $first->getId(),
+            $this->imageEntityService->findPreviousAccessibleId($last->getId(), null, true),
+        );
     }
 
     public function testAccessibleNeighborIds_followIdOrderSkipInvisibleImagesAndRespectBoundaries(): void

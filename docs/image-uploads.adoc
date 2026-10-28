@@ -51,7 +51,15 @@ authentication. They deliver files through `X-Accel-Redirect`. Moderators use
 `POST /api/review/reject`. Approval moves a pending-review image to accepted.
 Rejection deletes its row and attempts to delete unreferenced files instead of
 assigning a rejected status; a content-addressed file is retained while another
-image record references it. MODs can also use `POST /api/image/delete`, which
-records an `IMAGE_DELETED` audit entry. The image view confirms deletion with
-Enter or cancels it with Escape, then opens the previous visible neighbor (or
-the home page when none exists) and replaces the deleted image in history.
+image record references it.
+
+Moderators can also move an image to the delete queue with
+`POST /api/image/delete`. The image view does this immediately (no confirmation
+dialog) and then opens the previous visible neighbor, or the home page when none
+exists, replacing the image in history. Queued images keep their row and files
+but are excluded from the home page, profile uploads, tagme, neighbor
+navigation, and regular detail/sample/download access. `GET /api/delete-queue`
+lists them for `MOD` and higher; `POST /api/delete-queue/restore` makes an image
+visible again according to its review status, while
+`POST /api/delete-queue/delete` permanently deletes the row and unreferenced
+files and records an `IMAGE_DELETED` audit entry.

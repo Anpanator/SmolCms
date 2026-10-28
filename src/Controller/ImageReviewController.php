@@ -18,8 +18,8 @@ readonly class ImageReviewController
 {
     public function __construct(
         private ImageReviewService $imageReviewService,
-        private AuditLogService $auditLogService,
-        private SessionService  $sessionService,
+        private AuditLogService    $auditLogService,
+        private SessionService     $sessionService,
     )
     {
     }
@@ -51,13 +51,13 @@ readonly class ImageReviewController
         if ($id === null) {
             return new Response(HttpStatus::BAD_REQUEST);
         }
-        if (!$this->imageReviewService->delete($id)) {
+        if (!$this->imageReviewService->queueForDeletion($id)) {
             return new Response(HttpStatus::NOT_FOUND);
         }
 
         $user = $this->sessionService->getUserData();
         if ($user !== null) {
-            $this->auditLogService->record($user->id, AuditActionType::IMAGE_DELETED, "image_id=$id");
+            $this->auditLogService->record($user->id, AuditActionType::IMAGE_QUEUED_FOR_DELETION, "image_id=$id");
         }
 
         return new JsonResponse(status: HttpStatus::NO_CONTENT);

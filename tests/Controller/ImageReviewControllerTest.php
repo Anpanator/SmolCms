@@ -46,7 +46,7 @@ class ImageReviewControllerTest extends FunctionalTestCase
     {
         parent::tearDown();
         foreach (ImageStatus::cases() as $status) {
-            foreach ($this->imageEntityService->findByStatus($status) as $image) {
+            foreach ($this->imageEntityService->findByStatus($status, includeDeleted: true) as $image) {
                 $imageId = $image->getId();
                 if ($imageId !== null) {
                     $this->imageEntityService->deleteById($imageId);
@@ -414,7 +414,7 @@ class ImageReviewControllerTest extends FunctionalTestCase
         $this->assertNull($response->getContent());
     }
 
-    public function testDeleteAction_AcceptedImage_DeletesRowAndAllFiles(): void
+    public function testDeleteAction_AcceptedImage_MovesItToTheDeleteQueueWithoutDeletingFiles(): void
     {
         $this->loginUserWithAccessLevel('mod-user', 'Mod User', AccessLevel::MOD);
         $checksum = ImageTestUtils::randomChecksum();
@@ -444,14 +444,34 @@ class ImageReviewControllerTest extends FunctionalTestCase
 
         $this->assertSame(HttpStatus::NO_CONTENT, $response->getStatus());
         $this->assertNull($response->getContent());
-        $this->assertNull($this->imageEntityService->findOneById($entity->getId()));
-        $this->assertFileDoesNotExist($originalPath);
-        $this->assertFileDoesNotExist($thumbPath);
-        $this->assertFileDoesNotExist($samplePath);
-        $this->assertFileDoesNotExist($downloadPath);
+        $storedEntity = $this->imageEntityService->findOneById($entity->getId());
+        $this->assertNotNull($storedEntity);
+        $this->assertTrue($storedEntity->isDeleted());
+        $this->assertFileExists($originalPath);
+        $this->assertFileExists($thumbPath);
+        $this->assertFileExists($samplePath);
+        $this->assertFileExists($downloadPath);
     }
 
-    public function testDeleteAction_WritesAuditLogEntryForTheMod(): void
+    public function testDeleteAction_AlreadyQueuedImage_IsIdempotent(): void
+    {
+        $this->loginUserWithAccessLevel('mod-user', 'Mod User', AccessLevel::MOD);
+        $entity = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+            deletedAt: new DateTime('2026-10-20 10:00:00'),
+        );
+
+        $response = $this->simulateReviewPostRequest('/api/image/delete', (string)$entity->getId());
+
+        $this->assertSame(HttpStatus::NO_CONTENT, $response->getStatus());
+        $storedEntity = $this->imageEntityService->findOneById($entity->getId());
+        $this->assertNotNull($storedEntity);
+        $this->assertSame('2026-10-20 10:00:00', $storedEntity->getDeletedAt()?->format('Y-m-d H:i:s'));
+    }
+
+    public function testDeleteAction_WritesQueueAuditLogEntryForTheMod(): void
     {
         $this->loginUserWithAccessLevel('audit-mod-user', 'Audit Mod User', AccessLevel::MOD);
         $mod = $this->sessionService->getUserData();
@@ -467,7 +487,7 @@ class ImageReviewControllerTest extends FunctionalTestCase
         $this->assertSame(HttpStatus::NO_CONTENT, $response->getStatus());
         $entries = array_values(array_filter(
             $this->auditLogService->getEntries(1, '')['entries'],
-            static fn(array $entry): bool => $entry['actionType'] === AuditActionType::IMAGE_DELETED->value
+            static fn(array $entry): bool => $entry['actionType'] === AuditActionType::IMAGE_QUEUED_FOR_DELETION->value
                 && $entry['context'] === "image_id={$entity->getId()}",
         ));
         $this->assertCount(1, $entries);
@@ -486,7 +506,7 @@ class ImageReviewControllerTest extends FunctionalTestCase
             [],
             array_filter(
                 $this->auditLogService->getEntries(1, '')['entries'],
-                static fn(array $entry): bool => $entry['actionType'] === AuditActionType::IMAGE_DELETED->value
+                static fn(array $entry): bool => $entry['actionType'] === AuditActionType::IMAGE_QUEUED_FOR_DELETION->value
                     && $entry['context'] === 'image_id=99999',
             ),
         );

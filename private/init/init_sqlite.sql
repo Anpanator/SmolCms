@@ -58,8 +58,11 @@ CREATE TABLE image
     width              INTEGER      NULL,
     height             INTEGER      NULL,
     format             VARCHAR(16)  NULL,
-    file_size          INTEGER      NULL
+    file_size          INTEGER      NULL,
+    deleted_at         DATETIME     NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_image_deleted_at ON image (deleted_at);
 
 CREATE TABLE tag_category
 (

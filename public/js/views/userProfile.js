@@ -15,6 +15,8 @@ const MOD_ACTION_NAMES = new Map([
     [1, 'Tag added'],
     [2, 'Tag removed'],
     [4, 'Image deleted'],
+    [6, 'Image restored'],
+    [7, 'Image queued for deletion'],
 ]);
 
 /**

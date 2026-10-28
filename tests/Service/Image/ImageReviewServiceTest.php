@@ -64,6 +64,118 @@ class ImageReviewServiceTest extends FunctionalTestCase
         );
     }
 
+    public function testDeletionQueueMapsQueuedImagesAndExcludesActiveOnes(): void
+    {
+        $user = $this->createUser('image-delete-queue-' . bin2hex(random_bytes(4)), 'Delete Queue Uploader');
+        $thumbFilename = $this->storedFileName('delete-thumb');
+        $sampleFilename = $this->storedFileName('delete-sample');
+        $queued = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $user->getId(),
+            status: ImageStatus::ACCEPTED,
+            uploadDate: new DateTime('2026-10-05 06:07:08'),
+            thumbFilename: $thumbFilename,
+            sampleFilename: $sampleFilename,
+            deletedAt: new DateTime('2026-10-06 06:07:08'),
+        );
+        ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $user->getId(),
+            status: ImageStatus::ACCEPTED,
+        );
+
+        $entries = array_values(array_filter(
+            $this->imageReviewService->getDeletionQueue(),
+            static fn(array $entry): bool => $entry['id'] === $queued->getId(),
+        ));
+
+        self::assertCount(1, $entries);
+        self::assertSame(
+            [
+                'id' => $queued->getId(),
+                'thumbSrc' => $this->imageQueryService->getThumbSrc($queued),
+                'sampleSrc' => $this->imageQueryService->getSampleSrc($queued),
+                'uploadDate' => '2026-10-05 06:07:08',
+                'uploaderId' => $user->getId(),
+                'uploader' => 'Delete Queue Uploader',
+            ],
+            $entries[0],
+        );
+    }
+
+    public function testQueueForDeletionAndRestoreToggleTheDeletionMarker(): void
+    {
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+        );
+        self::assertFalse($image->isDeleted());
+
+        self::assertFalse($this->imageReviewService->queueForDeletion(PHP_INT_MAX));
+        self::assertTrue($this->imageReviewService->queueForDeletion($image->getId()));
+        $queued = $this->imageEntityService->findOneById($image->getId());
+        self::assertNotNull($queued);
+        self::assertTrue($queued->isDeleted());
+
+        // Queueing an already queued image is a no-op success and keeps its timestamp.
+        $deletedAt = $queued->getDeletedAt()?->format('Y-m-d H:i:s');
+        self::assertTrue($this->imageReviewService->queueForDeletion($image->getId()));
+        self::assertSame(
+            $deletedAt,
+            $this->imageEntityService->findOneById($image->getId())?->getDeletedAt()?->format('Y-m-d H:i:s'),
+        );
+
+        self::assertFalse($this->imageReviewService->restore(PHP_INT_MAX));
+        self::assertTrue($this->imageReviewService->restore($image->getId()));
+        self::assertFalse($this->imageEntityService->findOneById($image->getId())?->isDeleted());
+
+        // Restoring an image that is not queued is a no-op success.
+        self::assertTrue($this->imageReviewService->restore($image->getId()));
+    }
+
+    public function testReviewQueueExcludesImagesQueuedForDeletion(): void
+    {
+        $visible = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::PENDING_REVIEW,
+        );
+        $queued = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::PENDING_REVIEW,
+            deletedAt: new DateTime('2026-10-20 09:00:00'),
+        );
+
+        $ids = array_column($this->imageReviewService->getReviewQueue(), 'id');
+
+        self::assertContains($visible->getId(), $ids);
+        self::assertNotContains($queued->getId(), $ids);
+    }
+
+    public function testDeleteQueuedRequiresTheImageToBeInTheDeleteQueue(): void
+    {
+        $active = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+        );
+        $queued = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+            deletedAt: new DateTime('2026-10-20 09:00:00'),
+        );
+
+        self::assertFalse($this->imageReviewService->deleteQueued($active->getId()));
+        self::assertNotNull($this->imageEntityService->findOneById($active->getId()));
+
+        self::assertFalse($this->imageReviewService->deleteQueued(PHP_INT_MAX));
+        self::assertTrue($this->imageReviewService->deleteQueued($queued->getId()));
+        self::assertNull($this->imageEntityService->findOneById($queued->getId()));
+    }
+
     public function testApproveTransitionsPendingReviewAndIsIdempotentForAcceptedImages(): void
     {
         $pending = ImageTestUtils::createImageEntity(

@@ -15,6 +15,7 @@ enum RouteEnum: string
     case IMAGE_REVIEW = '/review';
     case TAGS_PAGE = '/tags';
     case TAG_QUEUE = '/tag-queue';
+    case DELETE_QUEUE = '/delete-queue';
     case TAGME_QUEUE = '/tagme';
     case USER_MANAGEMENT = '/users';
     case USER_PROFILE = '/user';
@@ -35,6 +36,9 @@ enum RouteEnum: string
     case API_REVIEW_APPROVE = '/api/review/approve';
     case API_REVIEW_REJECT = '/api/review/reject';
     case API_IMAGE_DELETE = '/api/image/delete';
+    case API_DELETE_QUEUE = '/api/delete-queue';
+    case API_DELETE_QUEUE_DELETE = '/api/delete-queue/delete';
+    case API_DELETE_QUEUE_RESTORE = '/api/delete-queue/restore';
     case API_IMAGE_TAGS = '/api/image/tags';
     case API_IMAGE_TAGS_REMOVE = '/api/image/tags/remove';
     case API_TAG_SUGGESTIONS = '/api/tag-suggestions';

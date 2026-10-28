@@ -118,6 +118,50 @@ class ImageFileControllerTest extends FunctionalTestCase
         $this->assertNull($response->getContent());
     }
 
+    public function testSampleAction_QueuedAcceptedImage_IsForbiddenAnonymouslyButServedToModerators(): void
+    {
+        $sampleFilename = ImageTestUtils::randomChecksum() . '.webp';
+        ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+            sampleFilename: $sampleFilename,
+            deletedAt: new \DateTime('2026-10-20 09:00:00'),
+        );
+        ImageTestUtils::writeImageFile(IMAGE_SAMPLE_DIR, $sampleFilename);
+
+        $anonymousResponse = $this->simulateSampleRequest($sampleFilename);
+        $this->assertSame(HttpStatus::FORBIDDEN, $anonymousResponse->getStatus());
+
+        $this->loginUserWithAccessLevel(
+            'queued-sample-mod-' . bin2hex(random_bytes(4)),
+            'Queued Sample Moderator',
+            AccessLevel::MOD,
+        );
+        $moderatorResponse = $this->simulateSampleRequest($sampleFilename);
+        $this->assertSame(HttpStatus::OK, $moderatorResponse->getStatus());
+        $this->assertNull($moderatorResponse->getContent());
+    }
+
+    public function testDownloadAction_QueuedImage_IsForbiddenToRegularUsers(): void
+    {
+        $downloadFilename = ImageTestUtils::randomChecksum() . '.jpeg';
+        ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+            downloadFilename: $downloadFilename,
+            deletedAt: new \DateTime('2026-10-20 09:00:00'),
+        );
+        ImageTestUtils::writeImageFile(IMAGE_DOWNLOAD_DIR, $downloadFilename);
+        $this->loginUser('queued-download-user', 'Queued Download User');
+
+        $response = $this->simulateDownloadRequest($downloadFilename);
+
+        $this->assertSame(HttpStatus::FORBIDDEN, $response->getStatus());
+        $this->assertNull($response->getContent());
+    }
+
     public function testSampleAction_AcceptedImage_ServesInternalRedirectWithImageType(): void
     {
         $this->loginUser('file-user', 'File User');

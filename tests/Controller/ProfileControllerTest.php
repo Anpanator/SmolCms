@@ -328,6 +328,14 @@ class ProfileControllerTest extends FunctionalTestCase
             uploadDate: new DateTime('2026-10-19 12:00:00'),
             thumbFilename: ImageTestUtils::randomChecksum() . '.avif',
         );
+        ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: $viewer->id,
+            status: ImageStatus::ACCEPTED,
+            uploadDate: new DateTime('2026-10-19 13:00:00'),
+            thumbFilename: ImageTestUtils::randomChecksum() . '.avif',
+            deletedAt: new DateTime('2026-10-20 12:00:00'),
+        );
 
         $otherUser = $this->createUser(
             'profile-visibility-other-' . bin2hex(random_bytes(5)),

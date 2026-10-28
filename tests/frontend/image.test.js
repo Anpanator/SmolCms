@@ -614,7 +614,7 @@ export async function testImageViewShowsModActionsSectionWithDeleteForMods() {
     }
 }
 
-export async function testImageViewDeleteRequiresConfirmationThenFallsBackHomeWithoutPreviousNeighbor() {
+export async function testImageViewDeleteSendsRequestImmediatelyWithoutConfirmation() {
     const {view, fetchMock, navigateCalls, navigateOptions, restore} = await modView((url, options) => {
         if (url === '/api/image/detail?id=7') {
             return detailResponse();
@@ -630,34 +630,17 @@ export async function testImageViewDeleteRequiresConfirmationThenFallsBackHomeWi
     try {
         const deleteButton = view.querySelector('.mod-action-delete');
         deleteButton.click();
-        let dialog = document.querySelector('.modal-backdrop');
-        assertTrue(dialog !== null, 'deletion should ask for confirmation');
-        assertTrue(dialog.textContent.includes('Delete image #7?'), 'the confirmation should name the image');
-        assertTrue(dialog.textContent.includes('cannot be undone'), 'the confirmation should warn about irreversibility');
-        assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/delete')).length, 0,
-            'no delete request should run before confirmation');
-
-        dialog.querySelector('.modal-cancel').click();
-        await settle();
-        assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/delete')).length, 0,
-            'cancelling must not delete');
-        assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/neighbor')).length, 0,
-            'the previous neighbor should only be looked up after confirmation');
-        assertFalse(deleteButton.disabled, 'a cancelled deletion should re-enable the delete button');
-
-        deleteButton.click();
-        dialog = document.querySelector('.modal-backdrop');
-        dialog.querySelector('.button--primary').click();
         await settle();
 
+        assertEqual(document.querySelector('.modal-backdrop'), null,
+            'deleting an image must not ask for confirmation anymore');
         const post = fetchMock.calls.find((call) => call.url === '/api/image/delete?id=7');
-        assertTrue(post !== undefined, 'confirming should send the delete request');
+        assertTrue(post !== undefined, 'deleting should send the delete request immediately');
         assertEqual(post.options.method, 'POST');
         assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/']), 'no previous neighbor should fall back to home');
         assertEqual(JSON.stringify(navigateOptions), JSON.stringify([{replace: true}]),
             'the deleted image should not stay in browser history');
     } finally {
-        document.querySelector('.modal-backdrop .modal-cancel')?.click();
         restore();
     }
 }
@@ -677,7 +660,6 @@ export async function testImageViewDeleteNavigatesToPreviousNeighborWithReplace(
     });
     try {
         view.querySelector('.mod-action-delete').click();
-        document.querySelector('.modal-backdrop .button--primary').click();
         await settle();
 
         const neighborIndex = fetchMock.calls.findIndex(
@@ -691,7 +673,6 @@ export async function testImageViewDeleteNavigatesToPreviousNeighborWithReplace(
         assertEqual(JSON.stringify(navigateOptions), JSON.stringify([{replace: true}]),
             'the deleted image should not stay in browser history');
     } finally {
-        document.querySelector('.modal-backdrop .modal-cancel')?.click();
         restore();
     }
 }
@@ -711,7 +692,6 @@ export async function testImageViewDeleteFallsBackHomeWhenPreviousNeighborLookup
     });
     try {
         view.querySelector('.mod-action-delete').click();
-        document.querySelector('.modal-backdrop .button--primary').click();
         await settle();
 
         assertTrue(fetchMock.calls.some((call) => call.url === '/api/image/delete?id=7'),
@@ -720,7 +700,6 @@ export async function testImageViewDeleteFallsBackHomeWhenPreviousNeighborLookup
             'a failed neighbor lookup should fall back to home');
         assertEqual(JSON.stringify(navigateOptions), JSON.stringify([{replace: true}]));
     } finally {
-        document.querySelector('.modal-backdrop .modal-cancel')?.click();
         restore();
     }
 }
@@ -740,7 +719,6 @@ export async function testImageViewDeleteFailureShowsMessageAndStays() {
     });
     try {
         view.querySelector('.mod-action-delete').click();
-        document.querySelector('.modal-backdrop .button--primary').click();
         await settle();
 
         assertTrue(fetchMock.calls.some((call) => call.url === '/api/image/neighbor?id=7&direction=previous'),
@@ -751,12 +729,11 @@ export async function testImageViewDeleteFailureShowsMessageAndStays() {
         assertEqual(JSON.stringify(navigateCalls), JSON.stringify([]), 'a failed deletion should not navigate');
         assertFalse(view.querySelector('.mod-action-delete').disabled, 'a failed deletion should re-enable the button');
     } finally {
-        document.querySelector('.modal-backdrop .modal-cancel')?.click();
         restore();
     }
 }
 
-export async function testImageViewDeleteDialogUsesEnterToConfirmAndEscapeToCancel(fixture) {
+export async function testImageViewDeleteHotkeySendsRequestImmediatelyWithoutConfirmation() {
     const {view, fetchMock, navigateCalls, restore} = await modView((url, options) => {
         if (url === '/api/image/detail?id=7') {
             return detailResponse();
@@ -769,37 +746,16 @@ export async function testImageViewDeleteDialogUsesEnterToConfirmAndEscapeToCanc
         }
         return {status: 200, body: null};
     });
-    fixture.append(view);
     try {
-        const deleteButton = view.querySelector('.mod-action-delete');
-        deleteButton.focus();
-        deleteButton.click();
-        let dialog = document.querySelector('.modal-backdrop');
-        assertTrue(dialog !== null);
-        assertFalse(deleteButton.disabled, 'the focused delete button must stay enabled for focus restoration');
-        assertEqual(deleteButton.getAttribute('aria-disabled'), 'true', 'a pending delete should use aria-disabled');
-
-        const escape = pressKey(dialog, 'Escape');
-        assertTrue(escape.defaultPrevented, 'Escape should cancel the confirmation');
+        assertTrue(pressKey(view, 'Delete').defaultPrevented, 'Delete should trigger the delete action');
         await settle();
-        assertEqual(document.querySelector('.modal-backdrop'), null, 'Escape should close the dialog');
-        assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/delete')).length, 0,
-            'Escape must not delete');
-        assertEqual(document.activeElement, deleteButton, 'a cancelled dialog should restore focus to Delete');
-        assertEqual(deleteButton.getAttribute('aria-disabled'), 'false');
 
-        deleteButton.click();
-        dialog = document.querySelector('.modal-backdrop');
-        assertTrue(dialog !== null);
-        const enter = pressKey(dialog, 'Enter');
-        assertTrue(enter.defaultPrevented, 'Enter should confirm the deletion dialog');
-        await settle();
+        assertEqual(document.querySelector('.modal-backdrop'), null,
+            'the Delete hotkey must not open a confirmation dialog');
         assertTrue(fetchMock.calls.some((call) => call.url === '/api/image/delete?id=7'),
-            'Enter should trigger the delete request');
+            'Delete should trigger the delete request immediately');
         assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/image?id=3']));
     } finally {
-        document.querySelector('.modal-backdrop .modal-cancel')?.click();
-        view.remove();
         restore();
     }
 }
@@ -814,7 +770,7 @@ export async function testImageViewControlsAreDisabledWithoutALoadedImage() {
             assertEqual(deleteButton.getAttribute('aria-disabled'), 'true', 'unavailable deletion should be aria-disabled');
             deleteButton.click();
             await settle();
-            assertEqual(document.querySelector('.modal-backdrop'), null, 'a disabled delete button must not confirm');
+            assertEqual(document.querySelector('.modal-backdrop'), null, 'a disabled delete button must not start a delete');
 
             const previousButton = view.querySelector('.image-nav-previous');
             const nextButton = view.querySelector('.image-nav-next');
@@ -1016,7 +972,7 @@ export async function testImageViewHotkeysIgnoreInputsContentEditableAndModifier
     }
 }
 
-export async function testImageViewDeleteHotkeyUsesConfirmationAndIgnoresKeysWhileModalIsOpen() {
+export async function testImageViewDeleteHotkeyIgnoresRepeatsAndSendsOneRequest() {
     const {view, fetchMock, navigateCalls, navigateOptions, restore} = await modView((url, options) => {
         if (url === '/api/image/detail?id=7') {
             return detailResponse();
@@ -1028,25 +984,17 @@ export async function testImageViewDeleteHotkeyUsesConfirmationAndIgnoresKeysWhi
     });
     try {
         assertTrue(pressKey(view, 'Delete', {repeat: true}).defaultPrevented, 'repeated Delete should still be handled');
-        assertEqual(document.querySelector('.modal-backdrop'), null, 'repeating Delete must not open a confirmation');
-        assertTrue(pressKey(view, 'Delete').defaultPrevented, 'Delete should open the confirmation flow');
-        const dialog = document.querySelector('.modal-backdrop');
-        assertTrue(dialog !== null, 'a moderator should get a confirmation dialog');
-        assertTrue(dialog.textContent.includes('Delete image #7?'));
-        assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/delete')).length, 0);
+        assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/delete')).length, 0,
+            'a repeated Delete event must not start a deletion');
 
-        pressKey(view, 'Delete');
-        assertEqual(document.querySelectorAll('.modal-backdrop').length, 1, 'an open modal must block a second delete hotkey');
-        assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/delete')).length, 0);
-
-        dialog.querySelector('.button--primary').click();
+        assertTrue(pressKey(view, 'Delete').defaultPrevented, 'Delete should trigger the delete action');
         await settle();
         assertTrue(fetchMock.calls.some((call) => call.url === '/api/image/delete?id=7'));
+        assertEqual(fetchMock.calls.filter((call) => call.url === '/api/image/delete?id=7').length, 1);
         assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/']));
         assertEqual(JSON.stringify(navigateOptions), JSON.stringify([{replace: true}]),
             'the delete hotkey should also replace the deleted image');
     } finally {
-        document.querySelector('.modal-backdrop .modal-cancel')?.click();
         restore();
     }
 }
@@ -1056,10 +1004,12 @@ export async function testImageViewDeleteHotkeyRequiresModeratorAndLoadedImage()
         ['anonymous', {getUser: () => null}, detailResponse()],
         ['moderator without a loaded image', MOD_SESSION, {status: 404, body: null}],
     ]) {
-        const {view, restore} = await createView(() => response, 'id=7', session);
+        const {view, fetchMock, restore} = await createView(() => response, 'id=7', session);
         try {
             pressKey(view, 'Delete');
-            assertEqual(document.querySelector('.modal-backdrop'), null, `${label} should not see a delete dialog`);
+            await settle();
+            assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/delete')).length, 0,
+                `${label} must not trigger a deletion`);
         } finally {
             restore();
         }
@@ -1086,7 +1036,8 @@ export async function testImageViewHotkeysDoNotRepeatWhileNavigationIsPending() 
         assertTrue(pressKey(view, 'ArrowRight').defaultPrevented, 'pending arrows should not scroll the page');
         pressKey(view, 'Delete');
         assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/neighbor')).length, 1);
-        assertEqual(document.querySelector('.modal-backdrop'), null, 'pending navigation should block delete hotkeys');
+        assertEqual(fetchMock.calls.filter((call) => call.url.startsWith('/api/image/delete')).length, 0,
+            'pending navigation should block delete hotkeys');
 
         resolveNeighbour({status: 200, body: {id: 12}});
         await settle();

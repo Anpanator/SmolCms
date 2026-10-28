@@ -135,10 +135,42 @@ export async function testModQueueLinkVisibleForModerators() {
             assertEqual(
                 JSON.stringify(links),
                 JSON.stringify([
-                    '/', '/upload-image', '/tagme', '/review', '/tag-queue', '/tags',
+                    '/', '/upload-image', '/tagme', '/review', '/tag-queue', '/delete-queue', '/tags',
                     '/users', '/audit-log', '/user?id=1', '/settings',
                 ]),
                 'moderation and internal links should precede both account links',
+            );
+        } finally {
+            restore();
+        }
+    }
+}
+
+export async function testDeleteQueueLinkVisibleForModerators() {
+    for (const accessLevel of [500, 600]) {
+        const {session, restore} = await createLoadedSession(() => sessionResponse(testUser({accessLevel})));
+        try {
+            const nav = createHeaderNav({session, navigate: () => {}});
+            const link = nav.element.querySelector('a.nav-link[href="/delete-queue"]');
+            assertTrue(link !== null, `access level ${accessLevel} should see the Delete Queue link`);
+            assertEqual(link.textContent, 'Delete Queue');
+        } finally {
+            restore();
+        }
+    }
+}
+
+export async function testDeleteQueueLinkHiddenBelowModerators() {
+    for (const accessLevel of [null, 100, 400]) {
+        const {session, restore} = await createLoadedSession(() => sessionResponse(
+            accessLevel === null ? null : testUser({accessLevel}),
+        ));
+        try {
+            const nav = createHeaderNav({session, navigate: () => {}});
+            assertEqual(
+                nav.element.querySelector('a.nav-link[href="/delete-queue"]'),
+                null,
+                `access level ${accessLevel ?? 'anonymous'} must not see the Delete Queue link`,
             );
         } finally {
             restore();

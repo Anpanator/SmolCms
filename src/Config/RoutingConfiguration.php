@@ -8,6 +8,7 @@ namespace SmolCms\Config;
 use SmolCms\Controller\AuditLogController;
 use SmolCms\Controller\AuthController;
 use SmolCms\Controller\ImageApiController;
+use SmolCms\Controller\ImageDeleteQueueController;
 use SmolCms\Controller\ImageFileController;
 use SmolCms\Controller\ImageReviewController;
 use SmolCms\Controller\ImageTagController;
@@ -121,6 +122,11 @@ class RoutingConfiguration
             ),
             RouteEnum::TAG_QUEUE->name => new Route(
                 path: RouteEnum::TAG_QUEUE->value,
+                method: HttpMethod::GET,
+                controller: IndexController::class,
+            ),
+            RouteEnum::DELETE_QUEUE->name => new Route(
+                path: RouteEnum::DELETE_QUEUE->value,
                 method: HttpMethod::GET,
                 controller: IndexController::class,
             ),
@@ -239,6 +245,24 @@ class RoutingConfiguration
                 method: HttpMethod::POST,
                 controller: ImageReviewController::class,
                 handler: 'deleteAction',
+            ),
+            RouteEnum::API_DELETE_QUEUE->name => new Route(
+                path: RouteEnum::API_DELETE_QUEUE->value,
+                method: HttpMethod::GET,
+                controller: ImageDeleteQueueController::class,
+                handler: 'queueAction',
+            ),
+            RouteEnum::API_DELETE_QUEUE_DELETE->name => new Route(
+                path: RouteEnum::API_DELETE_QUEUE_DELETE->value,
+                method: HttpMethod::POST,
+                controller: ImageDeleteQueueController::class,
+                handler: 'deleteAction',
+            ),
+            RouteEnum::API_DELETE_QUEUE_RESTORE->name => new Route(
+                path: RouteEnum::API_DELETE_QUEUE_RESTORE->value,
+                method: HttpMethod::POST,
+                controller: ImageDeleteQueueController::class,
+                handler: 'restoreAction',
             ),
             RouteEnum::API_IMAGE_TAGS->name => new Route(
                 path: RouteEnum::API_IMAGE_TAGS->value,

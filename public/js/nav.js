@@ -61,6 +61,7 @@ function sessionItems(user, activePath) {
         if (hasAccessLevel(user, AccessLevel.MOD)) {
             items.push(navItem(navLink(RoutePath.IMAGE_REVIEW, 'Mod Queue', activePath)));
             items.push(navItem(navLink(RoutePath.TAG_QUEUE, 'Tag Queue', activePath)));
+            items.push(navItem(navLink(RoutePath.DELETE_QUEUE, 'Delete Queue', activePath)));
             items.push(navItem(navLink(RoutePath.TAGS_PAGE, 'Tags', activePath)));
             items.push(internalNavItem(activePath));
         }

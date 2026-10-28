@@ -28,6 +28,7 @@ class IndexControllerTest extends FunctionalTestCase
             'image review' => [RouteEnum::IMAGE_REVIEW],
             'tags' => [RouteEnum::TAGS_PAGE],
             'tag queue' => [RouteEnum::TAG_QUEUE],
+            'delete queue' => [RouteEnum::DELETE_QUEUE],
             'tagme queue' => [RouteEnum::TAGME_QUEUE],
             'user management' => [RouteEnum::USER_MANAGEMENT],
             'user profile' => [RouteEnum::USER_PROFILE],

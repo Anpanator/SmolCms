@@ -15,6 +15,7 @@ export function testMainRouteRegistryCoversEveryClientPage() {
         RoutePath.TAGME_QUEUE,
         RoutePath.IMAGE_REVIEW,
         RoutePath.TAG_QUEUE,
+        RoutePath.DELETE_QUEUE,
         RoutePath.TAGS_PAGE,
         RoutePath.USER_MANAGEMENT,
         RoutePath.AUDIT_LOG,
@@ -27,6 +28,7 @@ export function testMainRouteRegistryCoversEveryClientPage() {
 export function testMainIdentifiesOnlyModerationRoutes() {
     assertTrue(isModerationRoute(RoutePath.IMAGE_REVIEW));
     assertTrue(isModerationRoute(RoutePath.TAG_QUEUE));
+    assertTrue(isModerationRoute(RoutePath.DELETE_QUEUE));
     assertTrue(!isModerationRoute(RoutePath.START_PAGE));
     assertTrue(!isModerationRoute(RoutePath.TAGS_PAGE));
 }

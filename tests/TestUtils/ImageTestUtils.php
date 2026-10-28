@@ -41,6 +41,7 @@ final class ImageTestUtils
         ?string            $thumbFilename = null,
         ?string            $sampleFilename = null,
         ?string            $downloadFilename = null,
+        ?DateTime          $deletedAt = null,
     ): ImageEntity
     {
         $entity = new ImageEntity(
@@ -57,6 +58,7 @@ final class ImageTestUtils
             height: 50,
             format: 'jpeg',
             fileSize: 1234,
+            deletedAt: $deletedAt,
         );
         $imageEntityService->saveAsNew($entity);
         return $entity;
