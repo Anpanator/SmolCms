@@ -245,11 +245,13 @@ export function testHomeGridStartsAtTopNextToSidebarColumn() {
     try {
         const toolbarRect = toolbar.getBoundingClientRect();
         const searchRect = search.getBoundingClientRect();
+        const columnRect = column.getBoundingClientRect();
         const sidebarRect = sidebar.getBoundingClientRect();
         const contentRect = content.getBoundingClientRect();
         const gridRect = grid.getBoundingClientRect();
 
         assertEqual(searchRect.left, sidebarRect.left, 'search should align with the sidebar below it');
+        assertEqual(sidebarRect.width, columnRect.width, 'the sidebar should fill the sidebar column width');
         assertEqual(Math.round(sidebarRect.top - toolbarRect.bottom), 16,
             'the sidebar should sit below the search with the shared layout gap');
         assertEqual(gridRect.top, toolbarRect.top,
@@ -310,6 +312,7 @@ export function testImageToolbarAlignsWithSidebarAndImageColumns() {
         const toolbarRect = toolbar.getBoundingClientRect();
         const searchRect = search.getBoundingClientRect();
         const navigationRect = navigation.getBoundingClientRect();
+        const sidebarColumnRect = sidebarColumn.getBoundingClientRect();
         const sidebarRect = sidebar.getBoundingClientRect();
         const imageRect = image.getBoundingClientRect();
         const contentRect = content.getBoundingClientRect();
@@ -317,6 +320,7 @@ export function testImageToolbarAlignsWithSidebarAndImageColumns() {
         const previousRect = previous.getBoundingClientRect();
 
         assertEqual(searchRect.left, sidebarRect.left, 'search should align with the sidebar below it');
+        assertEqual(sidebarRect.width, sidebarColumnRect.width, 'the sidebar should fill the sidebar column width');
         assertTrue(navigationRect.left >= sidebarRect.left && navigationRect.right <= sidebarRect.right,
             'navigation should sit inside the sidebar');
         assertEqual(imageRect.top, toolbarRect.top, 'the image should start where the search bar starts');
