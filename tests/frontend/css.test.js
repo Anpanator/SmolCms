@@ -402,6 +402,23 @@ export function testFormElementsAreStyled() {
     }
 }
 
+export function testUploadPageUsesOneThirdTwoThirdsColumns() {
+    const rules = collectRules(findMainStylesheet());
+    const layoutRule = findRule(rules, '.upload-layout', 'display:grid');
+    assertTrue(layoutRule !== undefined, 'the upload form and error column should use a grid');
+    assertMatches(
+        layoutRule.text,
+        /grid-template-columns:minmax\(0(?:px)?,1fr\)minmax\(0(?:px)?,2fr\)/,
+        'the upload form should take one third and the error column two thirds',
+    );
+    assertTrue(findRule(rules, '.page.upload-page', 'max-width:') !== undefined,
+        'the upload page should be wide enough for two columns');
+    assertTrue(findRule(rules, '.upload-errors', 'display:flex') !== undefined,
+        'the upload error column should have a styled layout');
+    assertTrue(findRule(rules, '.upload-errors[hidden]', 'display:none') !== undefined,
+        'the upload error column should stay hidden until there are errors');
+}
+
 export function testSearchInputAndPaginationStylesAreAvailable() {
     const rules = collectRules(findMainStylesheet());
     const searchInputRule = findRule(rules, '.search-input', 'overflow:hidden');

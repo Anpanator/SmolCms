@@ -1730,6 +1730,37 @@ h3 {
     box-shadow: var(--shadow);
 }
 
+.page.upload-page {
+    max-width: 64rem;
+}
+
+.upload-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: var(--space-4);
+    align-items: start;
+}
+
+.upload-errors {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-width: 0;
+    padding: var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.upload-errors[hidden] {
+    display: none;
+}
+
+.upload-errors-title {
+    font-size: 1.2rem;
+}
+
 .upload-progress {
     display: flex;
     flex-direction: column;
@@ -1963,7 +1994,8 @@ h3 {
         grid-row: auto;
     }
 
-    .internal-admin-workspace {
+    .internal-admin-workspace,
+    .upload-layout {
         grid-template-columns: minmax(0, 1fr);
     }
 

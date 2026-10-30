@@ -36,7 +36,7 @@ class LoggingService
             date('d-M-Y H:i:s T'),
             strtoupper($level->value),
             $message,
-        );
+            ) . PHP_EOL;
 
         if ($mode === LoggingMode::FILE) {
             $this->emitErrorLog($formattedMessage, $mode, $this->getLogFilePath($level));

@@ -92,6 +92,26 @@ export function createUploadView({ navigate }) {
     fields.image.input.multiple = true;
 
     const message = createMessageBox();
+    const errorMessage = createMessageBox();
+    const errorPanel = el('aside', {
+        className: 'upload-errors',
+        attributes: {hidden: 'hidden', 'aria-label': 'Upload errors'},
+        children: [
+            el('h2', {className: 'upload-errors-title', children: 'Upload errors'}),
+            errorMessage,
+        ],
+    });
+
+    function showErrors(text) {
+        showMessage(errorMessage, text, 'error');
+        errorPanel.hidden = false;
+    }
+
+    function clearErrors() {
+        clearMessage(errorMessage);
+        errorPanel.hidden = true;
+    }
+
     const fileCountProgress = el('progress', {
         attributes: {id: FILE_COUNT_PROGRESS_ID, max: '1', value: '0'},
     });
@@ -163,6 +183,7 @@ export function createUploadView({ navigate }) {
         }
 
         clearMessage(message);
+        clearErrors();
         progress.hidden = true;
         const files = Array.from(fields.image.input.files ?? []);
         const errors = {
@@ -208,12 +229,13 @@ export function createUploadView({ navigate }) {
                     setFileCountProgress(fileCountProgress, fileCountStatus, completed, files.length);
                     currentFileStatus.textContent = `${file.name} failed.`;
                     currentByteStatus.textContent = `${file.name}: ${failureReason(error)}`;
-                    showMessage(message, buildFailureMessage(completed, files.length, failures), 'error');
+                    showErrors(buildFailureMessage(completed, files.length, failures));
                 }
             }
 
             const noun = imageWord(files.length);
             if (failures.length === 0) {
+                clearErrors();
                 showMessage(
                     message,
                     files.length === 1 ? 'Image uploaded successfully.' : `${files.length} images uploaded successfully.`,
@@ -227,7 +249,7 @@ export function createUploadView({ navigate }) {
                 setFileCountProgress(fileCountProgress, fileCountStatus, completed, files.length);
                 currentFileStatus.textContent =
                     `${completed} of ${files.length} ${noun} uploaded; ${failures.length} failed.`;
-                showMessage(message, buildFailureMessage(completed, files.length, failures), 'error');
+                showErrors(buildFailureMessage(completed, files.length, failures));
             }
         } finally {
             uploading = false;
@@ -240,6 +262,12 @@ export function createUploadView({ navigate }) {
 
     return el('section', {
         className: 'page upload-page',
-        children: [el('h1', {className: 'page-title', children: 'Upload images'}), form],
+        children: [
+            el('h1', {className: 'page-title', children: 'Upload images'}),
+            el('div', {
+                className: 'upload-layout',
+                children: [form, errorPanel],
+            }),
+        ],
     });
 }

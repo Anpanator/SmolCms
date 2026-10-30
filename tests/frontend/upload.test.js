@@ -20,6 +20,14 @@ function dispatchSubmit(form) {
     form.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
 }
 
+function errorPanel(view) {
+    return view.querySelector('.upload-errors');
+}
+
+function errorMessage(view) {
+    return errorPanel(view)?.querySelector('.form-message');
+}
+
 export function testUploadViewRendersAccessibleFileInputAndProgressBars() {
     const view = createUploadView({ navigate: () => {} });
     const input = view.querySelector('input[name="image[]"]');
@@ -37,6 +45,14 @@ export function testUploadViewRendersAccessibleFileInputAndProgressBars() {
     assertEqual(view.querySelector('label[for="upload-file-byte-progress"]').textContent, 'Current image transfer');
     assertEqual(view.querySelectorAll('[role="status"]').length, 2, 'progress should include accessible status text');
     assertTrue(view.querySelector('.upload-progress').hidden, 'progress should be hidden before a valid submission');
+
+    const layout = view.querySelector('.upload-layout');
+    assertTrue(layout !== null, 'upload page should use a two-column layout');
+    assertEqual(layout.children.length, 2, 'the upload layout should have two columns');
+    assertEqual(layout.children[0].tagName, 'FORM', 'the form should be in the left column');
+    assertEqual(layout.children[1], errorPanel(view), 'upload errors should be in the right column');
+    assertTrue(errorPanel(view).hidden, 'the error column should be hidden before any errors occur');
+    assertEqual(errorMessage(view).getAttribute('role'), 'alert', 'the error column should announce upload errors');
 }
 
 export async function testMissingFileShowsErrorWithoutSendingRequest() {
@@ -80,9 +96,10 @@ export async function testMoreThanTenFilesAreUploadedOnePerRequest() {
             assertEqual(request.headers.length, 0, 'multipart Content-Type must not be set manually');
         }
 
-        const message = view.querySelector('.form-message');
+        const message = view.querySelector('.form-message--success');
         assertTrue(!message.hidden, 'success message should be visible');
         assertEqual(message.textContent, '11 images uploaded successfully.');
+        assertTrue(errorPanel(view).hidden, 'the error column should stay hidden after a successful batch');
         assertEqual(view.querySelector('#upload-file-count-progress').value, 11);
         assertEqual(view.querySelector('#upload-file-count-progress').max, 11);
         assertEqual(input.files.length, 0, 'form should be reset after all uploads succeed');
@@ -210,7 +227,8 @@ export async function testForbiddenShowsPermissionMessage() {
         chooseFile(view);
         await submitForm(view.querySelector('form'));
 
-        const message = view.querySelector('.form-message');
+        const message = errorMessage(view);
+        assertTrue(!errorPanel(view).hidden, '403 should reveal the error column');
         assertTrue(!message.hidden, '403 should show a message');
         assertTrue(message.textContent.includes('permission'), '403 should map to a permission message');
         assertEqual(navigateCalls.length, 0, '403 should not navigate');
@@ -230,7 +248,8 @@ export async function testServerErrorShowsGenericMessageWithoutSuccess() {
         chooseFile(view);
         await submitForm(view.querySelector('form'));
 
-        const message = view.querySelector('.form-message');
+        const message = errorMessage(view);
+        assertTrue(!errorPanel(view).hidden, '500 should reveal the error column');
         assertTrue(!message.hidden, '500 should show a message');
         assertTrue(message.textContent.includes('went wrong'), '500 should map to a generic error');
         assertTrue(!message.className.includes('--success'), 'failed upload must not be styled as success');
@@ -253,7 +272,8 @@ export async function testPartialFailureContinuesAndListsEveryFailedFile() {
         await submitForm(view.querySelector('form'));
 
         assertEqual(xhrMock.calls.length, 3, 'upload should continue after a failed file');
-        const message = view.querySelector('.form-message');
+        const message = errorMessage(view);
+        assertTrue(!errorPanel(view).hidden, 'partial failure should reveal the error column');
         assertTrue(!message.hidden, 'partial failure should show a message');
         assertTrue(message.textContent.includes('1 of 3 images uploaded'));
         assertTrue(message.textContent.includes('dog.png'), 'the first failed file should stay listed');
@@ -282,7 +302,8 @@ export async function testDuplicateUploadShowsPersistentErrorAndContinues() {
         await submitForm(view.querySelector('form'));
 
         assertEqual(xhrMock.calls.length, 2, 'the next file should still be uploaded after a duplicate');
-        const message = view.querySelector('.form-message');
+        const message = errorMessage(view);
+        assertTrue(!errorPanel(view).hidden, 'duplicate should reveal the error column');
         assertTrue(!message.hidden, 'duplicate should show an error');
         assertTrue(message.textContent.includes('duplicate.png'), 'the duplicate file should be named');
         assertTrue(message.textContent.includes('already been uploaded'), 'the duplicate reason should be shown');
@@ -312,7 +333,8 @@ export async function testAllFailedUploadsKeepTheirReasonsInTheErrorList() {
         await submitForm(view.querySelector('form'));
 
         assertEqual(xhrMock.calls.length, 2, 'all files should be attempted');
-        const message = view.querySelector('.form-message');
+        const message = errorMessage(view);
+        assertTrue(!errorPanel(view).hidden, 'failed uploads should reveal the error column');
         assertTrue(message.textContent.includes('Could not upload 2 of 2 images'));
         assertTrue(message.textContent.includes('duplicate.png: This image has already been uploaded.'));
         assertTrue(message.textContent.includes('too-large.png: The upload is too large.'));

@@ -53,6 +53,8 @@ class LoggingServiceTest extends SimpleTestCase
             '/^\[\d{2}-[A-Za-z]{3}-\d{4} \d{2}:\d{2}:\d{2} [^\]]+\] \[ERROR\] Error message$/m',
             $errorLog,
         );
+        self::assertStringEndsWith(PHP_EOL, $infoLog);
+        self::assertStringEndsWith(PHP_EOL, $errorLog);
     }
 
     public function testLog_UsesTheSelectedPhpErrorLogMode(): void
@@ -99,5 +101,6 @@ class LoggingServiceTest extends SimpleTestCase
             '/^\[\d{2}-[A-Za-z]{3}-\d{4} \d{2}:\d{2}:\d{2} [^\]]+\] \[INFO\] SAPI mode message$/',
             $emitted['message'],
         );
+        self::assertStringEndsWith(PHP_EOL, $emitted['message']);
     }
 }
