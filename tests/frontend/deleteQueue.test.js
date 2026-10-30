@@ -210,7 +210,7 @@ export async function testDeletePermanentlyPostsForSelectedImageAndRemovesIt() {
     }
 }
 
-export async function testDeleteAllPostsBulkActionAndEmptiesTheQueue() {
+export async function testDeleteAllConfirmsBeforeBulkActionAndEmptiesTheQueue() {
     let queueRequestCount = 0;
     const {view, fetchMock, restore} = await createViewWith(500, (url) => {
         if (url === QUEUE_URL) {
@@ -227,6 +227,20 @@ export async function testDeleteAllPostsBulkActionAndEmptiesTheQueue() {
     try {
         view.querySelector('.review-actions [data-action="delete-all"]')
             .dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+
+        const dialog = document.querySelector('.modal-backdrop');
+        assertTrue(dialog !== null, 'Delete All should ask for confirmation');
+        assertTrue(
+            dialog.querySelector('.modal-message')?.textContent.includes('2 queued images')
+                && dialog.querySelector('.modal-message')?.textContent.includes('cannot be undone'),
+            'the confirmation should warn that the bulk delete is permanent',
+        );
+        assertTrue(
+            !fetchMock.calls.some((call) => call.url === DELETE_ALL_URL),
+            'the bulk delete should wait for confirmation',
+        );
+
+        dialog.querySelector('.modal-actions .button--primary').click();
         await settle();
 
         const actionCall = fetchMock.calls.find((call) => call.url === DELETE_ALL_URL);
@@ -242,6 +256,28 @@ export async function testDeleteAllPostsBulkActionAndEmptiesTheQueue() {
         assertTrue(message.classList.contains('form-message--success'));
         assertTrue(view.querySelector('.review-actions [data-action="delete-all"]').disabled,
             'Delete All should be disabled when the queue is empty');
+    } finally {
+        restore();
+    }
+}
+
+export async function testCancelingDeleteAllKeepsTheQueueUntouched() {
+    const {view, fetchMock, restore} = await createViewWith(500);
+    try {
+        view.querySelector('.review-actions [data-action="delete-all"]').click();
+        const dialog = document.querySelector('.modal-backdrop');
+        assertTrue(dialog !== null, 'Delete All should ask for confirmation');
+
+        dialog.querySelector('.modal-cancel').click();
+        await settle();
+
+        assertTrue(
+            !fetchMock.calls.some((call) => call.url === DELETE_ALL_URL),
+            'canceling should not call the bulk delete endpoint',
+        );
+        assertEqual(view.querySelectorAll('.review-item').length, 2, 'canceling should leave all queued images visible');
+        assertEqual(view.querySelector('.review-actions [data-action="delete-all"]').disabled, false,
+            'Delete All should be enabled after the dialog is canceled');
     } finally {
         restore();
     }
@@ -304,6 +340,7 @@ export async function testDeleteAllUnauthorizedNavigatesToLogin() {
     try {
         view.querySelector('.review-actions [data-action="delete-all"]')
             .dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+        document.querySelector('.modal-backdrop .modal-actions .button--primary').click();
         await settle();
 
         assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/login']));

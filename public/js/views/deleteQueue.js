@@ -10,6 +10,7 @@ import {get, postJson} from '../api.js';
 import {AccessLevel, hasAccessLevel} from '../accessLevel.js';
 import {el} from '../dom.js';
 import {createImageViewer} from '../imageViewer.js';
+import {createConfirmDialog} from '../modal.js';
 import {createModerationQueue} from '../moderationQueue.js';
 import {clearMessage, createMessageBox, messageForStatus, showMessage} from '../forms.js';
 import {RoutePath, userProfileHref} from '../routes.js';
@@ -234,10 +235,19 @@ export function createDeleteQueueView({session, navigate = () => {}} = {}) {
             return;
         }
 
-        clearMessage(status);
         deleteAllPending = true;
-        setActionButtonsDisabled(true);
         try {
+            const dialog = createConfirmDialog({
+                message: `Permanently delete ${queuedCount} queued image${queuedCount === 1 ? '' : 's'}? This cannot be undone.`,
+                confirmLabel: 'Delete all permanently',
+                cancelLabel: 'Cancel',
+            });
+            if (!(await dialog.result)) {
+                return;
+            }
+
+            clearMessage(status);
+            setActionButtonsDisabled(true);
             const result = await postJson(DELETE_ALL_URL);
             await deleteQueue.load();
             const deletedCount = Number.isSafeInteger(result?.deletedCount)
