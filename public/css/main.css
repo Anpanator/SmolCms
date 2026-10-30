@@ -65,7 +65,7 @@ body {
     flex-direction: column;
     background: var(--color-bg);
     color: var(--color-text);
-    font-family: var(--font-sans);
+    font-family: var(--font-sans), sans-serif;
     font-size: 1rem;
     line-height: 1.5;
 }
@@ -95,7 +95,7 @@ a:focus-visible {
 h1,
 h2,
 h3 {
-    font-family: var(--font-serif);
+    font-family: var(--font-serif), serif;
     font-weight: 600;
     line-height: 1.25;
 }
@@ -929,13 +929,18 @@ h3 {
     display: block;
     max-width: 100%;
     max-height: calc(100vh - var(--site-header-height) - 2 * var(--space-4));
-    max-height: calc(100dvh - var(--site-header-height) - 2 * var(--space-4));
     width: auto;
     height: auto;
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
+}
+
+@supports (height: 100dvh) {
+    .image-view-image {
+        max-height: calc(100dvh - var(--site-header-height) - 2 * var(--space-4));
+    }
 }
 
 .image-processing {
@@ -1182,15 +1187,20 @@ h3 {
     min-width: 0;
     min-height: 0;
     height: 100vh;
-    height: 100dvh;
     max-height: 100vh;
-    max-height: 100dvh;
     padding: var(--space-3);
     place-items: center;
     overflow: hidden;
     background: #20201d;
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
+}
+
+@supports (height: 100dvh) {
+    .review-image-panel {
+        height: 100dvh;
+        max-height: 100dvh;
+    }
 }
 
 .review-image-frame {
@@ -1479,7 +1489,7 @@ h3 {
 .tag-queue-current-name {
     margin-bottom: var(--space-1);
     overflow-wrap: anywhere;
-    font-family: var(--font-serif);
+    font-family: var(--font-serif), serif;
     font-size: 1.2rem;
     font-weight: 700;
 }
@@ -1963,11 +1973,16 @@ h3 {
 
     .review-image-panel {
         height: 50vh;
-        height: 50dvh;
         min-height: min(16rem, 100vh);
-        min-height: min(16rem, 100dvh);
         max-height: 100vh;
-        max-height: 100dvh;
+    }
+
+    @supports (height: 100dvh) {
+        .review-image-panel {
+            height: 50dvh;
+            min-height: min(16rem, 100dvh);
+            max-height: 100dvh;
+        }
     }
 
     .review-sidebar {

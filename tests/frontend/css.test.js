@@ -16,14 +16,21 @@ function findMainStylesheet() {
 
 function collectRules(sheet) {
     const rules = [];
-    for (const rule of sheet.cssRules) {
-        if (rule instanceof CSSStyleRule) {
-            rules.push({
-                selector: rule.selectorText.replace(/\s+/g, ' '),
-                text: rule.cssText.replace(/\s+/g, '').toLowerCase(),
-            });
+
+    function collectFrom(cssRules) {
+        for (const rule of cssRules) {
+            if (rule instanceof CSSStyleRule) {
+                rules.push({
+                    selector: rule.selectorText.replace(/\s+/g, ' '),
+                    text: rule.cssText.replace(/\s+/g, '').toLowerCase(),
+                });
+            } else if (rule.cssRules !== undefined) {
+                collectFrom(rule.cssRules);
+            }
         }
     }
+
+    collectFrom(sheet.cssRules);
     return rules;
 }
 
@@ -102,8 +109,12 @@ export function testImageTileAndReviewStylesExist() {
         'the full-size review image should use its natural dimensions',
     );
     assertTrue(
+        findRule(rules, '.review-image-panel', 'max-height:100vh') !== undefined,
+        'the review image area should have a viewport-height fallback',
+    );
+    assertTrue(
         findRule(rules, '.review-image-panel', 'max-height:100dvh') !== undefined,
-        'the review image area should not exceed the viewport height',
+        'the review image area should not exceed the dynamic viewport height',
     );
     assertTrue(
         findRule(rules, '.review-image-frame', 'overflow:auto') !== undefined,
@@ -460,8 +471,12 @@ export function testImageNavigationAndModActionStylesExist() {
     assertTrue(findRule(rules, '.image-nav', 'margin-bottom:var(--space-4)') !== undefined, 'navigation should be separated from the sidebar content below it');
     assertTrue(findRule(rules, '.image-nav .button', 'width:100%') !== undefined, 'previous/next controls should fill their equal columns');
     assertTrue(
+        findRule(rules, '.image-view-image', 'max-height:calc(100vh-var(--site-header-height)-2*var(--space-4))') !== undefined,
+        'the image should have a viewport-height fallback below the header and layout padding',
+    );
+    assertTrue(
         findRule(rules, '.image-view-image', 'max-height:calc(100dvh-var(--site-header-height)-2*var(--space-4))') !== undefined,
-        'the image should use all viewport height remaining below the header and layout padding',
+        'the image should use the dynamic viewport height remaining below the header and layout padding',
     );
     assertTrue(findRule(rules, '.image-view', 'justify-content:flex-start') !== undefined, 'the image should be aligned to the left');
     assertTrue(findRule(rules, '.image-layout > .image-content', 'grid-area:1/2') !== undefined,
