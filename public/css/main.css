@@ -707,6 +707,7 @@ h3 {
 
 .quick-tags-sidebar {
     min-width: 0;
+    --quick-tags-tile-height: 1.9rem;
 }
 
 .quick-tags-sidebar[hidden] {
@@ -720,7 +721,6 @@ h3 {
     min-width: 0;
 }
 
-.quick-tags-column,
 .quick-tags-group {
     display: flex;
     flex-direction: column;
@@ -728,9 +728,26 @@ h3 {
     min-width: 0;
 }
 
+.quick-tags-group--global {
+    grid-column: 1 / -1;
+}
+
+.quick-tags-group--global .quick-tags-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.quick-tags-group--global .quick-tags-empty {
+    grid-column: 1 / -1;
+}
+
 .quick-tags-group-title {
+    height: var(--quick-tags-tile-height);
+    overflow: hidden;
     font-size: 0.95rem;
-    overflow-wrap: anywhere;
+    line-height: var(--quick-tags-tile-height);
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .quick-tags-list {
@@ -753,6 +770,7 @@ h3 {
 .quick-tag-button {
     display: block;
     width: 100%;
+    height: var(--quick-tags-tile-height);
     min-width: 0;
     padding: var(--space-1) var(--space-2);
     overflow: hidden;

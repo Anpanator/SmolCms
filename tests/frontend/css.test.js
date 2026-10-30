@@ -4,6 +4,7 @@
  * ../../public/css/main.css.
  */
 import {assertEqual, assertMatches, assertTrue} from './assert.js';
+import {createQuickTagsView} from '../../public/js/quickTags.js';
 
 function findMainStylesheet() {
     for (const sheet of document.styleSheets) {
@@ -438,6 +439,15 @@ export function testGalleryWidthAndQuickTagsLayoutStylesExist() {
     assertTrue(quickLayout?.text.includes('var(--sidebar-width)'));
     assertTrue(quickLayout?.text.includes('var(--quick-tags-sidebar-width)'));
     assertTrue(findRule(rules, '.quick-tags-columns', 'grid-template-columns') !== undefined);
+    assertTrue(
+        findRule(rules, '.quick-tags-group--global', 'grid-column:1/-1') !== undefined,
+        'the most-used group should span both quick-tag columns',
+    );
+    const globalListRule = findRule(rules, '.quick-tags-group--global .quick-tags-list', 'display:grid');
+    assertTrue(
+        globalListRule?.text.includes('repeat(2') && globalListRule.text.includes('1fr'),
+        'most-used tags should use two columns',
+    );
     const buttonRule = findRule(rules, '.quick-tag-button', 'text-overflow:ellipsis');
     assertTrue(buttonRule?.text.includes('overflow:hidden'), 'quick-tag names should not overflow their buttons');
     assertTrue(findRule(rules, '.quick-tag-button--active', 'background:var(--color-accent)') !== undefined);
@@ -450,6 +460,76 @@ export function testGalleryWidthAndQuickTagsLayoutStylesExist() {
         findRule(rules, '.button[aria-disabled="true"]', 'cursor:wait') !== undefined,
         'aria-disabled buttons such as the quick-tags toggle should look disabled',
     );
+}
+
+export function testQuickTagGroupTitlesMatchQuickTagTileHeights(fixture) {
+    const quickTags = createQuickTagsView();
+    quickTags.element.hidden = false;
+    const buttons = [...quickTags.element.querySelectorAll('.quick-tags-list')].map((list, index) => {
+        const item = document.createElement('li');
+        item.className = 'quick-tag-item';
+        const button = document.createElement('button');
+        button.className = 'quick-tag-button';
+        button.textContent = `tag-${index}`;
+        item.append(button);
+        list.replaceChildren(item);
+        return button;
+    });
+    fixture.append(quickTags.element);
+
+    try {
+        const buttonHeight = buttons[0].getBoundingClientRect().height;
+        assertTrue(buttonHeight > 0, 'quick-tag buttons should have a measurable height');
+        for (const heading of quickTags.element.querySelectorAll('.quick-tags-group-title')) {
+            assertEqual(
+                heading.getBoundingClientRect().height,
+                buttonHeight,
+                `${heading.textContent} should match the quick-tag tile height`,
+            );
+        }
+        for (const button of buttons) {
+            assertEqual(button.getBoundingClientRect().height, buttonHeight,
+                'quick-tag buttons should share the same tile height');
+        }
+    } finally {
+        quickTags.element.remove();
+    }
+}
+
+export function testQuickTagGroupsUseTheRequestedTwoColumnLayout(fixture) {
+    const quickTags = createQuickTagsView();
+    quickTags.element.hidden = false;
+    const globalList = quickTags.element.querySelector('.quick-tags-group--global .quick-tags-list');
+    globalList.replaceChildren(...['global-1', 'global-2', 'global-3'].map((name) => {
+        const item = document.createElement('li');
+        item.className = 'quick-tag-item';
+        const button = document.createElement('button');
+        button.className = 'quick-tag-button';
+        button.textContent = name;
+        item.append(button);
+        return item;
+    }));
+    fixture.append(quickTags.element);
+
+    try {
+        const columns = quickTags.element.querySelector('.quick-tags-columns');
+        const recent = quickTags.element.querySelector('.quick-tags-group--user-recent').getBoundingClientRect();
+        const mostUsedByUser = quickTags.element.querySelector('.quick-tags-group--user-most-used').getBoundingClientRect();
+        const mostUsed = quickTags.element.querySelector('.quick-tags-group--global').getBoundingClientRect();
+        const columnsRect = columns.getBoundingClientRect();
+        const [first, second, third] = [...globalList.querySelectorAll('.quick-tag-button')]
+            .map((button) => button.getBoundingClientRect());
+
+        assertEqual(recent.top, mostUsedByUser.top, 'personal tag groups should share the top row');
+        assertTrue(recent.left < mostUsedByUser.left, 'Your recent should be to the left of Your most used');
+        assertEqual(mostUsed.left, columnsRect.left, 'Most used should start at the left edge of both columns');
+        assertEqual(mostUsed.right, columnsRect.right, 'Most used should span both columns');
+        assertEqual(first.top, second.top, 'the first two Most used tags should share a row');
+        assertTrue(first.left < second.left, 'Most used tags should sit in two columns');
+        assertTrue(third.top > first.top, 'the third Most used tag should start a new row');
+    } finally {
+        quickTags.element.remove();
+    }
 }
 
 export function testImageTagEditingAndTagmeControlsHaveStyles() {

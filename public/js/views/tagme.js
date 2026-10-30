@@ -37,7 +37,14 @@ export function createTagmeView({session, navigate = () => {}, query: _query} = 
         onTagRemoved: (tagName) => tagList.removeTag(tagName),
     });
     const view = el('div', {className: 'layout tagme-layout'});
-    const quickTagsToggle = createQuickTagsToggle({session, quickTags, layout: view, status, navigate});
+    const quickTagsToggle = createQuickTagsToggle({
+        session,
+        quickTags,
+        layout: view,
+        status,
+        navigate,
+        defaultEnabled: true,
+    });
     const sidebar = el('aside', {
         className: 'sidebar',
         children: [

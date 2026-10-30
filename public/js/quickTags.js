@@ -29,10 +29,10 @@ export function createQuickTagsView({
     onTagRemoved = () => {},
 } = {}) {
     const id = `quick-tags-${nextQuickTagsId++}`;
-    const globalGroup = createTagGroup(id, 'global', 'Most used');
-    const userMostUsedGroup = createTagGroup(id, 'user-most-used', 'Your most used');
     const userRecentGroup = createTagGroup(id, 'user-recent', 'Your recent');
-    const groups = [globalGroup, userMostUsedGroup, userRecentGroup];
+    const userMostUsedGroup = createTagGroup(id, 'user-most-used', 'Your most used');
+    const globalGroup = createTagGroup(id, 'global', 'Most used');
+    const groups = [userRecentGroup, userMostUsedGroup, globalGroup];
     const element = el('aside', {
         className: 'sidebar quick-tags-sidebar',
         attributes: {id},
@@ -40,13 +40,7 @@ export function createQuickTagsView({
             el('h2', {className: 'sidebar-title', children: 'Quick tags'}),
             el('div', {
                 className: 'quick-tags-columns',
-                children: [
-                    el('div', {className: 'quick-tags-column quick-tags-column--global', children: globalGroup.element}),
-                    el('div', {
-                        className: 'quick-tags-column quick-tags-column--user',
-                        children: [userMostUsedGroup.element, userRecentGroup.element],
-                    }),
-                ],
+                children: [userRecentGroup.element, userMostUsedGroup.element, globalGroup.element],
             }),
         ],
     });
@@ -271,16 +265,24 @@ export function createQuickTagsView({
  *   layout: HTMLElement,
  *   status?: HTMLParagraphElement,
  *   navigate?: (path: string) => void,
+ *   defaultEnabled?: boolean,
  * }} options
  */
-export function createQuickTagsToggle({session, quickTags, layout, status = createMessageBox(), navigate = () => {}}) {
+export function createQuickTagsToggle({
+    session,
+    quickTags,
+    layout,
+    status = createMessageBox(),
+    navigate = () => {},
+    defaultEnabled = false,
+}) {
     if (!session?.getUser?.()) {
         quickTags.element.hidden = true;
         layout.classList.remove('layout--with-quick-tags');
         return null;
     }
 
-    let enabled = session.getQuickTagsEnabled?.() === true;
+    let enabled = defaultEnabled === true || session.getQuickTagsEnabled?.() === true;
     let pending = false;
     quickTags.element.hidden = !enabled;
     layout.classList.toggle('layout--with-quick-tags', enabled);

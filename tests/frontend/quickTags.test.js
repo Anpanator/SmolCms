@@ -38,8 +38,12 @@ export async function testQuickTagsLoadsTheThreeBoundedGroups(fixture) {
         assertTrue(quickTags.element.matches('.quick-tags-sidebar'));
         assertEqual(
             [...quickTags.element.querySelectorAll('.quick-tags-group-title')].map((heading) => heading.textContent).join('|'),
-            'Most used|Your most used|Your recent',
+            'Your recent|Your most used|Most used',
         );
+        const groups = [...quickTags.element.querySelector('.quick-tags-columns').children];
+        assertTrue(groups[0].classList.contains('quick-tags-group--user-recent'));
+        assertTrue(groups[1].classList.contains('quick-tags-group--user-most-used'));
+        assertTrue(groups[2].classList.contains('quick-tags-group--global'));
         assertEqual(quickTags.element.querySelectorAll('.quick-tags-group--global .quick-tag-button').length, 20);
         assertEqual(quickTags.element.querySelectorAll('.quick-tags-group--user-most-used .quick-tag-button').length, 10);
         assertEqual(quickTags.element.querySelectorAll('.quick-tags-group--user-recent .quick-tag-button').length, 10);

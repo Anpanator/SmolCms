@@ -29,7 +29,12 @@ async function createView(handler, session = {getUser: () => testUser()}) {
 }
 
 export async function testTagmeRendersOneRandomImageAndSharedTagControls() {
-    const {view, fetchMock, restore} = await createView(() => ({status: 200, body: {image: IMAGE}}));
+    const {view, fetchMock, restore} = await createView((url) => url === '/api/tagme/random'
+        ? {status: 200, body: {image: IMAGE}}
+        : {status: 200, body: {global: [], userMostUsed: [], userRecent: []}}, {
+        getUser: () => testUser(),
+        getQuickTagsEnabled: () => false,
+    });
     try {
         assertTrue(view.matches('.layout.tagme-layout'));
         assertEqual(view.querySelector('.tagme-toolbar .content-title')?.textContent, 'Tagme queue');
@@ -38,11 +43,14 @@ export async function testTagmeRendersOneRandomImageAndSharedTagControls() {
         assertEqual(view.querySelectorAll('.tags-item').length, 2);
         assertTrue(view.querySelector('.tag-add-input') !== null, 'tagme should use the shared tag editor');
         assertTrue(view.querySelector('.tag-remove-button[data-tag-name="tagme"]') !== null);
-        assertTrue(view.querySelector('.quick-tags-sidebar').hidden, 'quick tags should start hidden');
-        assertEqual(view.querySelector('.quick-tags-toggle')?.textContent, 'Show quick tags');
-        assertEqual(fetchMock.calls.length, 1);
-        assertEqual(fetchMock.calls[0].url, '/api/tagme/random');
-        assertEqual(fetchMock.calls[0].options.method, 'GET');
+        assertFalse(view.querySelector('.quick-tags-sidebar').hidden, 'quick tags should start visible in the tagme queue');
+        assertEqual(view.querySelector('.quick-tags-toggle')?.textContent, 'Hide quick tags');
+        assertEqual(fetchMock.calls.filter((call) => call.url === '/api/tagme/random').length, 1);
+        assertEqual(fetchMock.calls.filter((call) => call.url === '/api/tags/quick').length, 1);
+        assertEqual(fetchMock.calls.filter((call) => call.url === '/api/session/quick-tags').length, 0,
+            'showing quick tags by default should not change the session preference');
+        const imageRequest = fetchMock.calls.find((call) => call.url === '/api/tagme/random');
+        assertEqual(imageRequest.options.method, 'GET');
     } finally {
         restore();
     }
@@ -82,11 +90,9 @@ export async function testTagmeQuickTagButtonsFollowEachNewImageWithoutReloading
         return {status: 200, body: null};
     }, session);
     try {
-        const toggle = view.querySelector('.quick-tags-toggle');
-        toggle.click();
-        await settle();
         const quickTags = view.querySelector('.quick-tags-sidebar');
         assertFalse(quickTags.hidden);
+        assertEqual(view.querySelector('.quick-tags-toggle')?.textContent, 'Hide quick tags');
         assertEqual(quickTags.querySelector('.quick-tag-button[data-tag-name="nature"]')?.getAttribute('aria-pressed'), 'true');
         assertEqual(quickTags.querySelector('.quick-tag-button[data-tag-name="sky"]')?.getAttribute('aria-pressed'), 'false');
 
@@ -105,7 +111,10 @@ export async function testTagmeQuickTagButtonsFollowEachNewImageWithoutReloading
 
 export async function testTagmeNextButtonRefetchesAndRendersTheNewImage() {
     let requestNumber = 0;
-    const {view, fetchMock, restore} = await createView(() => {
+    const {view, fetchMock, restore} = await createView((url) => {
+        if (url === '/api/tags/quick') {
+            return {status: 200, body: {global: [], userMostUsed: [], userRecent: []}};
+        }
         requestNumber++;
         const image = {...IMAGE, id: requestNumber, sampleSrc: `/sample-${requestNumber}.webp`, uploader: `User ${requestNumber}`};
         return {status: 200, body: {image}};
