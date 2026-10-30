@@ -26,6 +26,7 @@ class ImageEntityServiceTest extends FunctionalTestCase
         int $userId = 1,
         ?string $thumbFilename = null,
         ?DateTime $deletedAt = null,
+        string $originalExtension = 'png',
     ): ImageEntity
     {
         return new ImageEntity(
@@ -34,7 +35,7 @@ class ImageEntityServiceTest extends FunctionalTestCase
             uploadDate: $uploadDate ?? new DateTime(),
             status: $status,
             checksum: $checksum ?? hash('sha256', uniqid('image-entity-test', true)),
-            originalExtension: 'png',
+            originalExtension: $originalExtension,
             thumbFilename: $thumbFilename,
             sampleFilename: null,
             downloadFilename: null,
@@ -133,6 +134,25 @@ class ImageEntityServiceTest extends FunctionalTestCase
             static fn(ImageEntity $entity) => $entity->getId(),
             $result
         ));
+    }
+
+    public function testFindByOriginalChecksumReturnsAllRowsForChecksumAndExtension(): void
+    {
+        $checksum = hash('sha256', 'shared-original');
+        $first = $this->makeEntity(checksum: $checksum);
+        $second = $this->makeEntity(checksum: $checksum);
+        $otherExtension = $this->makeEntity(checksum: $checksum, originalExtension: 'jpeg');
+        foreach ([$first, $second, $otherExtension] as $entity) {
+            $this->imageEntityService->saveAsNew($entity);
+        }
+
+        $matching = $this->imageEntityService->findByOriginalChecksum($checksum, 'png');
+
+        self::assertEqualsCanonicalizing(
+            [$first->getId(), $second->getId()],
+            array_map(static fn(ImageEntity $entity) => $entity->getId(), $matching),
+        );
+        self::assertSame([], $this->imageEntityService->findByOriginalChecksum($checksum, 'avif'));
     }
 
     public function testVisibleImagePageAndCountMatchViewerStatusFilterAndPagination(): void

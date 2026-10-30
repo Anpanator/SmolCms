@@ -3,13 +3,12 @@ declare(strict_types=1);
 
 namespace SmolCms\Test\Service\Image;
 
-use PHPUnit\Framework\MockObject\MockObject;
 use RuntimeException;
 use SmolCms\Data\Image\ImageType;
+use SmolCms\Exception\FileAccessException;
 use SmolCms\Service\File\FileSystemAccessService;
 use SmolCms\Service\Image\ImageStorageService;
 use SmolCms\Service\Image\StoredImage;
-use SmolCms\TestUtils\Attributes\Stub;
 use SmolCms\TestUtils\SimpleTestCase;
 
 class ImageStorageServiceTest extends SimpleTestCase
@@ -17,9 +16,7 @@ class ImageStorageServiceTest extends SimpleTestCase
     private const string TEST_STORAGE_DIR = '/private/test-img-storage';
 
     private ImageStorageService $testee;
-    #[Stub(FileSystemAccessService::class)]
-    private FileSystemAccessService|MockObject $fileSystemAccessService;
-    private bool $storageAllowed = true;
+    private FileSystemAccessService $fileSystemAccessService;
 
     protected function setUp(): void
     {
@@ -29,13 +26,7 @@ class ImageStorageServiceTest extends SimpleTestCase
             && !is_dir(ROOT_DIR . self::TEST_STORAGE_DIR)) {
             throw new RuntimeException('Could not create image storage directory for tests.');
         }
-        $this->storageAllowed = true;
-        $this->fileSystemAccessService
-            ->method('isPathAllowed')
-            ->willReturnCallback(
-                fn(string $path) => $this->storageAllowed
-                    && str_starts_with($path, ROOT_DIR . self::TEST_STORAGE_DIR)
-            );
+        $this->fileSystemAccessService = new FileSystemAccessService(ROOT_DIR . self::TEST_STORAGE_DIR);
         $this->testee = new ImageStorageService(ROOT_DIR . self::TEST_STORAGE_DIR, $this->fileSystemAccessService);
     }
 
@@ -100,6 +91,25 @@ class ImageStorageServiceTest extends SimpleTestCase
         self::assertSame(ImageType::PNG, $stored->getType());
     }
 
+    public function testStoreOriginal_writesChecksumNamedFileDirectlyInStorageRoot(): void
+    {
+        $image = imagecreatetruecolor(20, 10);
+        ob_start();
+        $success = imagepng($image);
+        $content = ob_get_clean();
+        self::assertTrue($success);
+        self::assertIsString($content);
+
+        $stored = $this->testee->storeOriginal($content, ImageType::PNG, $image);
+
+        self::assertSame($stored->getFilename(), $stored->getRelativePath());
+        self::assertFileExists(ROOT_DIR . self::TEST_STORAGE_DIR . '/' . $stored->getFilename());
+        self::assertDirectoryDoesNotExist(
+            ROOT_DIR . self::TEST_STORAGE_DIR . '/' . substr($stored->getChecksum(), 0, 2)
+        );
+        self::assertSame($content, file_get_contents(ROOT_DIR . self::TEST_STORAGE_DIR . '/' . $stored->getFilename()));
+    }
+
     public function testStoreImage_writesJpegContent(): void
     {
         $image = imagecreatetruecolor(100, 100);
@@ -140,13 +150,19 @@ class ImageStorageServiceTest extends SimpleTestCase
 
     public function testStoreImage_disallowedDirectory_throwsException(): void
     {
-        $this->storageAllowed = false;
+        $allowedDirectory = ROOT_DIR . self::TEST_STORAGE_DIR . '/allowed';
+        $disallowedDirectory = ROOT_DIR . self::TEST_STORAGE_DIR . '/disallowed';
+        if (!mkdir($allowedDirectory) || !mkdir($disallowedDirectory)) {
+            self::fail('Could not create directories for the whitelist test.');
+        }
+        $restrictedFileSystemAccessService = new FileSystemAccessService($allowedDirectory);
+        $restrictedTestee = new ImageStorageService($disallowedDirectory, $restrictedFileSystemAccessService);
         $image = imagecreatetruecolor(10, 10);
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessageIsOrContains('Image storage is not allowed in path. Check config!');
+        $this->expectException(FileAccessException::class);
+        $this->expectExceptionMessage('is not allowed');
 
-        $this->testee->storeImage($image, ImageType::PNG);
+        $restrictedTestee->storeImage($image, ImageType::PNG);
     }
 
     public function testStoreBytes_refusesToWriteThroughSymlink(): void
@@ -162,7 +178,7 @@ class ImageStorageServiceTest extends SimpleTestCase
 
         try {
             $this->expectException(RuntimeException::class);
-            $this->expectExceptionMessageIsOrContains('Refusing to write through symlink at path:');
+            $this->expectExceptionMessageIsOrContains('Refusing to write through symlink at path');
             $this->testee->storeBytes('replacement content', $relativePath);
         } finally {
             self::assertSame('original target content', file_get_contents($targetPath));

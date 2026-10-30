@@ -8,13 +8,12 @@ use InvalidArgumentException;
 /**
  * Single source of truth for the on-disk image file naming contract:
  *
- * Every stored image file is named `<sha-256 hex checksum>.<extension>` and lives
- * under a two-character subdirectory (the first two characters of the checksum)
- * of its configured base directory, i.e. `<base>/<c[0]><c[1]>/<checksum>.<extension>`.
+ * Every stored image file is named `<sha-256 hex checksum>.<extension>`. Original
+ * uploads are flat in their base directory; generated variants are sharded under
+ * a two-character subdirectory, `<base>/<c[0]><c[1]>/<checksum>.<extension>`.
  *
- * The same layout applies to every image variant directory (original uploads,
- * thumbs, samples, downloads) so that all image files can be located without a
- * database lookup.
+ * The checksum-based naming lets the worker locate database rows directly from
+ * files in the flat original-upload directory.
  */
 final class ImagePathLayout
 {
@@ -42,6 +41,12 @@ final class ImagePathLayout
     {
         $subdir = substr($checksum, 0, self::SUBDIR_PREFIX_LENGTH);
         return $subdir . '/' . self::fileName($checksum, $extension);
+    }
+
+    /** Original uploads are stored flat; generated variants remain sharded. */
+    public static function originalRelativePath(string $checksum, string $extension): string
+    {
+        return self::fileName($checksum, $extension);
     }
 
     /**

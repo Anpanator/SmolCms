@@ -34,18 +34,28 @@ readonly class ImageStorageService
      */
     public function storeOriginal(string $content, ImageType $imageType, GdImage $image): StoredImage
     {
-        return $this->storeContent($content, $imageType, imagesx($image), imagesy($image));
+        return $this->storeContent($content, $imageType, imagesx($image), imagesy($image), true);
     }
 
-    private function storeContent(string $content, ImageType $imageType, int $width, int $height): StoredImage
+    private function storeContent(
+        string $content,
+        ImageType $imageType,
+        int $width,
+        int $height,
+        bool $flat = false,
+    ): StoredImage
     {
         $checksum = hash('sha256', $content);
         $extension = $imageType->getFileExtension();
-        $this->storeBytes($content, ImagePathLayout::relativePath($checksum, $extension));
+        $relativePath = $flat
+            ? ImagePathLayout::originalRelativePath($checksum, $extension)
+            : ImagePathLayout::relativePath($checksum, $extension);
+        $this->storeBytes($content, $relativePath);
 
         return new StoredImage(
             checksum: $checksum,
             filename: ImagePathLayout::fileName($checksum, $extension),
+            relativePath: $relativePath,
             width: $width,
             height: $height,
             fileSize: strlen($content),
@@ -62,22 +72,8 @@ readonly class ImageStorageService
     {
         $fullPath = $this->storagePath . '/' . $relativePath;
         $subdirectory = dirname($fullPath);
-        if (!is_dir($subdirectory) && !mkdir($subdirectory, 0777, true) && !is_dir($subdirectory)) {
-            throw new RuntimeException("Could not create image storage directory: $subdirectory");
-        }
-        $resolvedSubdirectory = realpath($subdirectory);
-        if ($resolvedSubdirectory === false) {
-            throw new RuntimeException("Could not resolve directory for image storage path: $fullPath");
-        }
-        $this->fileSystemAccessService->isPathAllowed($resolvedSubdirectory) ?:
-            throw new RuntimeException('Image storage is not allowed in path. Check config!');
-
-        if (is_link($fullPath)) {
-            throw new RuntimeException("Refusing to write through symlink at path: $fullPath");
-        }
-        if (file_put_contents($fullPath, $content) === false) {
-            throw new RuntimeException("Failed to write image to path: $fullPath");
-        }
+        $this->fileSystemAccessService->ensureDirectory($subdirectory);
+        $this->fileSystemAccessService->writeFile($fullPath, $content);
         return $fullPath;
     }
 

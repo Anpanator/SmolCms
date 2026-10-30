@@ -97,9 +97,8 @@ class ImageUploadServiceTest extends FunctionalTestCase
         self::assertSame($expectedWidth, $entity->getWidth());
         self::assertSame($expectedHeight, $entity->getHeight());
 
-        // Stored original: <IMAGE_STORAGE_DIR>/<first 2 checksum chars>/<checksum>.png
-        $relativePath = substr($entity->getChecksum(), 0, 2) . '/' . $entity->getChecksum() . '.png';
-        $filePath = IMAGE_STORAGE_DIR . '/' . $relativePath;
+        // Stored originals are flat: <IMAGE_STORAGE_DIR>/<checksum>.png
+        $filePath = IMAGE_STORAGE_DIR . '/' . $entity->getChecksum() . '.png';
         self::assertFileExists($filePath);
         $storedContent = file_get_contents($filePath);
         self::assertSame($imageData, $storedContent);

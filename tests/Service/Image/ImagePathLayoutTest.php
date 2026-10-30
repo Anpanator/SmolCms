@@ -25,6 +25,14 @@ class ImagePathLayoutTest extends SimpleTestCase
         );
     }
 
+    public function testOriginalRelativePathIsFlat(): void
+    {
+        self::assertSame(
+            self::CHECKSUM . '.jpeg',
+            ImagePathLayout::originalRelativePath(self::CHECKSUM, 'jpeg'),
+        );
+    }
+
     public function testFileName_shortChecksum_throwsException(): void
     {
         $this->expectException(InvalidArgumentException::class);

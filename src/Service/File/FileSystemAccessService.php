@@ -70,6 +70,62 @@ readonly class FileSystemAccessService
         }
     }
 
+    /**
+     * Ensures a directory exists directly beneath an existing allowed directory.
+     * A symbolic link at the requested path is rejected.
+     */
+    public function ensureDirectory(string $path): void
+    {
+        $directoryName = basename($path);
+        if ($directoryName === '' || $directoryName === '.' || $directoryName === '..') {
+            throw new FileAccessException("Invalid directory path '$path'.");
+        }
+
+        if (is_link($path)) {
+            throw new FileAccessException("Refusing to follow symlink at directory path '$path'.");
+        }
+
+        $existingPath = realpath($path);
+        if ($existingPath !== false) {
+            $this->isPathAllowed($existingPath) ?: $this->throwNotAllowed($path);
+            if (!is_dir($existingPath)) {
+                throw new FileAccessException("Path '$path' is not a directory.");
+            }
+            return;
+        }
+
+        $resolvedParent = realpath(dirname($path));
+        if ($resolvedParent === false) {
+            $this->ensureDirectory(dirname($path));
+            $resolvedParent = realpath(dirname($path));
+        }
+        if ($resolvedParent === false || !is_dir($resolvedParent)) {
+            throw new FileAccessException("Could not resolve parent directory for path '$path'.");
+        }
+        $this->isPathAllowed($resolvedParent) ?: $this->throwNotAllowed($path);
+        $resolvedPath = $resolvedParent . DIRECTORY_SEPARATOR . $directoryName;
+
+        if (!mkdir($resolvedPath, 0777)) {
+            // Another request may have created it after the initial check.
+            if (is_link($resolvedPath)) {
+                throw new FileAccessException("Refusing to follow symlink at directory path '$path'.");
+            }
+            $existingPath = realpath($resolvedPath);
+            if ($existingPath === false || !is_dir($existingPath)) {
+                throw new FileAccessException("Could not create directory at path '$path'.");
+            }
+        }
+
+        $resolvedPath = realpath($resolvedPath);
+        if ($resolvedPath === false) {
+            throw new FileAccessException("Could not resolve directory path '$path'.");
+        }
+        $this->isPathAllowed($resolvedPath) ?: $this->throwNotAllowed($path);
+        if (!is_dir($resolvedPath)) {
+            throw new FileAccessException("Path '$path' is not a directory.");
+        }
+    }
+
     public function deleteFile(string $path): void
     {
         $resolvedPath = realpath($path);
@@ -84,7 +140,7 @@ readonly class FileSystemAccessService
 
     /**
      * @param string $path
-     * @return array The files (excluding symlinks pointing to not allowed paths)
+     * @return array The regular files in the directory; symbolic links are excluded.
      */
     public function listFiles(string $path): array
     {
@@ -102,7 +158,11 @@ readonly class FileSystemAccessService
         }
         $resultFiles = [];
         foreach ($files as $file) {
-            $normalizedFile = realpath("$resolvedPath/$file");
+            $filePath = "$resolvedPath/$file";
+            if (is_link($filePath)) {
+                continue;
+            }
+            $normalizedFile = realpath($filePath);
 
             if ($normalizedFile === false) {
                 continue;

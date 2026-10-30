@@ -63,6 +63,8 @@ CREATE TABLE image
 );
 
 CREATE INDEX IF NOT EXISTS idx_image_deleted_at ON image (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_image_original_checksum_extension
+    ON image (checksum, original_extension);
 
 CREATE TABLE tag_category
 (

@@ -9,7 +9,6 @@ use GdImage;
 use InvalidArgumentException;
 use RuntimeException;
 use SmolCms\Data\Constant\AccessLevel;
-use SmolCms\Data\Constant\ImageFileVariant;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Constant\LogLevel;
 use SmolCms\Data\Image\ImageType;
@@ -21,19 +20,14 @@ use SmolCms\Service\File\FileSystemAccessService;
 use Throwable;
 
 /**
- * Batch processor for uploaded images in PENDING state. For every image it decodes the
- * original and generates three variants — thumbnail (AVIF), sample/viewing
- * image (WebP) and download image (original format, or lossless WebP for PNG sources) —
- * each encoded from GD-decoded pixels rather than copied from the source bytes, so
- * source metadata or trailing payloads cannot reach the served variants.
- * then updates the entity with the variant filenames, the download image's metadata and
- * the next lifecycle status. Variant files are content-addressed and the entity update
- * is repeatable, so an interrupted image can safely be processed again while its original
- * is present. Original-file deletion is deferred until after processing and retried for
- * completed rows on subsequent worker runs.
+ * Batch processor for originals in the flat upload directory. Each original's
+ * checksum and extension locate its image rows. Partial rows are regenerated from
+ * scratch; if every matching row is complete, the leftover original is warned about
+ * and deleted without re-encoding it. Variant files are content-addressed, so a
+ * retry overwrites the same paths safely.
  *
- * A failure on a single image is logged and that row is left PENDING (retried on the
- * next run); the rest of the batch is still processed.
+ * A failure on one original is logged and left in the upload directory for retry;
+ * the rest of the batch is still processed.
  */
 class ImageProcessingService
 {
@@ -55,9 +49,9 @@ class ImageProcessingService
     }
 
     /**
-     * Processes up to $batchSize pending images (oldest uploads first).
+     * Processes up to $batchSize incomplete image records (oldest uploads first).
      *
-     * @return int The number of successfully processed images.
+     * @return int The number of image records successfully processed.
      */
     public function processBatch(int $batchSize): int
     {
@@ -65,30 +59,223 @@ class ImageProcessingService
             throw new InvalidArgumentException('Batch size must be a positive integer.');
         }
 
+        $candidates = $this->findOriginalCandidates();
+        usort($candidates, static function (array $left, array $right): int {
+            if ($left['uploadDate'] === null || $right['uploadDate'] === null) {
+                if ($left['uploadDate'] === $right['uploadDate']) {
+                    return strcmp($left['fileName'], $right['fileName']);
+                }
+                return $left['uploadDate'] === null ? 1 : -1;
+            }
+            $dateOrder = $left['uploadDate'] <=> $right['uploadDate'];
+            return $dateOrder !== 0 ? $dateOrder : strcmp($left['fileName'], $right['fileName']);
+        });
+
         $processed = 0;
-        $entities = $this->imageEntityService->findByStatus(ImageStatus::PENDING, $batchSize);
-        foreach ($entities as $entity) {
+        foreach ($candidates as $candidate) {
             try {
-                $this->processImage($entity);
+                $processed += $this->processOriginal($candidate, max(0, $batchSize - $processed));
+            } catch (Throwable $t) {
+                $this->loggingService->log(
+                    LogLevel::ERROR,
+                    "Failed to process original {$candidate['fileName']}: {$t->getMessage()}"
+                );
+            }
+        }
+        return $processed;
+    }
+
+    /**
+     * @return list<array{
+     *     fileName: string,
+     *     checksum: string,
+     *     extension: string,
+     *     entities: list<ImageEntity>,
+     *     uploadDate: \DateTime|null
+     * }>
+     */
+    private function findOriginalCandidates(): array
+    {
+        $candidates = [];
+        foreach ($this->fileSystemAccessService->listFiles($this->originalStoragePath) as $fileName) {
+            $parsed = $this->parseOriginalFileName($fileName);
+            if ($parsed === null) {
+                continue;
+            }
+
+            $entities = $this->imageEntityService->findByOriginalChecksum(
+                $parsed['checksum'],
+                $parsed['extension'],
+            );
+            if ($entities === []) {
+                $candidates[] = [
+                    'fileName' => $fileName,
+                    'checksum' => $parsed['checksum'],
+                    'extension' => $parsed['extension'],
+                    'entities' => [],
+                    'uploadDate' => null,
+                ];
+                continue;
+            }
+
+            usort($entities, static function (ImageEntity $left, ImageEntity $right): int {
+                $dateOrder = $left->getUploadDate() <=> $right->getUploadDate();
+                return $dateOrder !== 0 ? $dateOrder : ($left->getId() <=> $right->getId());
+            });
+
+            $uploadDate = $entities[0]->getUploadDate();
+            foreach ($entities as $entity) {
+                if ($entity->getUploadDate() < $uploadDate) {
+                    $uploadDate = $entity->getUploadDate();
+                }
+            }
+
+            $candidates[] = [
+                'fileName' => $fileName,
+                'checksum' => $parsed['checksum'],
+                'extension' => $parsed['extension'],
+                'entities' => $entities,
+                'uploadDate' => $uploadDate,
+            ];
+        }
+
+        return $candidates;
+    }
+
+    /**
+     * @return array{checksum: string, extension: string}|null
+     */
+    private function parseOriginalFileName(string $fileName): ?array
+    {
+        if (preg_match('/\A([0-9a-f]{64})\.([a-z]+)\z/', $fileName, $matches) !== 1) {
+            return null;
+        }
+        if (ImageType::tryFrom($matches[2]) === null) {
+            return null;
+        }
+        return ['checksum' => $matches[1], 'extension' => $matches[2]];
+    }
+
+    /**
+     * @param array{
+     *     fileName: string,
+     *     checksum: string,
+     *     extension: string,
+     *     entities: list<ImageEntity>,
+     *     uploadDate: \DateTime|null
+     * } $candidate
+     */
+    private function processOriginal(array $candidate, int $remainingBatchSize): int
+    {
+        if ($candidate['entities'] === []) {
+            $this->loggingService->log(
+                LogLevel::WARNING,
+                "Original {$candidate['fileName']} has no matching database image; deleting the orphaned original."
+            );
+            $this->deleteOriginalFile($candidate['fileName']);
+            return 0;
+        }
+
+        $partialEntities = array_values(array_filter(
+            $candidate['entities'],
+            fn(ImageEntity $entity): bool => !$this->isFullyProcessed($entity),
+        ));
+
+        if ($partialEntities === []) {
+            $this->loggingService->log(
+                LogLevel::WARNING,
+                "Original {$candidate['fileName']} is already fully processed; skipping processing and deleting it."
+            );
+            $this->deleteOriginalFile($candidate['fileName']);
+            return 0;
+        }
+
+        $entitiesToProcess = array_values(array_filter(
+            $partialEntities,
+            static fn(ImageEntity $entity): bool => !$entity->isDeleted(),
+        ));
+        if ($entitiesToProcess === []) {
+            // Keep originals for queued, unprocessed records in case they are restored.
+            return 0;
+        }
+        if ($remainingBatchSize === 0) {
+            return 0;
+        }
+        $entitiesToProcess = array_slice($entitiesToProcess, 0, $remainingBatchSize);
+
+        $originalPath = $this->originalStoragePath . '/' . $candidate['fileName'];
+        $originalContent = $this->fileSystemAccessService->readFile($originalPath);
+        if (hash('sha256', $originalContent) !== $candidate['checksum']) {
+            throw new RuntimeException("Original {$candidate['fileName']} does not match its checksum.");
+        }
+
+        $variants = $this->createVariants($originalContent, $entitiesToProcess[0]);
+        $processed = 0;
+        $saveFailed = false;
+        foreach ($entitiesToProcess as $entity) {
+            try {
+                $entity->setThumbFilename($variants['thumbFilename']);
+                $entity->setSampleFilename($variants['sampleFilename']);
+                $entity->setDownloadFilename($variants['downloadFilename']);
+                $entity->setWidth($variants['width']);
+                $entity->setHeight($variants['height']);
+                $entity->setFormat($variants['format']);
+                $entity->setFileSize($variants['fileSize']);
+                if ($entity->getStatus() === ImageStatus::PENDING) {
+                    $entity->setStatus($this->resolvePostProcessingStatus($entity));
+                }
+                $this->imageEntityService->saveOrUpdate($entity);
                 $processed++;
             } catch (Throwable $t) {
-                // Error policy: one broken image must never abort the run. The row stays
-                // PENDING so it is retried on the next batch.
+                $saveFailed = true;
                 $this->loggingService->log(
                     LogLevel::ERROR,
                     "Failed to process image {$entity->getId()}: {$t->getMessage()}"
                 );
             }
         }
-        // Deleting originals is the final phase. If the worker stops before it, the
-        // completed rows still identify which originals need cleanup on the next run.
-        $this->deleteOriginalsAfterProcessing();
+        if ($saveFailed) {
+            return $processed;
+        }
+
+        foreach ($candidate['entities'] as $entity) {
+            if (!$this->isFullyProcessed($entity)) {
+                return $processed;
+            }
+        }
+
+        $this->deleteOriginalFile($candidate['fileName']);
         return $processed;
     }
 
-    private function processImage(ImageEntity $entity): void
+    private function isFullyProcessed(ImageEntity $entity): bool
     {
-        $originalContent = $this->readOriginal($entity);
+        return $entity->getStatus() !== ImageStatus::PENDING
+            && $entity->getThumbFilename() !== null
+            && $entity->getSampleFilename() !== null
+            && $entity->getDownloadFilename() !== null
+            && $entity->getWidth() !== null
+            && $entity->getHeight() !== null
+            && $entity->getFormat() !== null
+            && $entity->getFileSize() !== null;
+    }
+
+    /**
+     * Rebuilds and stores every variant from source pixels. Existing content-addressed
+     * files are overwritten, which makes recovery from a partial row deterministic.
+     *
+     * @return array{
+     *     thumbFilename: string,
+     *     sampleFilename: string,
+     *     downloadFilename: string,
+     *     width: int,
+     *     height: int,
+     *     format: string,
+     *     fileSize: int
+     * }
+     */
+    private function createVariants(string $originalContent, ImageEntity $entity): array
+    {
         $image = $this->decodeOriginal($originalContent, $entity);
         $originalType = ImageType::from($entity->getOriginalExtension());
 
@@ -106,16 +293,18 @@ class ImageProcessingService
         $downloadChecksum = hash('sha256', $downloadContent);
         $downloadExtension = $downloadType->getFileExtension();
 
-        $entity->setThumbFilename($this->storeVariant($this->thumbStorage, $thumbContent, ImageType::AVIF));
-        $entity->setSampleFilename($this->storeVariant($this->sampleStorage, $sampleContent, ImageType::WEBP));
+        $thumbFilename = $this->storeVariant($this->thumbStorage, $thumbContent, ImageType::AVIF);
+        $sampleFilename = $this->storeVariant($this->sampleStorage, $sampleContent, ImageType::WEBP);
         $this->downloadStorage->storeBytes($downloadContent, ImagePathLayout::relativePath($downloadChecksum, $downloadExtension));
-        $entity->setDownloadFilename(ImagePathLayout::fileName($downloadChecksum, $downloadExtension));
-        $entity->setWidth(imagesx($downloadImage));
-        $entity->setHeight(imagesy($downloadImage));
-        $entity->setFormat($downloadExtension);
-        $entity->setFileSize(strlen($downloadContent));
-        $entity->setStatus($this->resolvePostProcessingStatus($entity));
-        $this->imageEntityService->saveOrUpdate($entity);
+        return [
+            'thumbFilename' => $thumbFilename,
+            'sampleFilename' => $sampleFilename,
+            'downloadFilename' => ImagePathLayout::fileName($downloadChecksum, $downloadExtension),
+            'width' => imagesx($downloadImage),
+            'height' => imagesy($downloadImage),
+            'format' => $downloadExtension,
+            'fileSize' => strlen($downloadContent),
+        ];
     }
 
     private function decodeOriginal(string $content, ImageEntity $entity): GdImage
@@ -143,30 +332,10 @@ class ImageProcessingService
         return $image;
     }
 
-    private function deleteOriginalsAfterProcessing(): void
+    private function deleteOriginalFile(string $fileName): void
     {
-        $seenOriginals = [];
-        foreach ($this->imageEntityService->findProcessedImages() as $entity) {
-            $originalKey = $entity->getChecksum() . "\0" . $entity->getOriginalExtension();
-            if (isset($seenOriginals[$originalKey])) {
-                continue;
-            }
-            $seenOriginals[$originalKey] = true;
-            $this->deleteOriginalAfterProcessing($entity);
-        }
-    }
-
-    private function deleteOriginalAfterProcessing(ImageEntity $entity): void
-    {
+        $originalPath = $this->originalStoragePath . '/' . $fileName;
         try {
-            if ($this->imageEntityService->hasOtherImageReference($entity, ImageFileVariant::ORIGINAL)) {
-                return;
-            }
-
-            $originalPath = $this->originalStoragePath . '/' . ImagePathLayout::relativePath(
-                    $entity->getChecksum(),
-                    $entity->getOriginalExtension()
-                );
             if (!$this->fileSystemAccessService->fileExists($originalPath)) {
                 return;
             }
@@ -174,7 +343,7 @@ class ImageProcessingService
         } catch (Throwable $e) {
             $this->loggingService->log(
                 LogLevel::WARNING,
-                "Could not delete processed original for image {$entity->getId()}: {$e->getMessage()}"
+                "Could not delete original {$fileName}: {$e->getMessage()}"
             );
         }
     }
@@ -210,12 +379,6 @@ class ImageProcessingService
         return $uploader->getAccessLevel()->value >= AccessLevel::WIZARD->value
             ? ImageStatus::ACCEPTED
             : ImageStatus::PENDING_REVIEW;
-    }
-
-    private function readOriginal(ImageEntity $entity): string
-    {
-        $relativePath = ImagePathLayout::relativePath($entity->getChecksum(), $entity->getOriginalExtension());
-        return $this->fileSystemAccessService->readFile($this->originalStoragePath . '/' . $relativePath);
     }
 
     /**

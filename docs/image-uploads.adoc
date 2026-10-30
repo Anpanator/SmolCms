@@ -9,8 +9,9 @@ The Docker PHP/Nginx configuration allows up to 100 MB per file and request;
 manual hosts must set compatible PHP and web-server limits.
 
 Upload validation decodes the image to confirm it is readable and capture its
-dimensions, but stores the original bytes unchanged. Stored files are
-content-addressed by SHA-256. A new image starts pending and is tagged `tagme`;
+dimensions, but stores the original bytes unchanged. Original files are stored
+flat as `<sha-256>.<extension>`; generated variants remain content-addressed in
+sharded directories. A new image starts pending and is tagged `tagme`;
 each successful upload is recorded as an `IMAGE_UPLOADED` audit action. Uploads
 can also authenticate with an API key for browser code (including cross-origin
 clients using the endpoint's CORS preflight) and server-to-server clients; see
@@ -18,17 +19,20 @@ clients using the endpoint's CORS preflight) and server-to-server clients; see
 
 === Processing and delivery
 
-The asynchronous worker re-decodes each original and creates three re-encoded
-variants: a public AVIF thumbnail, a private WebP viewing sample, and a private
-download. Downloads remain in the source format except PNG, which becomes
-pixel-lossless WebP. The worker moves the image to the accepted collection or
-moderation queue according to the uploader's role, then removes the original
-when no other image record references it.
+The asynchronous worker scans the flat original-upload directory, then looks up
+each file's checksum in the image records. Partial records are fully regenerated,
+overwriting their content-addressed variants. If every matching record is already
+complete, the worker warns and deletes the redundant original without reprocessing
+it. Originals with no matching database record are also warned about and deleted.
+Processing creates a public AVIF thumbnail, a private WebP viewing sample, and a
+private download. Downloads remain in the source format except PNG, which becomes
+pixel-lossless WebP. The worker moves pending images to the accepted collection
+or moderation queue according to the uploader's role.
 
 Run `php src/app.php --process-images 100` to process a batch; Docker runs the
 same command every second in the background. If another worker holds the lock
-file, this worker exits immediately without processing images. Failed images
-remain pending for retry. The original is never served to users. Thumbnails are
+file, this worker exits immediately without processing images. Failed originals
+remain on disk for retry. The original is never served to users. Thumbnails are
 static public files. Accepted-image details and viewing samples are accessible
 anonymously; viewing and download files are delivered through internal Nginx
 locations with `X-Accel-Redirect`. Downloads require authentication.

@@ -15,6 +15,7 @@ use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\AuditLogService;
 use SmolCms\Service\DB\ImageEntityService;
 use SmolCms\Service\Tag\TagService;
+use Throwable;
 
 /**
  * Orchestrates a single synchronous image upload: validate the image, store the
@@ -42,26 +43,32 @@ readonly class ImageUploadService
         }
 
         $image = $this->imageProcessorFacade->sanitizeImage($imageData, $imageType);
-        $stored = $this->imageStorageService->storeOriginal($imageData, $imageType, $image);
+        $checksum = hash('sha256', $imageData);
 
         $entity = new ImageEntity(
             id: null,
             userId: $userData->id,
             uploadDate: new DateTime(),
             status: ImageStatus::PENDING,
-            checksum: $stored->getChecksum(),
+            checksum: $checksum,
             originalExtension: $imageType->getFileExtension(),
             thumbFilename: null,
             sampleFilename: null,
             downloadFilename: null,
-            width: $stored->getWidth(),
-            height: $stored->getHeight(),
+            width: imagesx($image),
+            height: imagesy($image),
             format: $imageType->getFileExtension(),
-            fileSize: $stored->getFileSize(),
+            fileSize: strlen($imageData),
         );
         $this->imageEntityService->saveAsNew($entity);
         if ($entity->getId() === null) {
             throw new InvalidStateException('The uploaded image was saved without an ID.');
+        }
+        try {
+            $this->imageStorageService->storeOriginal($imageData, $imageType, $image);
+        } catch (Throwable $exception) {
+            $this->imageEntityService->deleteById($entity->getId());
+            throw $exception;
         }
         $this->tagService->attachTagToImage($entity->getId(), 'tagme');
         $context = 'image_id=' . $entity->getId();

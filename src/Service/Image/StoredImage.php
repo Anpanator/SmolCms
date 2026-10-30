@@ -14,6 +14,7 @@ readonly class StoredImage
     public function __construct(
         private string    $checksum,
         private string    $filename,
+        private string    $relativePath,
         private int       $width,
         private int       $height,
         private int       $fileSize,
@@ -36,7 +37,7 @@ readonly class StoredImage
     /** Path of the stored file relative to the storage base directory. */
     public function getRelativePath(): string
     {
-        return ImagePathLayout::relativePath($this->checksum, $this->type->getFileExtension());
+        return $this->relativePath;
     }
 
     public function getWidth(): int

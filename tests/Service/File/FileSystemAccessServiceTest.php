@@ -169,6 +169,16 @@ class FileSystemAccessServiceTest extends SimpleTestCase
         self::assertSame(['real.txt', 'test.txt'], $result);
     }
 
+    public function testListFiles_skipsSymlinksToAllowedFiles(): void
+    {
+        $targetPath = ROOT_DIR . self::TEST_DIR . '/target.txt';
+        $symlinkPath = ROOT_DIR . self::TEST_DIR . '/linked.txt';
+        file_put_contents($targetPath, 'target');
+        symlink($targetPath, $symlinkPath);
+
+        self::assertSame(['target.txt', 'test.txt'], $this->testee->listFiles(ROOT_DIR . self::TEST_DIR));
+    }
+
     public function testFileExists_throwsWhenResolvedPathNotAllowed(): void
     {
         $symlinkPath = ROOT_DIR . self::TEST_DIR . '/escape.link';
@@ -263,6 +273,43 @@ class FileSystemAccessServiceTest extends SimpleTestCase
         $this->testee->writeFile($file, 'updated');
 
         self::assertStringEqualsFile($file, 'updated');
+    }
+
+    public function testEnsureDirectory_createsDirectoryUnderAllowedPath(): void
+    {
+        $directory = ROOT_DIR . self::TEST_DIR . '/created/nested';
+
+        $this->testee->ensureDirectory($directory);
+
+        self::assertDirectoryExists($directory);
+    }
+
+    public function testEnsureDirectory_isIdempotentForExistingDirectory(): void
+    {
+        $this->testee->ensureDirectory(ROOT_DIR . self::EMPTY_DIR);
+
+        self::assertDirectoryExists(ROOT_DIR . self::EMPTY_DIR);
+    }
+
+    public function testEnsureDirectory_rejectsDisallowedParent(): void
+    {
+        $this->expectException(FileAccessException::class);
+
+        $this->testee->ensureDirectory('/etc/smolcms-test-dir');
+    }
+
+    public function testEnsureDirectory_rejectsSymlinks(): void
+    {
+        $symlinkPath = ROOT_DIR . self::TEST_DIR . '/linked-dir';
+        self::assertTrue(symlink(ROOT_DIR . self::EMPTY_DIR, $symlinkPath));
+
+        try {
+            $this->expectException(FileAccessException::class);
+            $this->expectExceptionMessage('Refusing to follow symlink');
+            $this->testee->ensureDirectory($symlinkPath);
+        } finally {
+            self::assertTrue(unlink($symlinkPath));
+        }
     }
 
     public function testIsPathAllowed_rejectsSiblingWithSharedPrefix(): void

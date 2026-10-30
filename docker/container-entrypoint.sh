@@ -31,7 +31,7 @@ do
     fi
 done
 
-# Background worker: process pending image uploads every second (up to 100 per run).
+# Background worker: reconcile flat original uploads every second (up to 100 image rows per run).
 # The CLI command holds the processing lock, so overlapping runs exit immediately.
 (
     while true; do

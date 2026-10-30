@@ -249,7 +249,7 @@ class ImageReviewServiceTest extends FunctionalTestCase
             status: ImageStatus::PENDING_REVIEW,
             checksum: $checksum,
         );
-        $originalPath = IMAGE_STORAGE_DIR . '/' . ImagePathLayout::relativePath($checksum, 'jpeg');
+        $originalPath = IMAGE_STORAGE_DIR . '/' . ImagePathLayout::originalRelativePath($checksum, 'jpeg');
         $targetPath = ROOT_DIR . '/private/review-file-target-' . bin2hex(random_bytes(4)) . '.txt';
         $logBefore = file_get_contents(ERROR_LOG_FILE_PATH);
         self::assertIsString($logBefore);

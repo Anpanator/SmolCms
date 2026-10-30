@@ -45,6 +45,24 @@ readonly class ImageEntityService extends EntityService
     }
 
     /**
+     * Finds all image records that refer to the same content-addressed original.
+     *
+     * @return list<ImageEntity>
+     */
+    public function findByOriginalChecksum(string $checksum, string $extension): array
+    {
+        $qc = new QueryCriteria();
+        $qc->select(ImageEntity::class)
+            ->andWhere('checksum = :checksum')
+            ->andWhere('original_extension = :original_extension')
+            ->withParameters([
+                'checksum' => $checksum,
+                'original_extension' => $extension,
+            ]);
+        return $this->execute($qc) ?? [];
+    }
+
+    /**
      * @param ImageStatus $status
      * @param int|null $limit
      * @param bool $includeDeleted Whether images queued for deletion are included

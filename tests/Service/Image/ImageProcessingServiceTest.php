@@ -131,7 +131,8 @@ class ImageProcessingServiceTest extends FunctionalTestCase
         int $userId,
         DateTime $uploadDate = new DateTime(),
     ): ImageEntity {
-        $stored = $this->originalStorage->storeImage($image, $type);
+        $content = self::encodeImage($image, $type);
+        $stored = $this->originalStorage->storeOriginal($content, $type, $image);
         $entity = new ImageEntity(
             id: null,
             userId: $userId,
@@ -152,7 +153,7 @@ class ImageProcessingServiceTest extends FunctionalTestCase
     ): ImageEntity
     {
         $checksum = hash('sha256', $content);
-        $this->originalStorage->storeBytes($content, ImagePathLayout::relativePath($checksum, $type->getFileExtension()));
+        $this->originalStorage->storeBytes($content, ImagePathLayout::originalRelativePath($checksum, $type->getFileExtension()));
         $entity = new ImageEntity(
             id: null,
             userId: $userId,
@@ -183,10 +184,8 @@ class ImageProcessingServiceTest extends FunctionalTestCase
 
     private function originalPath(ImageEntity $entity): string
     {
-        return self::variantPath(
-            $this->originalStorage->getStoragePath(),
-            ImagePathLayout::fileName($entity->getChecksum(), $entity->getOriginalExtension())
-        );
+        return $this->originalStorage->getStoragePath() . '/'
+            . ImagePathLayout::originalRelativePath($entity->getChecksum(), $entity->getOriginalExtension());
     }
 
     private static function assertChecksumFilename(string $baseDir, string $filename): string
@@ -346,7 +345,7 @@ class ImageProcessingServiceTest extends FunctionalTestCase
         self::assertSame(self::encodeImage($decodedOriginal, ImageType::AVIF, 75), $downloadContent);
     }
 
-    public function testProcessBatch_duplicatePendingImagesKeepsSharedOriginalAfterBothAreProcessed(): void
+    public function testProcessBatch_duplicatePendingImagesDeletesSharedOriginalAfterBothAreProcessed(): void
     {
         $wizard = $this->createUser(AccessLevel::WIZARD);
         $image = self::createTestImage(24, 16);
@@ -358,9 +357,30 @@ class ImageProcessingServiceTest extends FunctionalTestCase
 
         self::assertSame(2, $this->testee->processBatch(10));
 
-        self::assertFileExists($this->originalPath($first));
+        self::assertFileDoesNotExist($this->originalPath($first));
         self::assertSame(ImageStatus::ACCEPTED, $this->imageEntityService->findOneById($first->getId())->getStatus());
         self::assertSame(ImageStatus::ACCEPTED, $this->imageEntityService->findOneById($second->getId())->getStatus());
+    }
+
+    public function testProcessBatch_orphanedOriginalLogsWarningAndDeletesIt(): void
+    {
+        $content = self::encodeImage(self::createTestImage(24, 16), ImageType::PNG);
+        $checksum = hash('sha256', $content);
+        $fileName = ImagePathLayout::fileName($checksum, ImageType::PNG->getFileExtension());
+        $originalPath = $this->originalStorage->getStoragePath() . '/' . $fileName;
+        $this->originalStorage->storeBytes($content, $fileName);
+        $logBefore = file_get_contents(ERROR_LOG_FILE_PATH);
+        self::assertIsString($logBefore);
+
+        self::assertSame(0, $this->testee->processBatch(10));
+
+        self::assertFileDoesNotExist($originalPath);
+        $logAfter = file_get_contents(ERROR_LOG_FILE_PATH);
+        self::assertIsString($logAfter);
+        $newLogEntries = substr($logAfter, strlen($logBefore));
+        self::assertStringContainsString('[WARNING]', $newLogEntries);
+        self::assertStringContainsString('no matching database image', $newLogEntries);
+        self::assertStringContainsString($fileName, $newLogEntries);
     }
 
     public function testProcessBatch_reprocessingIsIdempotentAndRetriesCompletedOriginalCleanup(): void
@@ -380,13 +400,13 @@ class ImageProcessingServiceTest extends FunctionalTestCase
             $firstResult->getDownloadFilename(),
         ];
 
-        // Simulate a retry after variant files were written but before the entity update.
+        // Simulate an interrupted, partial database state after variants were written.
         $this->originalStorage->storeBytes(
             $originalContent,
-            ImagePathLayout::relativePath($entity->getChecksum(), $entity->getOriginalExtension())
+            ImagePathLayout::originalRelativePath($entity->getChecksum(), $entity->getOriginalExtension())
         );
-        $entity->setStatus(ImageStatus::PENDING);
-        $this->imageEntityService->saveOrUpdate($entity);
+        $firstResult->setStatus(ImageStatus::PENDING);
+        $this->imageEntityService->saveOrUpdate($firstResult);
 
         self::assertSame(1, $this->testee->processBatch(10));
         $secondResult = $this->imageEntityService->findOneById($entity->getId());
@@ -401,12 +421,19 @@ class ImageProcessingServiceTest extends FunctionalTestCase
         // Simulate an interruption after the entity update but before original deletion.
         $this->originalStorage->storeBytes(
             $originalContent,
-            ImagePathLayout::relativePath($entity->getChecksum(), $entity->getOriginalExtension())
+            ImagePathLayout::originalRelativePath($entity->getChecksum(), $entity->getOriginalExtension())
         );
         self::assertFileExists($originalPath);
 
+        $logBefore = file_get_contents(ERROR_LOG_FILE_PATH);
+        self::assertIsString($logBefore);
         self::assertSame(0, $this->testee->processBatch(10));
         self::assertFileDoesNotExist($originalPath);
+        $logAfter = file_get_contents(ERROR_LOG_FILE_PATH);
+        self::assertIsString($logAfter);
+        $newLogEntries = substr($logAfter, strlen($logBefore));
+        self::assertStringContainsString('[WARNING]', $newLogEntries);
+        self::assertStringContainsString('already fully processed', $newLogEntries);
     }
 
     public function testProcessBatch_corruptOriginal_staysPendingAndBatchContinues(): void
@@ -414,7 +441,7 @@ class ImageProcessingServiceTest extends FunctionalTestCase
         $wizard = $this->createUser(AccessLevel::WIZARD);
         $corruptContent = 'this is not decodable image data';
         $corruptChecksum = hash('sha256', $corruptContent);
-        $this->originalStorage->storeBytes($corruptContent, ImagePathLayout::relativePath($corruptChecksum, 'png'));
+        $this->originalStorage->storeBytes($corruptContent, ImagePathLayout::originalRelativePath($corruptChecksum, 'png'));
         $corruptEntity = new ImageEntity(
             id: null,
             userId: $wizard->getId(),

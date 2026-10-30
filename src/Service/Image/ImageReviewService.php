@@ -200,7 +200,7 @@ readonly class ImageReviewService
     {
         $files = [
             [
-                'path' => IMAGE_STORAGE_DIR . '/' . ImagePathLayout::relativePath(
+                'path' => IMAGE_STORAGE_DIR . '/' . ImagePathLayout::originalRelativePath(
                     $entity->getChecksum(),
                     $entity->getOriginalExtension()
                 ),
@@ -225,10 +225,10 @@ readonly class ImageReviewService
             if ($this->imageEntityService->hasOtherImageReference($entity, $variant)) {
                 continue;
             }
-            if (!is_file($path)) {
-                continue;
-            }
             try {
+                if (!$this->fileSystemAccessService->fileExists($path)) {
+                    continue;
+                }
                 $this->fileSystemAccessService->deleteFile($path);
             } catch (FileAccessException) {
                 $this->loggingService->log(

@@ -70,12 +70,14 @@ final class ImageTestUtils
     }
 
     /**
-     * Absolute on-disk path of an image file with the given stored file name
-     * below the given base directory (two-character subdirectory layout).
+     * Absolute path of an image file with the given stored file name. Originals
+     * are flat in IMAGE_STORAGE_DIR; generated variants use the sharded layout.
      */
     public static function imageFilePath(string $baseDir, string $fileName): string
     {
-        return $baseDir . '/' . ImagePathLayout::relativePathForFileName($fileName);
+        $shardedPath = ImagePathLayout::relativePathForFileName($fileName);
+        $relativePath = $baseDir === IMAGE_STORAGE_DIR ? $fileName : $shardedPath;
+        return $baseDir . '/' . $relativePath;
     }
 
     /**

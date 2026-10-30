@@ -535,7 +535,7 @@ class ImageUploadControllerTest extends FunctionalTestCase
         $body = json_decode((string)$response->getContent(), true);
         $this->assertSame(['message' => 'Image uploaded successfully.'], $body);
 
-        // The stored original is named <sha-256 checksum>.jpeg and lives in a two-char subdirectory.
+        // The stored original is named <sha-256 checksum>.jpeg directly in upload storage.
         $pendingEntities = $this->imageEntityService->findByStatus(ImageStatus::PENDING);
         $uploadedEntities = array_values(array_filter(
             $pendingEntities,
@@ -545,7 +545,7 @@ class ImageUploadControllerTest extends FunctionalTestCase
         $entity = $uploadedEntities[0];
         $checksum = $entity->getChecksum();
         $filename = $checksum . '.' . $entity->getOriginalExtension();
-        $filePath = IMAGE_STORAGE_DIR . '/' . substr($checksum, 0, 2) . '/' . $filename;
+        $filePath = IMAGE_STORAGE_DIR . '/' . $filename;
         $this->assertFileExists($filePath);
         $this->assertSame($checksum, hash('sha256', (string)file_get_contents($filePath)));
         // The client-supplied name is no longer used
