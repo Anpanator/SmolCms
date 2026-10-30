@@ -14,6 +14,7 @@ import {createConfirmDialog} from '../modal.js';
 import {createModerationQueue} from '../moderationQueue.js';
 import {clearMessage, createMessageBox, messageForStatus, showMessage} from '../forms.js';
 import {RoutePath, userProfileHref} from '../routes.js';
+import {registerViewHotkeys} from '../hotkeys.js';
 
 const QUEUE_URL = RoutePath.API_DELETE_QUEUE;
 const IMAGE_DETAIL_URL = RoutePath.API_IMAGE_DETAIL;
@@ -284,10 +285,19 @@ export function createDeleteQueueView({session, navigate = () => {}} = {}) {
     deleteAllButton.addEventListener('click', () => {
         void deleteAllQueued();
     });
-    page.addEventListener('keydown', (event) => {
+    const handleKeyboard = (event) => {
         if (!deleteAllPending) {
             deleteQueue.handleKeyboard(event);
         }
+    };
+    registerViewHotkeys(page, {
+        ArrowLeft: handleKeyboard,
+        ArrowUp: handleKeyboard,
+        ArrowRight: handleKeyboard,
+        ArrowDown: handleKeyboard,
+        Enter: handleKeyboard,
+        Delete: handleKeyboard,
+        Backspace: handleKeyboard,
     });
     deleteQueue.load();
     return page;

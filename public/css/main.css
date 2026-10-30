@@ -220,6 +220,10 @@ h3 {
     padding: var(--space-4);
 }
 
+.layout:focus {
+    outline: none;
+}
+
 .layout--with-quick-tags {
     grid-template-columns: var(--sidebar-width) minmax(0, 1fr) minmax(14rem, var(--quick-tags-sidebar-width));
 }

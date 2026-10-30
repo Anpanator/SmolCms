@@ -6,6 +6,7 @@ import {createHeaderNav} from './nav.js';
 import {createRouter} from './router.js';
 import {createSession} from './session.js';
 import {el} from './dom.js';
+import {createHotkeyHandler} from './hotkeys.js';
 import {RoutePath} from './routes.js';
 import {createHomeView} from './views/home.js';
 import {createImageView} from './views/image.js';
@@ -76,6 +77,7 @@ async function bootstrap() {
     if (!appRoot) {
         return;
     }
+    appRoot.tabIndex = -1;
 
     const session = createSession();
     await session.load();
@@ -106,6 +108,7 @@ async function bootstrap() {
 
     const header = el('header', { className: 'site-header', children: headerNav.element });
     appRoot.append(header, viewContainer);
+    createHotkeyHandler(appRoot, () => viewContainer.firstElementChild);
     syncHeaderHeight(header);
     router.start();
 }

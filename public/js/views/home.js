@@ -9,6 +9,7 @@ import {createPagination} from '../pagination.js';
 import {createSearchView, normalizeTags} from '../search.js';
 import {messageForStatus} from '../forms.js';
 import {createTagLinkList, normalizeActiveTags} from '../tagLinks.js';
+import {registerViewHotkeys} from '../hotkeys.js';
 
 const IMAGES_URL = '/api/images';
 const DEFAULT_PER_PAGE = 20;
@@ -102,7 +103,10 @@ export function createHomeView({navigate = () => {}, query = new URLSearchParams
         attributes: {tabindex: '-1', 'aria-label': 'Home page'},
         children: [sidebarColumn, content],
     });
-    view.addEventListener('keydown', handleKeyboard);
+    registerViewHotkeys(view, {
+        ArrowLeft: handleKeyboard,
+        ArrowRight: handleKeyboard,
+    });
     queueMicrotask(() => {
         if (view.isConnected) {
             view.focus({preventScroll: true});

@@ -11,6 +11,7 @@ import {createImageViewer} from '../imageViewer.js';
 import {createModerationQueue} from '../moderationQueue.js';
 import {clearMessage, createMessageBox, messageForStatus, showMessage} from '../forms.js';
 import {userProfileHref} from '../routes.js';
+import {registerViewHotkeys} from '../hotkeys.js';
 
 const QUEUE_URL = '/api/review/queue';
 const IMAGE_DETAIL_URL = '/api/image/detail';
@@ -217,7 +218,15 @@ export function createReviewView({ session, navigate }) {
 
     approveButton.addEventListener('click', () => moderationQueue.act('approve'));
     rejectButton.addEventListener('click', () => moderationQueue.act('reject'));
-    page.addEventListener('keydown', moderationQueue.handleKeyboard);
+    registerViewHotkeys(page, {
+        ArrowLeft: moderationQueue.handleKeyboard,
+        ArrowUp: moderationQueue.handleKeyboard,
+        ArrowRight: moderationQueue.handleKeyboard,
+        ArrowDown: moderationQueue.handleKeyboard,
+        Enter: moderationQueue.handleKeyboard,
+        Delete: moderationQueue.handleKeyboard,
+        Backspace: moderationQueue.handleKeyboard,
+    });
     moderationQueue.load();
     return page;
 }

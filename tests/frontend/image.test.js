@@ -1,5 +1,5 @@
 import {assertEqual, assertFalse, assertTrue, settle} from './assert.js';
-import {mockFetch, testUser, useFetch} from './mocks.js';
+import {attachHotkeyHandler, mockFetch, testUser, useFetch} from './mocks.js';
 import {createImageView, formatFileSize} from '../../public/js/views/image.js';
 
 const DETAIL = {
@@ -22,7 +22,7 @@ function detailResponse(overrides = {}) {
 
 async function createView(handler, query = 'id=7', session = {getUser: () => null}) {
     const fetchMock = mockFetch(handler);
-    const restore = useFetch(fetchMock);
+    const restoreFetch = useFetch(fetchMock);
     const navigateCalls = [];
     const navigateOptions = [];
     const view = createImageView({
@@ -33,8 +33,19 @@ async function createView(handler, query = 'id=7', session = {getUser: () => nul
         },
         query: new URLSearchParams(query),
     });
+    const hotkeyHandler = attachHotkeyHandler(view);
     await settle();
-    return { view, fetchMock, navigateCalls, navigateOptions, restore };
+    return {
+        view,
+        hotkeyContainer: hotkeyHandler.container,
+        fetchMock,
+        navigateCalls,
+        navigateOptions,
+        restore() {
+            hotkeyHandler.destroy();
+            restoreFetch();
+        },
+    };
 }
 
 function pressKey(target, key, options = {}) {
@@ -200,7 +211,7 @@ export async function testImageViewHotkeysKeepWorkingAfterQuickTagsAreShown(fixt
         getQuickTagsEnabled: () => quickTagsEnabled,
         setQuickTagsEnabled: (enabled) => { quickTagsEnabled = enabled; },
     };
-    const {view, fetchMock, navigateCalls, restore} = await createView((url, options) => {
+    const {view, hotkeyContainer, fetchMock, navigateCalls, restore} = await createView((url, options) => {
         if (url === '/api/image/detail?id=7') {
             return detailResponse();
         }
@@ -219,7 +230,7 @@ export async function testImageViewHotkeysKeepWorkingAfterQuickTagsAreShown(fixt
         }
         return {status: 200, body: null};
     }, 'id=7', session);
-    fixture.append(view);
+    fixture.append(hotkeyContainer);
     try {
         const toggle = view.querySelector('.quick-tags-toggle');
         toggle.focus();

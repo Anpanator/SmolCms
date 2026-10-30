@@ -1,5 +1,5 @@
 import {assertEqual, assertTrue, settle} from './assert.js';
-import {mockFetch, sessionResponse, testUser, useFetch} from './mocks.js';
+import {attachHotkeyHandler, mockFetch, sessionResponse, testUser, useFetch} from './mocks.js';
 import {createSession} from '../../public/js/session.js';
 import {createReviewView} from '../../public/js/views/review.js';
 
@@ -61,13 +61,22 @@ async function createViewWith(accessLevel, handler = () => undefined) {
         const response = await handler(url, options);
         return response === undefined ? defaultResponse(url) : response;
     });
-    const restore = useFetch(fetchMock);
+    const restoreFetch = useFetch(fetchMock);
     const session = createSession();
     await session.load();
     const navigateCalls = [];
     const view = createReviewView({ session, navigate: (path) => navigateCalls.push(path) });
+    const hotkeyHandler = attachHotkeyHandler(view);
     await settle();
-    return { view, fetchMock, navigateCalls, restore };
+    return {
+        view,
+        fetchMock,
+        navigateCalls,
+        restore() {
+            hotkeyHandler.destroy();
+            restoreFetch();
+        },
+    };
 }
 
 function defaultResponse(url) {

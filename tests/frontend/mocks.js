@@ -3,6 +3,7 @@
  * Importing this module has no side effects.
  */
 import {settle} from './assert.js';
+import {createHotkeyHandler} from '../../public/js/hotkeys.js';
 
 const NULL_BODY_STATUSES = new Set([204, 205, 304]);
 
@@ -144,6 +145,20 @@ export function useFetch(implementation) {
     globalThis.fetch = implementation;
     return () => {
         globalThis.fetch = original;
+    };
+}
+
+/** Wrap a view in the same delegated-hotkey boundary used by the app shell. */
+export function attachHotkeyHandler(view) {
+    const container = document.createElement('div');
+    container.append(view);
+    const handler = createHotkeyHandler(container, () => view);
+    return {
+        container,
+        destroy() {
+            handler.destroy();
+            container.remove();
+        },
     };
 }
 

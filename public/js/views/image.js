@@ -15,6 +15,7 @@ import {createQuickTagsToggle, createQuickTagsView} from '../quickTags.js';
 import {createSearchView, normalizeTags} from '../search.js';
 import {RoutePath} from '../routes.js';
 import {createTagList} from '../tagList.js';
+import {registerViewHotkeys} from '../hotkeys.js';
 
 export {formatFileSize};
 
@@ -100,7 +101,14 @@ export function createImageView({session, navigate = () => {}, query = new URLSe
     const state = {navigate, imageDetails, tagList, status};
     page.append(sidebarColumn, content, quickTags.element);
 
-    page.addEventListener('keydown', handleKeyboard);
+    const pageHotkeys = {
+        ArrowLeft: handleKeyboard,
+        ArrowRight: handleKeyboard,
+    };
+    if (deleteButton !== null) {
+        pageHotkeys.Delete = handleKeyboard;
+    }
+    registerViewHotkeys(page, pageHotkeys);
     queueMicrotask(() => {
         if (page.isConnected) {
             page.focus({preventScroll: true});

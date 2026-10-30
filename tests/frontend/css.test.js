@@ -222,6 +222,21 @@ export function testLayoutAndGridUseCssGrid() {
     }
 }
 
+export function testFocusedLayoutDoesNotShowAnOutline(fixture) {
+    const layout = document.createElement('div');
+    layout.className = 'layout';
+    layout.tabIndex = -1;
+    fixture.append(layout);
+
+    try {
+        layout.focus();
+        assertEqual(document.activeElement, layout, '.layout should be focused for the shortcut navigation');
+        assertEqual(getComputedStyle(layout).outlineStyle, 'none', 'focused layouts should not show an outline');
+    } finally {
+        layout.remove();
+    }
+}
+
 export function testHomeGridStartsAtTopNextToSidebarColumn() {
     const fixture = document.getElementById('test-fixture');
     const layout = document.createElement('div');

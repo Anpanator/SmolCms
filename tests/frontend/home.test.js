@@ -1,5 +1,5 @@
 import {assertEqual, assertFalse, assertTrue, settle} from './assert.js';
-import {mockFetch, useFetch} from './mocks.js';
+import {attachHotkeyHandler, mockFetch, useFetch} from './mocks.js';
 import {createHomeView} from '../../public/js/views/home.js';
 
 const IMAGES = {
@@ -18,10 +18,18 @@ const IMAGES = {
 
 async function createLoadedView(handler, query = '', navigate = () => {}) {
     const fetchMock = mockFetch(handler);
-    const restore = useFetch(fetchMock);
+    const restoreFetch = useFetch(fetchMock);
     const view = createHomeView({ navigate, query: new URLSearchParams(query) });
+    const hotkeyHandler = attachHotkeyHandler(view);
     await settle();
-    return { view, fetchMock, restore };
+    return {
+        view,
+        fetchMock,
+        restore() {
+            hotkeyHandler.destroy();
+            restoreFetch();
+        },
+    };
 }
 
 export async function testHomeViewRendersPageTagsAndImageGrid() {
