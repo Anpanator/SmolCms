@@ -55,6 +55,20 @@ readonly class ImageDeleteQueueController
         );
     }
 
+    #[Authenticated(AccessLevel::MOD)]
+    public function deleteAllAction(EmptyRequest $request): Response
+    {
+        $deletedIds = $this->imageReviewService->deleteAllQueued();
+        $user = $this->sessionService->getUserData();
+        if ($user !== null) {
+            foreach ($deletedIds as $id) {
+                $this->auditLogService->record($user->id, AuditActionType::IMAGE_DELETED, "image_id=$id");
+            }
+        }
+
+        return new JsonResponse(['deletedCount' => count($deletedIds)]);
+    }
+
     private function processAction(int $id, callable $action, AuditActionType $auditActionType): Response
     {
         if (!$action($id)) {

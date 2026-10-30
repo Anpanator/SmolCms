@@ -190,6 +190,36 @@ class ImageReviewServiceTest extends FunctionalTestCase
         self::assertNull($this->imageEntityService->findOneById($queued->getId()));
     }
 
+    public function testDeleteAllQueuedOnlyRemovesImagesInTheDeleteQueue(): void
+    {
+        $queuedOne = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+            deletedAt: new DateTime('2026-10-20 09:00:00'),
+        );
+        $queuedTwo = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::PENDING_REVIEW,
+            deletedAt: new DateTime('2026-10-21 09:00:00'),
+        );
+        $active = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+        );
+
+        $deletedIds = $this->imageReviewService->deleteAllQueued();
+
+        self::assertContains($queuedOne->getId(), $deletedIds);
+        self::assertContains($queuedTwo->getId(), $deletedIds);
+        self::assertNotContains($active->getId(), $deletedIds);
+        self::assertNull($this->imageEntityService->findOneById($queuedOne->getId()));
+        self::assertNull($this->imageEntityService->findOneById($queuedTwo->getId()));
+        self::assertNotNull($this->imageEntityService->findOneById($active->getId()));
+    }
+
     public function testApproveTransitionsPendingReviewAndIsIdempotentForAcceptedImages(): void
     {
         $pending = ImageTestUtils::createImageEntity(

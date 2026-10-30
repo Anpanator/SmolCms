@@ -142,6 +142,23 @@ readonly class ImageReviewService
     }
 
     /**
+     * Permanently deletes every image currently waiting in the delete queue.
+     *
+     * @return list<int> IDs of images deleted from the queue
+     */
+    public function deleteAllQueued(): array
+    {
+        $deletedIds = [];
+        foreach ($this->imageEntityService->findDeletionQueue() as $entity) {
+            $id = $entity->getId();
+            if ($id !== null && $this->deleteQueued($id)) {
+                $deletedIds[] = $id;
+            }
+        }
+        return $deletedIds;
+    }
+
+    /**
      * Deletes an image of any status: deletes the database row and all related
      * image files (original, thumb, sample, download). Returns false only for
      * an unknown id.

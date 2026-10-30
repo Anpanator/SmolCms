@@ -1292,6 +1292,10 @@ h3 {
     text-align: center;
 }
 
+.review-actions [data-action="delete-all"] {
+    grid-column: 1 / -1;
+}
+
 .review-hotkeys {
     padding: var(--space-2);
     color: var(--color-muted);

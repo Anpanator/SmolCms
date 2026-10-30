@@ -258,6 +258,12 @@ class RoutingConfiguration
                 controller: ImageDeleteQueueController::class,
                 handler: 'deleteAction',
             ),
+            RouteEnum::API_DELETE_QUEUE_DELETE_ALL->name => new Route(
+                path: RouteEnum::API_DELETE_QUEUE_DELETE_ALL->value,
+                method: HttpMethod::POST,
+                controller: ImageDeleteQueueController::class,
+                handler: 'deleteAllAction',
+            ),
             RouteEnum::API_DELETE_QUEUE_RESTORE->name => new Route(
                 path: RouteEnum::API_DELETE_QUEUE_RESTORE->value,
                 method: HttpMethod::POST,

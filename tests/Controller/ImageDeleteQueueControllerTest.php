@@ -349,6 +349,76 @@ class ImageDeleteQueueControllerTest extends FunctionalTestCase
         $this->assertSame($mod->id, $entries[0]['user']['id']);
     }
 
+    public function testDeleteAllAction_Anonymous_ReturnsUnauthorized(): void
+    {
+        $response = $this->simulateDeleteAllRequest();
+
+        $this->assertSame(HttpStatus::UNAUTHORIZED, $response->getStatus());
+        $this->assertNull($response->getContent());
+    }
+
+    public function testDeleteAllAction_Novice_ReturnsForbidden(): void
+    {
+        $this->loginUser('delete-all-novice', 'Delete All Novice');
+
+        $response = $this->simulateDeleteAllRequest();
+
+        $this->assertSame(HttpStatus::FORBIDDEN, $response->getStatus());
+        $this->assertNull($response->getContent());
+    }
+
+    public function testDeleteAllAction_DeletesQueuedImagesAndAuditsEachDeletion(): void
+    {
+        $queuedOne = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+            deletedAt: new DateTime('2026-10-20 09:00:00'),
+        );
+        $queuedTwo = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::PENDING_REVIEW,
+            deletedAt: new DateTime('2026-10-21 09:00:00'),
+        );
+        $active = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+        );
+        $this->loginUserWithAccessLevel('delete-all-mod', 'Delete All Mod', AccessLevel::MOD);
+        $mod = $this->sessionService->getUserData();
+        $this->assertNotNull($mod);
+
+        $response = $this->simulateDeleteAllRequest();
+
+        $this->assertSame(HttpStatus::OK, $response->getStatus());
+        $this->assertSame(
+            ['deletedCount' => 2],
+            json_decode((string)$response->getContent(), true, JSON_THROW_ON_ERROR),
+        );
+        $this->assertNull($this->imageEntityService->findOneById($queuedOne->getId()));
+        $this->assertNull($this->imageEntityService->findOneById($queuedTwo->getId()));
+        $this->assertNotNull($this->imageEntityService->findOneById($active->getId()));
+
+        $auditEntries = array_values(array_filter(
+            $this->auditLogService->getEntries(1, '')['entries'],
+            static fn(array $entry): bool => $entry['actionType'] === AuditActionType::IMAGE_DELETED->value
+                && in_array($entry['context'], [
+                    'image_id=' . $queuedOne->getId(),
+                    'image_id=' . $queuedTwo->getId(),
+                ], true),
+        ));
+        $this->assertCount(2, $auditEntries);
+        $this->assertEqualsCanonicalizing([
+            'image_id=' . $queuedOne->getId(),
+            'image_id=' . $queuedTwo->getId(),
+        ], array_column($auditEntries, 'context'));
+        foreach ($auditEntries as $entry) {
+            $this->assertSame($mod->id, $entry['user']['id']);
+        }
+    }
+
     public function testDeleteAction_NonQueuedImage_ReturnsNotFoundAndKeepsImage(): void
     {
         $this->loginUserWithAccessLevel('purge-mod-user', 'Purge Mod User', AccessLevel::MOD);
@@ -409,6 +479,14 @@ class ImageDeleteQueueControllerTest extends FunctionalTestCase
     private function simulateDeleteRequest(?string $id): Response
     {
         return $this->simulatePostRequest('/api/delete-queue/delete', $id);
+    }
+
+    private function simulateDeleteAllRequest(): Response
+    {
+        return $this->simulateRequest(new Request(
+            url: new Url(protocol: 'https', host: 'localhost', path: '/api/delete-queue/delete-all'),
+            method: HttpMethod::POST,
+        ));
     }
 
     private function simulatePostRequest(string $path, ?string $id): Response

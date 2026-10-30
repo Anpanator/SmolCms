@@ -6,6 +6,7 @@ import {createDeleteQueueView} from '../../public/js/views/deleteQueue.js';
 const QUEUE_URL = '/api/delete-queue';
 const RESTORE_URL = '/api/delete-queue/restore';
 const DELETE_URL = '/api/delete-queue/delete';
+const DELETE_ALL_URL = '/api/delete-queue/delete-all';
 const QUEUE = {
     images: [
         {
@@ -150,6 +151,8 @@ export async function testDeleteQueueShowsDownloadImageAndActiveMetadata() {
 
         assertEqual(view.querySelector('.review-actions [data-action="restore"]')?.textContent, 'Restore');
         assertEqual(view.querySelector('.review-actions [data-action="delete"]')?.textContent, 'Delete permanently');
+        assertEqual(view.querySelector('.review-actions [data-action="delete-all"]')?.textContent, 'Delete All');
+        assertEqual(view.querySelector('.review-actions [data-action="delete-all"]')?.disabled, false);
         assertTrue(view.querySelector('.review-hotkeys').textContent.includes('Enter'));
         assertTrue(view.querySelector('.review-hotkeys').textContent.includes('delete permanently'));
     } finally {
@@ -207,6 +210,43 @@ export async function testDeletePermanentlyPostsForSelectedImageAndRemovesIt() {
     }
 }
 
+export async function testDeleteAllPostsBulkActionAndEmptiesTheQueue() {
+    let queueRequestCount = 0;
+    const {view, fetchMock, restore} = await createViewWith(500, (url) => {
+        if (url === QUEUE_URL) {
+            queueRequestCount++;
+            return {
+                status: 200,
+                body: {images: queueRequestCount === 1 ? QUEUE.images : []},
+            };
+        }
+        return url === DELETE_ALL_URL
+            ? {status: 200, body: {deletedCount: 2}}
+            : undefined;
+    });
+    try {
+        view.querySelector('.review-actions [data-action="delete-all"]')
+            .dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+        await settle();
+
+        const actionCall = fetchMock.calls.find((call) => call.url === DELETE_ALL_URL);
+        assertTrue(actionCall !== undefined, 'Delete All should call the bulk endpoint');
+        assertEqual(actionCall.options.method, 'POST');
+        assertEqual(queueCalls(fetchMock).length, 2, 'the queue should refresh after the bulk delete');
+        assertEqual(view.querySelectorAll('.review-item').length, 0);
+        assertTrue(view.querySelector('.review-empty')?.textContent.includes('No images are waiting for deletion'));
+
+        const message = view.querySelector('.form-message');
+        assertTrue(message !== null && !message.hidden, 'bulk deletion should show a success message');
+        assertTrue(message.textContent.includes('2 images deleted permanently'));
+        assertTrue(message.classList.contains('form-message--success'));
+        assertTrue(view.querySelector('.review-actions [data-action="delete-all"]').disabled,
+            'Delete All should be disabled when the queue is empty');
+    } finally {
+        restore();
+    }
+}
+
 export async function testEnterRestoresAndDeleteKeyPermanentlyDeletes() {
     const {view, fetchMock, restore} = await createViewWith(500, (url) => (
         url.startsWith(RESTORE_URL) || url.startsWith(DELETE_URL) ? {status: 204, body: null} : undefined
@@ -257,6 +297,23 @@ export async function testDeleteQueueActionUnauthorizedNavigatesToLogin() {
     }
 }
 
+export async function testDeleteAllUnauthorizedNavigatesToLogin() {
+    const {view, navigateCalls, restore} = await createViewWith(500, (url) => (
+        url === DELETE_ALL_URL ? {status: 401, body: null} : undefined
+    ));
+    try {
+        view.querySelector('.review-actions [data-action="delete-all"]')
+            .dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+        await settle();
+
+        assertEqual(JSON.stringify(navigateCalls), JSON.stringify(['/login']));
+        assertEqual(view.querySelectorAll('.review-item').length, 2,
+            'an unauthorized bulk delete should leave the displayed queue unchanged');
+    } finally {
+        restore();
+    }
+}
+
 export async function testDeleteQueueEmptyState() {
     const {view, restore} = await createViewWith(600, (url) => (
         url === QUEUE_URL ? {status: 200, body: {images: []}} : undefined
@@ -267,6 +324,7 @@ export async function testDeleteQueueEmptyState() {
         assertTrue(empty.textContent.includes('No images are waiting for deletion'));
         assertTrue(view.querySelector('.review-image') === null);
         assertTrue(view.querySelector('.review-actions [data-action="restore"]').disabled);
+        assertTrue(view.querySelector('.review-actions [data-action="delete-all"]').disabled);
     } finally {
         restore();
     }

@@ -38,6 +38,7 @@ enum RouteEnum: string
     case API_IMAGE_DELETE = '/api/image/delete';
     case API_DELETE_QUEUE = '/api/delete-queue';
     case API_DELETE_QUEUE_DELETE = '/api/delete-queue/delete';
+    case API_DELETE_QUEUE_DELETE_ALL = '/api/delete-queue/delete-all';
     case API_DELETE_QUEUE_RESTORE = '/api/delete-queue/restore';
     case API_IMAGE_TAGS = '/api/image/tags';
     case API_IMAGE_TAGS_REMOVE = '/api/image/tags/remove';

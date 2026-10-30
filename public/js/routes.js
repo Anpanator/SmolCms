@@ -31,6 +31,7 @@ export const RoutePath = Object.freeze({
     API_IMAGE_DELETE: '/api/image/delete',
     API_DELETE_QUEUE: '/api/delete-queue',
     API_DELETE_QUEUE_DELETE: '/api/delete-queue/delete',
+    API_DELETE_QUEUE_DELETE_ALL: '/api/delete-queue/delete-all',
     API_DELETE_QUEUE_RESTORE: '/api/delete-queue/restore',
     API_IMAGE_TAGS: '/api/image/tags',
     API_IMAGE_TAGS_REMOVE: '/api/image/tags/remove',

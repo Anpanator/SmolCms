@@ -18,6 +18,7 @@ const QUEUE_URL = RoutePath.API_DELETE_QUEUE;
 const IMAGE_DETAIL_URL = RoutePath.API_IMAGE_DETAIL;
 const RESTORE_URL = RoutePath.API_DELETE_QUEUE_RESTORE;
 const DELETE_URL = RoutePath.API_DELETE_QUEUE_DELETE;
+const DELETE_ALL_URL = RoutePath.API_DELETE_QUEUE_DELETE_ALL;
 
 export function createDeleteQueueView({session, navigate = () => {}} = {}) {
     if (!hasAccessLevel(session.getUser(), AccessLevel.MOD)) {
@@ -53,6 +54,12 @@ export function createDeleteQueueView({session, navigate = () => {}} = {}) {
         attributes: {type: 'button', 'data-action': 'delete', disabled: 'disabled'},
         children: 'Delete permanently',
     });
+    const deleteAllButton = el('button', {
+        className: 'button button--danger',
+        attributes: {type: 'button', 'data-action': 'delete-all', disabled: 'disabled'},
+        children: 'Delete All',
+    });
+    let deleteAllPending = false;
 
     const page = el('section', {
         className: 'review-page',
@@ -79,7 +86,7 @@ export function createDeleteQueueView({session, navigate = () => {}} = {}) {
                         }),
                         el('div', {
                             className: 'review-actions',
-                            children: [restoreButton, deleteButton],
+                            children: [restoreButton, deleteButton, deleteAllButton],
                         }),
                         el('p', {
                             className: 'review-hotkeys',
@@ -149,8 +156,10 @@ export function createDeleteQueueView({session, navigate = () => {}} = {}) {
     }
 
     function setActionButtonsDisabled(disabled) {
-        restoreButton.disabled = disabled;
-        deleteButton.disabled = disabled;
+        const actionsDisabled = disabled || deleteAllPending;
+        restoreButton.disabled = actionsDisabled;
+        deleteButton.disabled = actionsDisabled;
+        deleteAllButton.disabled = actionsDisabled;
     }
 
     const deleteQueue = createModerationQueue({
@@ -219,9 +228,57 @@ export function createDeleteQueueView({session, navigate = () => {}} = {}) {
         shouldCacheDetails: (details) => Boolean(details?.downloadSrc),
     });
 
-    restoreButton.addEventListener('click', () => deleteQueue.act('restore'));
-    deleteButton.addEventListener('click', () => deleteQueue.act('delete'));
-    page.addEventListener('keydown', deleteQueue.handleKeyboard);
+    async function deleteAllQueued() {
+        const queuedCount = deleteQueue.getItems().length;
+        if (deleteAllPending || queuedCount === 0) {
+            return;
+        }
+
+        clearMessage(status);
+        deleteAllPending = true;
+        setActionButtonsDisabled(true);
+        try {
+            const result = await postJson(DELETE_ALL_URL);
+            await deleteQueue.load();
+            const deletedCount = Number.isSafeInteger(result?.deletedCount)
+                ? result.deletedCount
+                : queuedCount;
+            showMessage(status, deletedCount === 0
+                ? 'No images were waiting for deletion.'
+                : `${deletedCount} image${deletedCount === 1 ? '' : 's'} deleted permanently.`, 'success');
+        } catch (error) {
+            if ((error?.status ?? 0) === 401) {
+                navigate(RoutePath.LOGIN);
+                return;
+            }
+            showMessage(status, messageForStatus(error?.status ?? 0));
+            if ((error?.status ?? 0) !== 403) {
+                await deleteQueue.load();
+            }
+        } finally {
+            deleteAllPending = false;
+            setActionButtonsDisabled(deleteQueue.getItems().length === 0);
+        }
+    }
+
+    restoreButton.addEventListener('click', () => {
+        if (!deleteAllPending) {
+            void deleteQueue.act('restore');
+        }
+    });
+    deleteButton.addEventListener('click', () => {
+        if (!deleteAllPending) {
+            void deleteQueue.act('delete');
+        }
+    });
+    deleteAllButton.addEventListener('click', () => {
+        void deleteAllQueued();
+    });
+    page.addEventListener('keydown', (event) => {
+        if (!deleteAllPending) {
+            deleteQueue.handleKeyboard(event);
+        }
+    });
     deleteQueue.load();
     return page;
 }

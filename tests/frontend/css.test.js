@@ -111,6 +111,10 @@ export function testImageTileAndReviewStylesExist() {
     );
 
     assertTrue(findRule(rules, '.review-metadata-panel') !== undefined, 'active image metadata should have a panel');
+    assertTrue(
+        findRule(rules, '.review-actions [data-action="delete-all"]', 'grid-column:1/-1') !== undefined,
+        'the bulk delete action should span the review action row',
+    );
 
     assertTrue(findRule(rules, '.button--danger') !== undefined, 'a danger button style should exist for Reject');
     assertTrue(findRule(rules, '.image-meta') !== undefined, 'the image metadata list should be styled');
