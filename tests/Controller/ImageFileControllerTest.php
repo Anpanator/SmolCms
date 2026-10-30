@@ -265,6 +265,27 @@ class ImageFileControllerTest extends FunctionalTestCase
         $this->assertNull($response->getContent());
     }
 
+    public function testSampleAction_FileOutsideWhitelist_ReturnsNotFoundWithoutRedirect(): void
+    {
+        $sampleFilename = ImageTestUtils::randomChecksum() . '.webp';
+        ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            status: ImageStatus::ACCEPTED,
+            sampleFilename: $sampleFilename,
+        );
+        $samplePath = ImageTestUtils::imageFilePath(IMAGE_SAMPLE_DIR, $sampleFilename);
+        ImageTestUtils::writeImageFile(IMAGE_SAMPLE_DIR, $sampleFilename);
+        self::assertTrue(unlink($samplePath));
+        self::assertTrue(symlink('/etc/passwd', $samplePath));
+
+        $response = $this->simulateSampleRequest($sampleFilename);
+
+        self::assertSame(HttpStatus::NOT_FOUND, $response->getStatus());
+        self::assertNull($response->getContent());
+        self::assertArrayNotHasKey(HttpHeader::X_ACCEL_REDIRECT->value, $response->getHeaders());
+    }
+
     public function testSampleAction_PendingReviewImage_NonUploaderForbiddenModeratorAllowed(): void
     {
         $this->loginUser('novice-user', 'Novice User');

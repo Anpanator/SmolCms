@@ -93,22 +93,26 @@ class ImageReviewControllerTest extends FunctionalTestCase
         $this->assertNotNull($uploader);
         $uploaderId = $uploader->id;
 
+        $olderThumbFilename = ImageTestUtils::randomChecksum() . '.avif';
         $older = ImageTestUtils::createImageEntity(
             $this->imageEntityService,
             userId: $uploaderId,
             status: ImageStatus::PENDING_REVIEW,
             uploadDate: new DateTime('2026-10-19 09:00:00'),
-            thumbFilename: ImageTestUtils::randomChecksum() . '.avif',
+            thumbFilename: $olderThumbFilename,
             sampleFilename: ImageTestUtils::randomChecksum() . '.webp',
         );
+        $newerThumbFilename = ImageTestUtils::randomChecksum() . '.avif';
         $newer = ImageTestUtils::createImageEntity(
             $this->imageEntityService,
             userId: $uploaderId,
             status: ImageStatus::PENDING_REVIEW,
             uploadDate: new DateTime('2026-10-19 11:00:00'),
-            thumbFilename: ImageTestUtils::randomChecksum() . '.avif',
+            thumbFilename: $newerThumbFilename,
             sampleFilename: ImageTestUtils::randomChecksum() . '.webp',
         );
+        ImageTestUtils::writeImageFile(IMAGE_THUMB_DIR, $olderThumbFilename);
+        ImageTestUtils::writeImageFile(IMAGE_THUMB_DIR, $newerThumbFilename);
         ImageTestUtils::createImageEntity(
             $this->imageEntityService,
             userId: $uploaderId,

@@ -7,8 +7,10 @@ use InvalidArgumentException;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Constant\RouteEnum;
 use SmolCms\Data\Persistence\ImageEntity;
+use SmolCms\Exception\FileAccessException;
 use SmolCms\Service\DB\ImageEntityService;
 use SmolCms\Service\DB\UserService;
+use SmolCms\Service\File\FileSystemAccessService;
 use SmolCms\Service\Tag\TagService;
 
 /**
@@ -21,9 +23,10 @@ readonly class ImageQueryService
     private const int IMAGES_PER_PAGE = 15;
 
     public function __construct(
-        private ImageEntityService $imageEntityService,
-        private UserService        $userService,
-        private TagService         $tagService,
+        private ImageEntityService      $imageEntityService,
+        private UserService             $userService,
+        private TagService              $tagService,
+        private FileSystemAccessService $fileSystemAccessService,
     )
     {
     }
@@ -158,8 +161,8 @@ readonly class ImageQueryService
     }
 
     /**
-     * Public URL of an image's thumbnail (a static file served by nginx), or null
-     * while the image has not been processed yet.
+     * Public URL of an available image thumbnail (a static file served by nginx),
+     * or null while the image has not been processed or its file is unavailable.
      */
     public function getThumbSrc(ImageEntity $entity): ?string
     {
@@ -195,6 +198,17 @@ readonly class ImageQueryService
         if ($thumbFilename === null) {
             return null;
         }
-        return '/public/img/thumb/' . ImagePathLayout::relativePathForFileName($thumbFilename);
+
+        $relativePath = ImagePathLayout::relativePathForFileName($thumbFilename);
+        // nginx serves this URL directly, so only expose an existing allowed file.
+        try {
+            if (!$this->fileSystemAccessService->fileExists(IMAGE_THUMB_DIR . '/' . $relativePath)) {
+                return null;
+            }
+        } catch (FileAccessException) {
+            return null;
+        }
+
+        return '/public/img/thumb/' . $relativePath;
     }
 }

@@ -50,6 +50,18 @@ class ProfileControllerTest extends FunctionalTestCase
     #[Autowire]
     private ApiKeyService $apiKeyService;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        ImageTestUtils::cleanImageDirs();
+    }
+
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+        ImageTestUtils::cleanImageDirs();
+    }
+
     public function testProfileRequiresAuthenticationAndReturnsApprovedSuggestionCount(): void
     {
         $unauthorized = $this->simulateProfileRequest();
@@ -167,13 +179,15 @@ class ProfileControllerTest extends FunctionalTestCase
                 : ImageStatus::ACCEPTED;
             $uploadDate = new DateTime('2026-10-19 00:00:00');
             $uploadDate->modify('+' . $index . ' minutes');
+            $thumbFilename = ImageTestUtils::randomChecksum() . '.avif';
             $uploads[] = ImageTestUtils::createImageEntity(
                 $this->imageEntityService,
                 userId: $userId,
                 status: $status,
                 uploadDate: $uploadDate,
-                thumbFilename: ImageTestUtils::randomChecksum() . '.avif',
+                thumbFilename: $thumbFilename,
             );
+            ImageTestUtils::writeImageFile(IMAGE_THUMB_DIR, $thumbFilename);
         }
 
         ImageTestUtils::createImageEntity(
@@ -260,13 +274,15 @@ class ProfileControllerTest extends FunctionalTestCase
         for ($index = 0; $index < 17; $index++) {
             $uploadDate = new DateTime('2026-10-19 00:00:00');
             $uploadDate->modify('+' . $index . ' minutes');
+            $thumbFilename = ImageTestUtils::randomChecksum() . '.avif';
             $uploads[] = ImageTestUtils::createImageEntity(
                 $this->imageEntityService,
                 userId: $targetId,
                 status: ImageStatus::ACCEPTED,
                 uploadDate: $uploadDate,
-                thumbFilename: ImageTestUtils::randomChecksum() . '.avif',
+                thumbFilename: $thumbFilename,
             );
+            ImageTestUtils::writeImageFile(IMAGE_THUMB_DIR, $thumbFilename);
         }
         ImageTestUtils::createImageEntity(
             $this->imageEntityService,

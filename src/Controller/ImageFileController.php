@@ -9,9 +9,11 @@ use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Request\ImageFileRequest;
 use SmolCms\Data\Response\Response;
+use SmolCms\Exception\FileAccessException;
 use SmolCms\Service\Core\Attribute\Authenticated;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\ImageEntityService;
+use SmolCms\Service\File\FileSystemAccessService;
 use SmolCms\Service\Image\ImageAccessPolicy;
 use SmolCms\Service\Image\ImagePathLayout;
 
@@ -35,9 +37,10 @@ readonly class ImageFileController
     ];
 
     public function __construct(
-        private ImageEntityService $imageEntityService,
-        private ImageAccessPolicy  $imageAccessPolicy,
-        private SessionService     $sessionService,
+        private ImageEntityService      $imageEntityService,
+        private ImageAccessPolicy       $imageAccessPolicy,
+        private SessionService          $sessionService,
+        private FileSystemAccessService $fileSystemAccessService,
     )
     {
     }
@@ -88,14 +91,20 @@ readonly class ImageFileController
             return new Response(HttpStatus::FORBIDDEN);
         }
 
-        $filePath = $baseDir . '/' . ImagePathLayout::relativePathForFileName($name);
-        if (!is_file($filePath)) {
+        $relativePath = ImagePathLayout::relativePathForFileName($name);
+        $filePath = $baseDir . '/' . $relativePath;
+        try {
+            if (!$this->fileSystemAccessService->fileExists($filePath)) {
+                return new Response(HttpStatus::NOT_FOUND);
+            }
+        } catch (FileAccessException) {
+            // Missing subdirectories and paths outside the whitelist are both unavailable.
             return new Response(HttpStatus::NOT_FOUND);
         }
 
         $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
         $response = new Response(HttpStatus::OK);
-        $response->addHeader(HttpHeader::X_ACCEL_REDIRECT->value, $internalLocation . ImagePathLayout::relativePathForFileName($name));
+        $response->addHeader(HttpHeader::X_ACCEL_REDIRECT->value, $internalLocation . $relativePath);
         $response->addHeader(HttpHeader::CONTENT_TYPE->value, self::CONTENT_TYPES[$extension]);
         if ($asAttachment) {
             $response->addHeader(HttpHeader::CONTENT_DISPOSITION->value, "attachment; filename=\"$name\"");

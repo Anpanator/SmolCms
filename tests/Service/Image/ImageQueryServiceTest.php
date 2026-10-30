@@ -32,6 +32,18 @@ class ImageQueryServiceTest extends FunctionalTestCase
     #[Autowire]
     private TagService $tagService;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        ImageTestUtils::cleanImageDirs();
+    }
+
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+        ImageTestUtils::cleanImageDirs();
+    }
+
     public function testImagePageMapsImageSummariesAndPageTagCloud(): void
     {
         $tagName = 'query-page-' . bin2hex(random_bytes(4));
@@ -49,6 +61,7 @@ class ImageQueryServiceTest extends FunctionalTestCase
             uploadDate: new DateTime('2026-10-01 11:00:00'),
             thumbFilename: $newerThumb,
         );
+        ImageTestUtils::writeImageFile(IMAGE_THUMB_DIR, $newerThumb);
         $pending = ImageTestUtils::createImageEntity(
             $this->imageEntityService,
             userId: 1,
@@ -89,6 +102,7 @@ class ImageQueryServiceTest extends FunctionalTestCase
             sampleFilename: $sampleFilename,
             downloadFilename: $downloadFilename,
         );
+        ImageTestUtils::writeImageFile(IMAGE_THUMB_DIR, $thumbFilename);
         $tagName = 'image-detail-tag-' . bin2hex(random_bytes(3));
         $this->tagService->attachTagToImage($image->getId(), $tagName);
 
@@ -115,6 +129,33 @@ class ImageQueryServiceTest extends FunctionalTestCase
         );
         self::assertNull($this->imageQueryService->getImageDetail(PHP_INT_MAX));
         self::assertNull($this->imageQueryService->getThumbSrc($this->imageWithoutThumb()));
+    }
+
+    public function testThumbSrcIsNullWhenTheFileIsMissing(): void
+    {
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            thumbFilename: $this->storedFileName('missing-thumb'),
+        );
+
+        self::assertNull($this->imageQueryService->getThumbSrc($image));
+    }
+
+    public function testThumbSrcIsNullWhenTheFileResolvesOutsideTheWhitelist(): void
+    {
+        $thumbFilename = $this->storedFileName('external-thumb');
+        $image = ImageTestUtils::createImageEntity(
+            $this->imageEntityService,
+            userId: 1,
+            thumbFilename: $thumbFilename,
+        );
+        $thumbPath = ImageTestUtils::imageFilePath(IMAGE_THUMB_DIR, $thumbFilename);
+        ImageTestUtils::writeImageFile(IMAGE_THUMB_DIR, $thumbFilename);
+        self::assertTrue(unlink($thumbPath));
+        self::assertTrue(symlink('/etc/passwd', $thumbPath));
+
+        self::assertNull($this->imageQueryService->getThumbSrc($image));
     }
 
     public function testImageDetailUsesNullUploaderFieldsWhenUploaderIsMissing(): void

@@ -31,6 +31,18 @@ class ImageReviewServiceTest extends FunctionalTestCase
     #[Autowire]
     private UserService $userService;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        ImageTestUtils::cleanImageDirs();
+    }
+
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+        ImageTestUtils::cleanImageDirs();
+    }
+
     public function testReviewQueueMapsPendingReviewImagesAndUploader(): void
     {
         $user = $this->createUser('image-review-queue-' . bin2hex(random_bytes(4)), 'Review Queue Uploader');
@@ -44,6 +56,7 @@ class ImageReviewServiceTest extends FunctionalTestCase
             thumbFilename: $thumbFilename,
             sampleFilename: $sampleFilename,
         );
+        ImageTestUtils::writeImageFile(IMAGE_THUMB_DIR, $thumbFilename);
 
         $matchingQueueEntry = array_values(array_filter(
             $this->imageReviewService->getReviewQueue(),
@@ -78,6 +91,7 @@ class ImageReviewServiceTest extends FunctionalTestCase
             sampleFilename: $sampleFilename,
             deletedAt: new DateTime('2026-10-06 06:07:08'),
         );
+        ImageTestUtils::writeImageFile(IMAGE_THUMB_DIR, $thumbFilename);
         ImageTestUtils::createImageEntity(
             $this->imageEntityService,
             userId: $user->getId(),

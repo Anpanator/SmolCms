@@ -63,20 +63,24 @@ class ImageApiControllerTest extends FunctionalTestCase
     {
         $markerTag = 'image-list-marker-' . bin2hex(random_bytes(5));
         $this->tagService->createTag($markerTag);
+        $olderThumbFilename = ImageTestUtils::randomChecksum() . '.avif';
         $olderAccepted = ImageTestUtils::createImageEntity(
             $this->imageEntityService,
             userId: 1,
             status: ImageStatus::ACCEPTED,
             uploadDate: new DateTime('2026-10-19 09:00:00'),
-            thumbFilename: ImageTestUtils::randomChecksum() . '.avif',
+            thumbFilename: $olderThumbFilename,
         );
+        $newerThumbFilename = ImageTestUtils::randomChecksum() . '.avif';
         $newerAccepted = ImageTestUtils::createImageEntity(
             $this->imageEntityService,
             userId: 1,
             status: ImageStatus::ACCEPTED,
             uploadDate: new DateTime('2026-10-19 11:00:00'),
-            thumbFilename: ImageTestUtils::randomChecksum() . '.avif',
+            thumbFilename: $newerThumbFilename,
         );
+        ImageTestUtils::writeImageFile(IMAGE_THUMB_DIR, $olderThumbFilename);
+        ImageTestUtils::writeImageFile(IMAGE_THUMB_DIR, $newerThumbFilename);
         $this->tagService->attachTagToImage($olderAccepted->getId(), $markerTag);
         $this->tagService->attachTagToImage($newerAccepted->getId(), $markerTag);
         $pendingReview = ImageTestUtils::createImageEntity(
@@ -130,6 +134,7 @@ class ImageApiControllerTest extends FunctionalTestCase
             status: ImageStatus::ACCEPTED,
             thumbFilename: $thumbFilename,
         );
+        ImageTestUtils::writeImageFile(IMAGE_THUMB_DIR, $thumbFilename);
         $this->tagService->attachTagToImage($image->getId(), $markerTag);
 
         $response = $this->simulateListRequest(['tags' => $markerTag]);

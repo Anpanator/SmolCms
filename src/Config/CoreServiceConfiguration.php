@@ -15,6 +15,7 @@ use SmolCms\Service\Core\Action\RequestMappingPreControllerAction;
 use SmolCms\Service\Core\Action\SameOriginPreControllerAction;
 use SmolCms\Service\Core\Action\ValidationPreControllerAction;
 use SmolCms\Service\Core\ApplicationStartupHandler;
+use SmolCms\Service\Core\CaseConverter;
 use SmolCms\Service\Core\CliCommand\GenerateJsIntegrityExecutor;
 use SmolCms\Service\Core\CliCommand\GenerateMigrationExecutor;
 use SmolCms\Service\Core\CliCommand\InitializeDatabaseExecutor;
@@ -27,13 +28,11 @@ use SmolCms\Service\Core\Startup\RegisterSessionHandlerStartupAction;
 use SmolCms\Service\Core\Startup\RestrictDirectoryAccessStartupAction;
 use SmolCms\Service\Core\Startup\ResumeSessionStartupAction;
 use SmolCms\Service\Core\Startup\SetCrossOriginResourcePolicyStartupAction;
-use SmolCms\Service\Core\CaseConverter;
 use SmolCms\Service\DB\AuditLogService;
 use SmolCms\Service\DB\EntityAttributeProcessor;
 use SmolCms\Service\DB\ImageEntityService;
 use SmolCms\Service\DB\QueryBuilder;
 use SmolCms\Service\DB\TagApprovalService;
-use SmolCms\Service\Tag\TagSuggestionService;
 use SmolCms\Service\DB\UserService;
 use SmolCms\Service\File\FileSystemAccessService;
 use SmolCms\Service\Image\AvifImageProcessor;
@@ -51,6 +50,7 @@ use SmolCms\Service\Image\PngImageTypeDetector;
 use SmolCms\Service\Image\WebpImageProcessor;
 use SmolCms\Service\Image\WebpImageTypeDetector;
 use SmolCms\Service\Tag\TagService;
+use SmolCms\Service\Tag\TagSuggestionService;
 use SmolCms\Service\Validation\ImageUploadValidator;
 
 class CoreServiceConfiguration
@@ -189,6 +189,7 @@ class CoreServiceConfiguration
                     ImageEntityService::class,
                     UserService::class,
                     TagService::class,
+                    FileSystemAccessService::class,
                 ]
             ),
             new Service(

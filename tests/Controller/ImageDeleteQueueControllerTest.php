@@ -93,15 +93,17 @@ class ImageDeleteQueueControllerTest extends FunctionalTestCase
         $this->assertNotNull($uploader);
         $uploaderId = $uploader->id;
 
+        $olderThumbFilename = ImageTestUtils::randomChecksum() . '.avif';
         $older = ImageTestUtils::createImageEntity(
             $this->imageEntityService,
             userId: $uploaderId,
             status: ImageStatus::ACCEPTED,
             uploadDate: new DateTime('2026-10-19 09:00:00'),
-            thumbFilename: ImageTestUtils::randomChecksum() . '.avif',
+            thumbFilename: $olderThumbFilename,
             sampleFilename: ImageTestUtils::randomChecksum() . '.webp',
             deletedAt: new DateTime('2026-10-20 09:00:00'),
         );
+        ImageTestUtils::writeImageFile(IMAGE_THUMB_DIR, $olderThumbFilename);
         $newer = ImageTestUtils::createImageEntity(
             $this->imageEntityService,
             userId: $uploaderId,
