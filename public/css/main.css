@@ -560,6 +560,16 @@ h3 {
     margin-top: var(--space-4);
 }
 
+.home-pagination {
+    justify-content: space-between;
+    gap: var(--space-1);
+    margin: 0 0 var(--space-3);
+}
+
+.home-pagination .pagination-button {
+    padding: var(--space-1) var(--space-2);
+}
+
 .pagination-button {
     padding: var(--space-1) var(--space-3);
     border: 1px solid var(--color-border);

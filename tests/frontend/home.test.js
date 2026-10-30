@@ -8,7 +8,7 @@ const IMAGES = {
         { id: 3, thumbSrc: '/public/img/thumb/cd/cd1234.avif', status: 'accepted' },
     ],
     page: 1,
-    perPage: 15,
+    perPage: 20,
     total: 27,
     tags: [
         { name: 'nature', imageCount: 2 },
@@ -33,8 +33,13 @@ export async function testHomeViewRendersPageTagsAndImageGrid() {
         assertTrue(sidebarColumn !== null, 'search and sidebar should share a column');
         assertTrue(sidebarColumn.querySelector(':scope > .home-toolbar .search-view') !== null,
             'the tag search should stay above the sidebar');
-        assertTrue(sidebarColumn.querySelector(':scope > .sidebar') !== null,
+        const sidebar = sidebarColumn.querySelector(':scope > .sidebar');
+        assertTrue(sidebar !== null,
             'the sidebar should sit below the tag search');
+        const pagination = sidebar.querySelector(':scope > .home-pagination');
+        assertTrue(pagination !== null, 'home pagination should be in the sidebar');
+        assertTrue(pagination.nextElementSibling.matches('.sidebar-title'), 'pagination should appear above the tags heading');
+        assertEqual(view.querySelector('.content .pagination'), null, 'home pagination should not stay below the image grid');
         assertEqual(sidebarColumn.querySelector('.sidebar .search-view'), null,
             'home sidebar should not contain tag search');
         assertTrue(sidebarColumn.querySelector('.sidebar .tags') !== null, 'sidebar tag list should exist');
@@ -133,12 +138,59 @@ export async function testHomePaginationUsesUrlStateAndKeepsTagFilter() {
 
         const previous = view.querySelector('.pagination-button--previous');
         const next = view.querySelector('.pagination-button--next');
+        assertEqual(previous.textContent, '←');
+        assertEqual(previous.getAttribute('aria-label'), 'Previous page');
+        assertEqual(next.textContent, '→');
+        assertEqual(next.getAttribute('aria-label'), 'Next page');
         assertTrue(!previous.disabled, 'Previous should be enabled after page one');
         assertTrue(!next.disabled, 'Next should be enabled before the last page');
         next.click();
         previous.click();
         assertEqual(navigation[0], '/?page=3&tags=nature');
         assertEqual(navigation[1], '/?tags=nature');
+    } finally {
+        restore();
+    }
+}
+
+export async function testHomePaginationHotkeysNavigateAndRespectEditableTargets() {
+    const navigation = [];
+    const {view, restore} = await createLoadedView(
+        () => ({status: 200, body: {...IMAGES, page: 2, total: 45}}),
+        'page=2&tags=nature',
+        (path) => navigation.push(path),
+    );
+    try {
+        const nextEvent = new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true, cancelable: true});
+        view.dispatchEvent(nextEvent);
+        const previousEvent = new KeyboardEvent('keydown', {key: 'ArrowLeft', bubbles: true, cancelable: true});
+        view.dispatchEvent(previousEvent);
+
+        assertTrue(nextEvent.defaultPrevented, 'right arrow should be handled as a pagination shortcut');
+        assertTrue(previousEvent.defaultPrevented, 'left arrow should be handled as a pagination shortcut');
+        assertEqual(navigation[0], '/?page=3&tags=nature');
+        assertEqual(navigation[1], '/?tags=nature');
+
+        const searchInput = view.querySelector('.search-input');
+        const inputEvent = new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true, cancelable: true});
+        searchInput.dispatchEvent(inputEvent);
+        assertFalse(inputEvent.defaultPrevented, 'arrow keys should keep their normal behavior in the tag search');
+        assertEqual(navigation.length, 2, 'typing in the search should not change pages');
+    } finally {
+        restore();
+    }
+}
+
+export async function testHomeUsesTwentyImageFallbackWhenPageSizeIsMissing() {
+    const navigation = [];
+    const {view, restore} = await createLoadedView(
+        () => ({status: 200, body: {images: [], page: 3, total: 31, tags: []}}),
+        'page=3',
+        (path, options) => navigation.push({path, options}),
+    );
+    try {
+        assertEqual(navigation[0]?.path, '/?page=2', 'the fallback page size should be 20 images');
+        assertTrue(navigation[0]?.options?.replace, 'an out-of-range page should replace the current URL');
     } finally {
         restore();
     }
@@ -164,7 +216,7 @@ export function testHomeGridShowsLoadingStateFirst() {
 
 export async function testHomeGridShowsEmptyStateAndNoTags() {
     const { view, restore } = await createLoadedView(
-        () => ({ status: 200, body: { images: [], page: 1, perPage: 15, total: 0, tags: [] } }),
+        () => ({ status: 200, body: { images: [], page: 1, perPage: 20, total: 0, tags: [] } }),
         'tags=missing',
     );
     try {
@@ -201,7 +253,7 @@ export async function testHomeTileWithoutThumbShowsPlaceholder() {
         () => ({ status: 200, body: {
             images: [{ id: 9, thumbSrc: null }],
             page: 1,
-            perPage: 15,
+            perPage: 20,
             total: 1,
             tags: [],
         } }),
@@ -225,7 +277,7 @@ export async function testPendingReviewTilesGetUnapprovedClass() {
                 {id: 10, thumbSrc: '/public/img/thumb/cd/cd1234.avif', status: 'accepted'},
             ],
             page: 1,
-            perPage: 15,
+            perPage: 20,
             total: 2,
             tags: [],
         }}),

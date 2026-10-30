@@ -11,7 +11,7 @@ import {messageForStatus} from '../forms.js';
 import {createTagLinkList, normalizeActiveTags} from '../tagLinks.js';
 
 const IMAGES_URL = '/api/images';
-const DEFAULT_PER_PAGE = 15;
+const DEFAULT_PER_PAGE = 20;
 const LOADING_TILE_COUNT = 6;
 
 /** Build the shared list of tag links used by the home and image sidebars. */
@@ -65,9 +65,21 @@ export function createHomeView({navigate = () => {}, query = new URLSearchParams
         children: search.element,
     });
     const tagView = createTagView([], activeTags);
+    const pagination = createPagination(requestedPage, (page) => {
+        navigate(buildHomePath(page, tags));
+    }, {
+        previousLabel: '←',
+        nextLabel: '→',
+    });
+    pagination.element.classList.add('home-pagination');
+    pagination.element.setAttribute('aria-label', 'Image pages');
+    const previousButton = pagination.element.querySelector('.pagination-button--previous');
+    const nextButton = pagination.element.querySelector('.pagination-button--next');
+
     const sidebar = el('aside', {
         className: 'sidebar',
         children: [
+            pagination.element,
             el('h2', { className: 'sidebar-title', children: 'Tags' }),
             tagView,
         ],
@@ -75,23 +87,49 @@ export function createHomeView({navigate = () => {}, query = new URLSearchParams
 
     const grid = el('div', { className: 'grid' });
     showLoadingTiles(grid);
-    const pagination = createPagination(requestedPage, (page) => {
-        navigate(buildHomePath(page, tags));
-    });
-    pagination.element.setAttribute('aria-label', 'Image pages');
 
     const content = el('section', {
         className: 'content',
-        children: [grid, pagination.element],
+        children: [grid],
     });
-
-    loadImages({ grid, tagView, pagination, page: requestedPage, tags, navigate });
 
     const sidebarColumn = el('div', {
         className: 'home-sidebar-column',
         children: [toolbar, sidebar],
     });
-    return el('div', { className: 'layout home-layout', children: [sidebarColumn, content] });
+    const view = el('div', {
+        className: 'layout home-layout',
+        attributes: {tabindex: '-1', 'aria-label': 'Home page'},
+        children: [sidebarColumn, content],
+    });
+    view.addEventListener('keydown', handleKeyboard);
+    queueMicrotask(() => {
+        if (view.isConnected) {
+            view.focus({preventScroll: true});
+        }
+    });
+
+    loadImages({ grid, tagView, pagination, page: requestedPage, tags, navigate });
+    return view;
+
+    function handleKeyboard(event) {
+        const target = event.target;
+        if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
+            || (target instanceof Element && target.closest('input, textarea, select') !== null)
+            || (target instanceof HTMLElement && target.isContentEditable)
+            || document.querySelector('.modal-backdrop') !== null) {
+            return;
+        }
+
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+            return;
+        }
+
+        event.preventDefault();
+        if (!event.repeat) {
+            (event.key === 'ArrowLeft' ? previousButton : nextButton).click();
+        }
+    }
 }
 
 function showLoadingTiles(grid) {

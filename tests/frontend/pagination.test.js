@@ -10,6 +10,10 @@ export function testPaginationUpdatesPageStateAndCallsAdjacentPages() {
     assertEqual(pagination.element.className, 'pagination');
     assertEqual(pagination.element.getAttribute('aria-label'), 'Pages');
     assertEqual(pagination.element.querySelector('.pagination-label').textContent, 'Loading…');
+    assertEqual(previous.textContent, 'Previous');
+    assertEqual(previous.getAttribute('aria-label'), 'Previous page');
+    assertEqual(next.textContent, 'Next');
+    assertEqual(next.getAttribute('aria-label'), 'Next page');
     assertTrue(previous.disabled);
     assertTrue(next.disabled);
 

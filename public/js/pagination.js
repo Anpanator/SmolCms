@@ -7,24 +7,28 @@ import {el} from './dom.js';
 /**
  * @param {number} initialPage
  * @param {(page: number) => void} onPageChange
+ * @param {{previousLabel?: string, nextLabel?: string}} [labels]
  * @returns {{
  *   element: HTMLElement,
  *   update: (state: {page: number, total: number, perPage: number}) => void,
  *   loading: (page: number) => void
  * }}
  */
-export function createPagination(initialPage, onPageChange) {
+export function createPagination(initialPage, onPageChange, {
+    previousLabel = 'Previous',
+    nextLabel = 'Next',
+} = {}) {
     let currentPage = initialPage;
     const previous = el('button', {
         className: 'pagination-button pagination-button--previous',
-        attributes: {type: 'button', disabled: ''},
-        children: 'Previous',
+        attributes: {type: 'button', disabled: '', 'aria-label': 'Previous page'},
+        children: previousLabel,
     });
     const label = el('span', {className: 'pagination-label', children: 'Loading…'});
     const next = el('button', {
         className: 'pagination-button pagination-button--next',
-        attributes: {type: 'button', disabled: ''},
-        children: 'Next',
+        attributes: {type: 'button', disabled: '', 'aria-label': 'Next page'},
+        children: nextLabel,
     });
     const element = el('nav', {
         className: 'pagination',
