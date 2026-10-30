@@ -1,7 +1,9 @@
 /**
  * Upload view: each selected image is sent sequentially as its own multipart
- * request (field "image[]"). On 401 the user is sent to login; on 403/500
- * mapped messages are shown. Importing this module has no side effects.
+ * request (field "image[]"). On 401 the user is sent to login. Other failures
+ * do not stop the batch; every failed file is kept in a persistent error list
+ * so later status updates cannot hide which uploads failed and why.
+ * Importing this module has no side effects.
  */
 import {postFormWithProgress} from '../api.js';
 import {el} from '../dom.js';
@@ -17,9 +19,24 @@ import {
 
 const FILE_COUNT_PROGRESS_ID = 'upload-file-count-progress';
 const FILE_BYTE_PROGRESS_ID = 'upload-file-byte-progress';
+const DUPLICATE_IMAGE_MESSAGE = 'This image has already been uploaded.';
 
 function imageWord(count) {
     return count === 1 ? 'image' : 'images';
+}
+
+function failureReason(error) {
+    return messageForStatus(error?.status ?? 0, DUPLICATE_IMAGE_MESSAGE);
+}
+
+function buildFailureMessage(completed, total, failures) {
+    const noun = imageWord(total);
+    const summary = completed === 0
+        ? `Could not upload ${failures.length} of ${total} ${noun}.`
+        : `${completed} of ${total} ${noun} uploaded.`;
+    const heading = failures.length === 1 ? 'Failed upload:' : 'Failed uploads:';
+    const details = failures.map(({file, error}) => `- ${file.name}: ${failureReason(error)}`);
+    return `${summary}\n${heading}\n${details.join('\n')}`;
 }
 
 function setFileCountProgress(progress, status, completed, total) {
@@ -165,50 +182,53 @@ export function createUploadView({ navigate }) {
         form.setAttribute('aria-busy', 'true');
 
         let completed = 0;
-        let currentFile = null;
+        const failures = [];
         try {
             for (const [index, file] of files.entries()) {
-                currentFile = file;
                 setCurrentFile(fileByteProgress, currentFileStatus, currentByteStatus, file, index, files.length);
 
-                const formData = new FormData();
-                formData.append('image[]', file);
-                await postFormWithProgress('/upload-image', formData, (uploadEvent) => {
-                    updateByteProgress(fileByteProgress, currentByteStatus, file, uploadEvent);
-                });
+                try {
+                    const formData = new FormData();
+                    formData.append('image[]', file);
+                    await postFormWithProgress('/upload-image', formData, (uploadEvent) => {
+                        updateByteProgress(fileByteProgress, currentByteStatus, file, uploadEvent);
+                    });
 
-                completed++;
+                    completed++;
+                    setFileCountProgress(fileCountProgress, fileCountStatus, completed, files.length);
+                    completeByteProgress(fileByteProgress, currentByteStatus, file);
+                    currentFileStatus.textContent = `${file.name} uploaded.`;
+                } catch (error) {
+                    if (isAuthError(error)) {
+                        navigate('/login');
+                        return;
+                    }
+
+                    failures.push({file, error});
+                    setFileCountProgress(fileCountProgress, fileCountStatus, completed, files.length);
+                    currentFileStatus.textContent = `${file.name} failed.`;
+                    currentByteStatus.textContent = `${file.name}: ${failureReason(error)}`;
+                    showMessage(message, buildFailureMessage(completed, files.length, failures), 'error');
+                }
+            }
+
+            const noun = imageWord(files.length);
+            if (failures.length === 0) {
+                showMessage(
+                    message,
+                    files.length === 1 ? 'Image uploaded successfully.' : `${files.length} images uploaded successfully.`,
+                    'success',
+                );
+                currentFileStatus.textContent = files.length === 1
+                    ? 'Image uploaded successfully.'
+                    : `All ${files.length} ${noun} uploaded successfully.`;
+                form.reset();
+            } else {
                 setFileCountProgress(fileCountProgress, fileCountStatus, completed, files.length);
-                completeByteProgress(fileByteProgress, currentByteStatus, file);
-                currentFileStatus.textContent = `${file.name} uploaded.`;
+                currentFileStatus.textContent =
+                    `${completed} of ${files.length} ${noun} uploaded; ${failures.length} failed.`;
+                showMessage(message, buildFailureMessage(completed, files.length, failures), 'error');
             }
-
-            const noun = imageWord(files.length);
-            showMessage(
-                message,
-                files.length === 1 ? 'Image uploaded successfully.' : `${files.length} images uploaded successfully.`,
-                'success',
-            );
-            currentFileStatus.textContent = files.length === 1
-                ? 'Image uploaded successfully.'
-                : `All ${files.length} ${noun} uploaded successfully.`;
-            form.reset();
-        } catch (error) {
-            const failedFile = currentFile ?? files[completed];
-            setFileCountProgress(fileCountProgress, fileCountStatus, completed, files.length);
-            currentFileStatus.textContent = `Upload stopped while uploading ${failedFile.name}.`;
-            currentByteStatus.textContent = `Upload failed for ${failedFile.name}.`;
-
-            if (isAuthError(error)) {
-                navigate('/login');
-                return;
-            }
-
-            const noun = imageWord(files.length);
-            const summary = completed === 0
-                ? `Could not upload ${failedFile.name}. `
-                : `${completed} of ${files.length} ${noun} uploaded before ${failedFile.name} failed. `;
-            showMessage(message, `${summary}${messageForStatus(error?.status ?? 0)}`);
         } finally {
             uploading = false;
             fields.image.input.disabled = false;

@@ -1924,6 +1924,7 @@ h3 {
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius);
     font-size: 0.95rem;
+    white-space: pre-line;
 }
 
 .form-message--error {

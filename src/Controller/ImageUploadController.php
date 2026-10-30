@@ -44,10 +44,11 @@ readonly class ImageUploadController
             return new Response($validationStatus);
         }
 
-        // Validate every file's readability and type before storing any of the batch.
-        // Keep only paths and types here so a batch does not retain all file contents
-        // in memory at once.
+        // Validate every file's readability, type, and uniqueness before storing any
+        // of the batch. Keep only paths and types here so a batch does not retain all
+        // file contents in memory at once.
         $uploads = [];
+        $checksums = [];
         foreach ($this->imageUploadValidator->getFiles($request) as $file) {
             $tmpPath = $file['tmp_name'];
             $fileContent = is_readable($tmpPath) ? file_get_contents($tmpPath) : false;
@@ -59,6 +60,12 @@ readonly class ImageUploadController
             if ($imageType === null) {
                 return new Response(HttpStatus::BAD_REQUEST);
             }
+
+            $checksum = hash('sha256', $fileContent);
+            if (isset($checksums[$checksum]) || $this->imageUploadService->hasDuplicateChecksum($checksum)) {
+                return new Response(HttpStatus::CONFLICT);
+            }
+            $checksums[$checksum] = true;
 
             $uploads[] = ['tmpPath' => $tmpPath, 'imageType' => $imageType];
         }

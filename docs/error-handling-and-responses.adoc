@@ -1,14 +1,16 @@
 [#_error_handling_and_responses]
 == Error handling and responses
 
-An unmatched route returns `404`. `BadRequestException` becomes `400`; other
-exceptions from the pre-controller chain or controller become `500`. These
-framework responses (`400`, `401`, `403`, `404`, and `500`) have empty bodies
-by default; PHP's `display_errors` setting can expose an exception stack trace.
+An unmatched route returns `404`. `BadRequestException` becomes `400`,
+`DuplicateImageException` becomes `409`, and other exceptions from the
+pre-controller chain or controller become `500`. These framework responses
+(`400`, `401`, `403`, `404`, `409`, and `500`) have empty bodies by default;
+PHP's `display_errors` setting can expose an exception stack trace.
 
-Exceptions are logged: bad requests at informational level and other failures
-as errors. Validation details are retained in the log, not returned as an API
-message. The SPA uses status codes for user-facing errors.
+Exceptions are logged: bad requests and duplicate images at informational
+level and other failures as errors. Validation details are retained in the log,
+not returned as an API message. The SPA uses status codes for user-facing
+errors.
 
 For `application/json` requests, `RequestFactory` decodes `php://input` into
 POST parameters. Malformed or non-array JSON yields no mapped POST parameters;

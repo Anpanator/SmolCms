@@ -4,9 +4,11 @@ declare(strict_types=1);
 namespace SmolCms\Test\Service\Image;
 
 use GdImage;
+use PDO;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Image\ImageType;
 use SmolCms\Data\Persistence\ImageEntity;
+use SmolCms\Exception\DuplicateImageException;
 use SmolCms\Exception\InvalidStateException;
 use SmolCms\Service\Core\Session\SessionService;
 use SmolCms\Service\DB\ImageEntityService;
@@ -22,10 +24,13 @@ class ImageUploadServiceTest extends FunctionalTestCase
     private ImageEntityService $imageEntityService;
     #[Autowire]
     private SessionService $sessionService;
+    #[Autowire]
+    private PDO $pdo;
 
     protected function setUp(): void
     {
         parent::setUp();
+        $this->pdo->exec('DELETE FROM image_tag; DELETE FROM image;');
         $this->loginUser('image-uploader', 'Image Uploader');
         $this->cleanImageStorage();
     }
@@ -148,5 +153,34 @@ class ImageUploadServiceTest extends FunctionalTestCase
             static fn(ImageEntity $pendingEntity) => $pendingEntity->getId(),
             $pending
         ));
+    }
+
+    public function testUpload_sameImageTwice_throwsDuplicateImageExceptionWithoutStoringIt(): void
+    {
+        $imageData = file_get_contents(ROOT_DIR . '/tests/TestUtils/TestFiles/image.png');
+        $first = $this->imageUploadService->upload($imageData, ImageType::PNG);
+
+        $this->expectException(DuplicateImageException::class);
+        $this->expectExceptionMessageIsOrContains('already been uploaded');
+        try {
+            $this->imageUploadService->upload($imageData, ImageType::PNG);
+        } finally {
+            self::assertCount(1, $this->imageEntityService->findByStatus(ImageStatus::PENDING));
+            self::assertSame(
+                hash('sha256', $imageData),
+                $this->imageEntityService->findOneById($first->getId())?->getChecksum()
+            );
+            self::assertFileExists(IMAGE_STORAGE_DIR . '/' . $first->getChecksum() . '.png');
+        }
+    }
+
+    public function testHasDuplicateChecksum_isTrueForAnyExistingImageWithTheSameBytes(): void
+    {
+        $imageData = file_get_contents(ROOT_DIR . '/tests/TestUtils/TestFiles/image.jpg');
+        $checksum = hash('sha256', $imageData);
+
+        self::assertFalse($this->imageUploadService->hasDuplicateChecksum($checksum));
+        $this->imageUploadService->upload($imageData, ImageType::JPEG);
+        self::assertTrue($this->imageUploadService->hasDuplicateChecksum($checksum));
     }
 }

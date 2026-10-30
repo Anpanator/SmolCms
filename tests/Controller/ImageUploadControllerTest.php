@@ -84,6 +84,7 @@ class ImageUploadControllerTest extends FunctionalTestCase
         $this->originalCookie = $_COOKIE;
         $_COOKIE = [];
         parent::setUp();
+        $this->pdo->exec('DELETE FROM image_tag; DELETE FROM image;');
         $this->uploadUrl = new Url(protocol: 'https', host: 'localhost', path: '/upload-image');
         $this->cleanImageStorage();
     }
@@ -559,6 +560,65 @@ class ImageUploadControllerTest extends FunctionalTestCase
         $this->assertContains('tagme', $this->tagService->getTagsForImage($entity->getId()));
     }
 
+    public function testPostAction_duplicateImage_returnsConflictAndDoesNotStoreIt(): void
+    {
+        $this->loginUser('testuser', 'Test User');
+        $tmpPath = ROOT_DIR . '/tests/TestUtils/TestFiles/image.jpg';
+        $request = $this->createUploadRequest([$tmpPath], ['test.jpg']);
+
+        $firstResponse = $this->simulateRequest($request);
+        self::assertSame(HttpStatus::CREATED, $firstResponse->getStatus());
+        $pendingAfterFirstUpload = $this->imageEntityService->findByStatus(ImageStatus::PENDING);
+        self::assertCount(1, $pendingAfterFirstUpload);
+
+        $duplicateResponse = $this->simulateRequest($request);
+
+        self::assertSame(HttpStatus::CONFLICT, $duplicateResponse->getStatus());
+        self::assertCount(1, $this->imageEntityService->findByStatus(ImageStatus::PENDING));
+        self::assertSame(
+            $pendingAfterFirstUpload[0]->getChecksum(),
+            hash('sha256', (string)file_get_contents($tmpPath)),
+        );
+    }
+
+    public function testPostAction_batchContainingDuplicate_storesNoFilesAndReturnsConflict(): void
+    {
+        $this->loginUser('testuser', 'Test User');
+        $jpegPath = ROOT_DIR . '/tests/TestUtils/TestFiles/image.jpg';
+        $pngPath = ROOT_DIR . '/tests/TestUtils/TestFiles/image.png';
+        self::assertSame(
+            HttpStatus::CREATED,
+            $this->simulateRequest($this->createUploadRequest([$jpegPath], ['first.jpg']))->getStatus(),
+        );
+        $pngChecksum = hash('sha256', (string)file_get_contents($pngPath));
+
+        $response = $this->simulateRequest($this->createUploadRequest(
+            [$jpegPath, $pngPath],
+            ['duplicate.jpg', 'new.png'],
+        ));
+
+        self::assertSame(HttpStatus::CONFLICT, $response->getStatus());
+        self::assertCount(1, $this->imageEntityService->findByStatus(ImageStatus::PENDING));
+        self::assertFileDoesNotExist(IMAGE_STORAGE_DIR . '/' . $pngChecksum . '.png');
+    }
+
+    public function testPostAction_sameFileTwiceInOneBatch_returnsConflictAndStoresNothing(): void
+    {
+        $this->loginUser('testuser', 'Test User');
+        $pngPath = ROOT_DIR . '/tests/TestUtils/TestFiles/image.png';
+
+        $response = $this->simulateRequest($this->createUploadRequest(
+            [$pngPath, $pngPath],
+            ['first.png', 'second.png'],
+        ));
+
+        self::assertSame(HttpStatus::CONFLICT, $response->getStatus());
+        self::assertCount(0, $this->imageEntityService->findByStatus(ImageStatus::PENDING));
+        self::assertFileDoesNotExist(
+            IMAGE_STORAGE_DIR . '/' . hash('sha256', (string)file_get_contents($pngPath)) . '.png'
+        );
+    }
+
     public function testPostAction_multipleImages_uploadsEachImage(): void
     {
         $this->loginUser('testuser', 'Test User');
@@ -594,6 +654,42 @@ class ImageUploadControllerTest extends FunctionalTestCase
         $extensions = array_map(static fn($entity) => $entity->getOriginalExtension(), $uploadedEntities);
         sort($extensions);
         $this->assertSame(['jpeg', 'png'], $extensions);
+    }
+
+    /**
+     * @param list<string> $tmpPaths
+     * @param list<string> $names
+     */
+    private function createUploadRequest(array $tmpPaths, array $names): Request
+    {
+        $files = [];
+        foreach ($tmpPaths as $index => $tmpPath) {
+            $files[] = [
+                'name' => $names[$index],
+                'tmp_name' => $tmpPath,
+                'size' => filesize($tmpPath),
+                'type' => 'application/octet-stream',
+                'error' => UPLOAD_ERR_OK,
+            ];
+        }
+
+        if (count($files) === 1) {
+            $image = $files[0];
+        } else {
+            $image = [
+                'name' => array_column($files, 'name'),
+                'tmp_name' => array_column($files, 'tmp_name'),
+                'size' => array_column($files, 'size'),
+                'type' => array_column($files, 'type'),
+                'error' => array_column($files, 'error'),
+            ];
+        }
+
+        return new Request(
+            url: $this->uploadUrl,
+            method: HttpMethod::POST,
+            files: ['image' => $image],
+        );
     }
 
     /** @param array<array-key, mixed> $headers */

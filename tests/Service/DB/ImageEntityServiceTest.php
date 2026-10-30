@@ -155,6 +155,19 @@ class ImageEntityServiceTest extends FunctionalTestCase
         self::assertSame([], $this->imageEntityService->findByOriginalChecksum($checksum, 'avif'));
     }
 
+    public function testFindOneByChecksumMatchesContentRegardlessOfExtension(): void
+    {
+        $checksum = hash('sha256', 'find-one-by-checksum-' . bin2hex(random_bytes(8)));
+        $entity = $this->makeEntity(checksum: $checksum, originalExtension: 'jpeg');
+        $this->imageEntityService->saveAsNew($entity);
+
+        $found = $this->imageEntityService->findOneByChecksum($checksum);
+
+        self::assertNotNull($found);
+        self::assertSame($entity->getId(), $found->getId());
+        self::assertNull($this->imageEntityService->findOneByChecksum(hash('sha256', 'unknown')));
+    }
+
     public function testVisibleImagePageAndCountMatchViewerStatusFilterAndPagination(): void
     {
         $viewerId = 4321;

@@ -9,6 +9,7 @@ use SmolCms\Data\Constant\ContextKey;
 use SmolCms\Data\Constant\ImageStatus;
 use SmolCms\Data\Image\ImageType;
 use SmolCms\Data\Persistence\ImageEntity;
+use SmolCms\Exception\DuplicateImageException;
 use SmolCms\Exception\InvalidStateException;
 use SmolCms\Service\Core\ContextService;
 use SmolCms\Service\Core\Session\SessionService;
@@ -35,6 +36,15 @@ readonly class ImageUploadService
     {
     }
 
+    /**
+     * Whether an image with the same original-byte checksum already exists.
+     * Duplicate uploads are rejected before any bytes or records are stored.
+     */
+    public function hasDuplicateChecksum(string $checksum): bool
+    {
+        return $this->imageEntityService->findOneByChecksum($checksum) !== null;
+    }
+
     public function upload(string $imageData, ImageType $imageType): ImageEntity
     {
         $userData = $this->sessionService->getUserData();
@@ -42,8 +52,12 @@ readonly class ImageUploadService
             throw new InvalidStateException('Cannot upload an image without an authenticated user.');
         }
 
-        $image = $this->imageProcessorFacade->sanitizeImage($imageData, $imageType);
         $checksum = hash('sha256', $imageData);
+        if ($this->hasDuplicateChecksum($checksum)) {
+            throw new DuplicateImageException('An image with this checksum has already been uploaded.');
+        }
+
+        $image = $this->imageProcessorFacade->sanitizeImage($imageData, $imageType);
 
         $entity = new ImageEntity(
             id: null,

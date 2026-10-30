@@ -9,21 +9,33 @@ The Docker PHP/Nginx configuration allows up to 100 MB per file and request;
 manual hosts must set compatible PHP and web-server limits.
 
 Upload validation decodes the image to confirm it is readable and capture its
-dimensions, but stores the original bytes unchanged. Original files are stored
-flat as `<sha-256>.<extension>`; generated variants remain content-addressed in
-sharded directories. A new image starts pending and is tagged `tagme`;
-each successful upload is recorded as an `IMAGE_UPLOADED` audit action. Uploads
-can also authenticate with an API key for browser code (including cross-origin
-clients using the endpoint's CORS preflight) and server-to-server clients; see
-`docs/api/index.adoc`.
+dimensions, but stores the original bytes unchanged. Before storing anything,
+the server looks up the SHA-256 checksum of every file. A checksum that already
+exists in the image records is rejected with `409` and no file from that request
+is stored; the client-supplied name and extension do not affect the match.
+Original files are stored flat as `<sha-256>.<extension>`; generated variants
+remain content-addressed in sharded directories. A new image starts pending and
+is tagged `tagme`; each successful upload is recorded as an `IMAGE_UPLOADED`
+audit action. Uploads can also authenticate with an API key for browser code
+(including cross-origin clients using the endpoint's CORS preflight) and
+server-to-server clients; see `docs/api/index.adoc`.
+
+The SPA uploads files one at a time. A failed file does not stop the remaining
+files, and the view keeps a list of every failed file name with its mapped
+reason, so later progress messages do not hide earlier failures. The form is
+only reset after a fully successful batch.
 
 === Processing and delivery
 
 The asynchronous worker scans the flat original-upload directory, then looks up
-each file's checksum in the image records. Partial records are fully regenerated,
-overwriting their content-addressed variants. If every matching record is already
-complete, the worker warns and deletes the redundant original without reprocessing
-it. Originals with no matching database record are also warned about and deleted.
+each file's checksum in the image records. As a secondary safeguard, multiple
+active records for the same checksum are treated as duplicates: the oldest record
+is kept and newer active duplicates are deleted before processing; queued records
+are left untouched so they can still be restored. Partial records are fully
+regenerated, overwriting their content-addressed variants. If every matching
+record is already complete, the worker warns and deletes the redundant original
+without reprocessing it. Originals with no matching database record are also
+warned about and deleted.
 Processing creates a public AVIF thumbnail, a private WebP viewing sample, and a
 private download. Downloads remain in the source format except PNG, which becomes
 pixel-lossless WebP. The worker moves pending images to the accepted collection

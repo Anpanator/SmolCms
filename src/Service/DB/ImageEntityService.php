@@ -45,6 +45,21 @@ readonly class ImageEntityService extends EntityService
     }
 
     /**
+     * Finds an image record by the SHA-256 checksum of its original bytes.
+     * The checksum alone identifies the content, regardless of its extension.
+     */
+    public function findOneByChecksum(string $checksum): ?ImageEntity
+    {
+        $qc = new QueryCriteria();
+        $qc->select(ImageEntity::class)
+            ->andWhere('checksum = :checksum')
+            ->withParameters(['checksum' => $checksum])
+            ->maxResults(1);
+        $result = $this->execute($qc);
+        return $result[0] ?? null;
+    }
+
+    /**
      * Finds all image records that refer to the same content-addressed original.
      *
      * @return list<ImageEntity>

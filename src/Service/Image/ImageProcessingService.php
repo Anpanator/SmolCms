@@ -21,10 +21,11 @@ use Throwable;
 
 /**
  * Batch processor for originals in the flat upload directory. Each original's
- * checksum and extension locate its image rows. Partial rows are regenerated from
- * scratch; if every matching row is complete, the leftover original is warned about
- * and deleted without re-encoding it. Variant files are content-addressed, so a
- * retry overwrites the same paths safely.
+ * checksum and extension locate its image rows. Newer active rows for the same
+ * original are discarded as duplicates before processing; partial rows are
+ * regenerated from scratch. If every matching row is complete, the leftover
+ * original is warned about and deleted without re-encoding it. Variant files are
+ * content-addressed, so a retry overwrites the same paths safely.
  *
  * A failure on one original is logged and left in the upload directory for retry;
  * the rest of the batch is still processed.
@@ -176,8 +177,10 @@ class ImageProcessingService
             return 0;
         }
 
+        $entities = $this->discardDuplicateEntities($candidate['entities'], $candidate['fileName']);
+
         $partialEntities = array_values(array_filter(
-            $candidate['entities'],
+            $entities,
             fn(ImageEntity $entity): bool => !$this->isFullyProcessed($entity),
         ));
 
@@ -238,7 +241,7 @@ class ImageProcessingService
             return $processed;
         }
 
-        foreach ($candidate['entities'] as $entity) {
+        foreach ($entities as $entity) {
             if (!$this->isFullyProcessed($entity)) {
                 return $processed;
             }
@@ -246,6 +249,55 @@ class ImageProcessingService
 
         $this->deleteOriginalFile($candidate['fileName']);
         return $processed;
+    }
+
+    /**
+     * Keeps the oldest active record for an original and permanently removes newer
+     * active duplicates that bypassed the upload-time checksum check. Queued records
+     * are left untouched so they can still be restored.
+     *
+     * @param list<ImageEntity> $entities Sorted oldest first.
+     * @return list<ImageEntity>
+     */
+    private function discardDuplicateEntities(array $entities, string $fileName): array
+    {
+        $activeEntities = array_values(array_filter(
+            $entities,
+            static fn(ImageEntity $entity): bool => !$entity->isDeleted(),
+        ));
+        if (count($activeEntities) <= 1) {
+            return $entities;
+        }
+
+        $canonical = $activeEntities[0];
+        $discardedIds = [];
+        foreach (array_slice($activeEntities, 1) as $duplicate) {
+            $duplicateId = $duplicate->getId();
+            if ($duplicateId === null) {
+                continue;
+            }
+            $this->imageEntityService->deleteById($duplicateId);
+            $discardedIds[] = $duplicateId;
+        }
+        if ($discardedIds === []) {
+            return $entities;
+        }
+
+        $discardedLookup = array_fill_keys($discardedIds, true);
+        $this->loggingService->log(
+            LogLevel::WARNING,
+            sprintf(
+                'Original %s has duplicate image records; keeping image %d and discarding image(s) %s.',
+                $fileName,
+                $canonical->getId(),
+                implode(', ', $discardedIds),
+            )
+        );
+
+        return array_values(array_filter(
+            $entities,
+            static fn(ImageEntity $entity): bool => !isset($discardedLookup[$entity->getId()]),
+        ));
     }
 
     private function isFullyProcessed(ImageEntity $entity): bool

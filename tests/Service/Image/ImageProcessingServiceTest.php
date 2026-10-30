@@ -345,21 +345,68 @@ class ImageProcessingServiceTest extends FunctionalTestCase
         self::assertSame(self::encodeImage($decodedOriginal, ImageType::AVIF, 75), $downloadContent);
     }
 
-    public function testProcessBatch_duplicatePendingImagesDeletesSharedOriginalAfterBothAreProcessed(): void
+    public function testProcessBatch_duplicatePendingImagesKeepsOldestAndDiscardsNewer(): void
     {
         $wizard = $this->createUser(AccessLevel::WIZARD);
         $image = self::createTestImage(24, 16);
-        $first = $this->createPendingImage($image, ImageType::PNG, $wizard->getId());
-        $second = $this->createPendingImage($image, ImageType::PNG, $wizard->getId());
+        $first = $this->createPendingImage(
+            $image,
+            ImageType::PNG,
+            $wizard->getId(),
+            new DateTime('2026-01-01 00:00:00'),
+        );
+        $second = $this->createPendingImage(
+            $image,
+            ImageType::PNG,
+            $wizard->getId(),
+            new DateTime('2026-01-02 00:00:00'),
+        );
 
         self::assertSame($first->getChecksum(), $second->getChecksum());
         self::assertFileExists($this->originalPath($first));
+        $logBefore = file_get_contents(ERROR_LOG_FILE_PATH);
+        self::assertIsString($logBefore);
 
-        self::assertSame(2, $this->testee->processBatch(10));
+        self::assertSame(1, $this->testee->processBatch(10));
 
         self::assertFileDoesNotExist($this->originalPath($first));
         self::assertSame(ImageStatus::ACCEPTED, $this->imageEntityService->findOneById($first->getId())->getStatus());
-        self::assertSame(ImageStatus::ACCEPTED, $this->imageEntityService->findOneById($second->getId())->getStatus());
+        self::assertNull($this->imageEntityService->findOneById($second->getId()));
+        $logAfter = file_get_contents(ERROR_LOG_FILE_PATH);
+        self::assertIsString($logAfter);
+        $newLogEntries = substr($logAfter, strlen($logBefore));
+        self::assertStringContainsString('[WARNING]', $newLogEntries);
+        self::assertStringContainsString('duplicate image records', $newLogEntries);
+        self::assertStringContainsString('discarding image(s) ' . $second->getId(), $newLogEntries);
+    }
+
+    public function testProcessBatch_pendingDuplicateOfProcessedImageIsDiscardedWithoutReprocessing(): void
+    {
+        $wizard = $this->createUser(AccessLevel::WIZARD);
+        $image = self::createTestImage(24, 16);
+        $first = $this->createPendingImage(
+            $image,
+            ImageType::PNG,
+            $wizard->getId(),
+            new DateTime('2026-01-01 00:00:00'),
+        );
+        self::assertSame(1, $this->testee->processBatch(10));
+        self::assertSame(ImageStatus::ACCEPTED, $this->imageEntityService->findOneById($first->getId())->getStatus());
+        self::assertFileDoesNotExist($this->originalPath($first));
+
+        $second = $this->createPendingImage(
+            $image,
+            ImageType::PNG,
+            $wizard->getId(),
+            new DateTime('2026-01-02 00:00:00'),
+        );
+        self::assertFileExists($this->originalPath($second));
+
+        self::assertSame(0, $this->testee->processBatch(10));
+
+        self::assertFileDoesNotExist($this->originalPath($second));
+        self::assertSame(ImageStatus::ACCEPTED, $this->imageEntityService->findOneById($first->getId())->getStatus());
+        self::assertNull($this->imageEntityService->findOneById($second->getId()));
     }
 
     public function testProcessBatch_orphanedOriginalLogsWarningAndDeletesIt(): void
@@ -533,8 +580,8 @@ class ImageProcessingServiceTest extends FunctionalTestCase
     {
         $wizard = $this->createUser(AccessLevel::WIZARD);
         $oldest = $this->createPendingImage(self::createTestImage(8, 8), ImageType::PNG, $wizard->getId(), new DateTime('2026-01-01 00:00:00'));
-        $middle = $this->createPendingImage(self::createTestImage(8, 8), ImageType::PNG, $wizard->getId(), new DateTime('2026-01-02 00:00:00'));
-        $newest = $this->createPendingImage(self::createTestImage(8, 8), ImageType::PNG, $wizard->getId(), new DateTime('2026-01-03 00:00:00'));
+        $middle = $this->createPendingImage(self::createTestImage(9, 8), ImageType::PNG, $wizard->getId(), new DateTime('2026-01-02 00:00:00'));
+        $newest = $this->createPendingImage(self::createTestImage(10, 8), ImageType::PNG, $wizard->getId(), new DateTime('2026-01-03 00:00:00'));
 
         $processed = $this->testee->processBatch(2);
 

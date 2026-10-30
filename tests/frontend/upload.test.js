@@ -239,7 +239,7 @@ export async function testServerErrorShowsGenericMessageWithoutSuccess() {
     }
 }
 
-export async function testPartialFailureReportsUploadedCountWithoutSuccess() {
+export async function testPartialFailureContinuesAndListsEveryFailedFile() {
     const xhrMock = mockXhr(() => xhrMock.calls.length === 1
         ? {status: 201, body: null}
         : {status: 500, body: null});
@@ -249,16 +249,75 @@ export async function testPartialFailureReportsUploadedCountWithoutSuccess() {
             navigate: () => {
             }
         });
-        chooseFiles(view, ['cat.png', 'dog.png', 'bird.png']);
+        const input = chooseFiles(view, ['cat.png', 'dog.png', 'bird.png']);
         await submitForm(view.querySelector('form'));
 
-        assertEqual(xhrMock.calls.length, 2, 'upload should stop after the first failed file');
+        assertEqual(xhrMock.calls.length, 3, 'upload should continue after a failed file');
         const message = view.querySelector('.form-message');
         assertTrue(!message.hidden, 'partial failure should show a message');
-        assertTrue(message.textContent.includes('1 of 3 images uploaded before dog.png failed'));
+        assertTrue(message.textContent.includes('1 of 3 images uploaded'));
+        assertTrue(message.textContent.includes('dog.png'), 'the first failed file should stay listed');
+        assertTrue(message.textContent.includes('bird.png'), 'later failures should be added to the list');
+        assertTrue(message.textContent.includes('went wrong'), 'the failure reason should be shown');
         assertTrue(!message.textContent.includes('successfully'), 'partial failure must not claim success');
         assertTrue(!message.className.includes('--success'), 'partial failure must not be styled as success');
         assertEqual(view.querySelector('#upload-file-count-progress').value, 1);
+        assertEqual(input.files.length, 3, 'failed uploads should keep the selection for a retry');
+    } finally {
+        restore();
+    }
+}
+
+export async function testDuplicateUploadShowsPersistentErrorAndContinues() {
+    const xhrMock = mockXhr(() => xhrMock.calls.length === 1
+        ? {status: 409, body: null}
+        : {status: 201, body: null});
+    const restore = useXhr(xhrMock);
+    try {
+        const view = createUploadView({
+            navigate: () => {
+            }
+        });
+        chooseFiles(view, ['duplicate.png', 'new.png']);
+        await submitForm(view.querySelector('form'));
+
+        assertEqual(xhrMock.calls.length, 2, 'the next file should still be uploaded after a duplicate');
+        const message = view.querySelector('.form-message');
+        assertTrue(!message.hidden, 'duplicate should show an error');
+        assertTrue(message.textContent.includes('duplicate.png'), 'the duplicate file should be named');
+        assertTrue(message.textContent.includes('already been uploaded'), 'the duplicate reason should be shown');
+        assertTrue(!message.textContent.includes('new.png'), 'successful files should not be listed as failures');
+        assertTrue(!message.className.includes('--success'), 'duplicate must not be styled as success');
+        assertEqual(view.querySelector('#upload-file-count-progress').value, 1);
+
+        // Later per-file status updates must not replace the accumulated error.
+        assertTrue(view.querySelector('.upload-current-file-status').textContent.includes('uploaded'));
+        assertTrue(message.textContent.includes('already been uploaded'));
+    } finally {
+        restore();
+    }
+}
+
+export async function testAllFailedUploadsKeepTheirReasonsInTheErrorList() {
+    const xhrMock = mockXhr(() => xhrMock.calls.length === 1
+        ? {status: 409, body: null}
+        : {status: 413, body: null});
+    const restore = useXhr(xhrMock);
+    try {
+        const view = createUploadView({
+            navigate: () => {
+            }
+        });
+        chooseFiles(view, ['duplicate.png', 'too-large.png']);
+        await submitForm(view.querySelector('form'));
+
+        assertEqual(xhrMock.calls.length, 2, 'all files should be attempted');
+        const message = view.querySelector('.form-message');
+        assertTrue(message.textContent.includes('Could not upload 2 of 2 images'));
+        assertTrue(message.textContent.includes('duplicate.png: This image has already been uploaded.'));
+        assertTrue(message.textContent.includes('too-large.png: The upload is too large.'));
+        assertTrue(!message.className.includes('--success'));
+        assertEqual(view.querySelector('#upload-file-count-progress').value, 0);
     } finally {
         restore();
     }

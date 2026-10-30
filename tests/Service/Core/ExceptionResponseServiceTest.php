@@ -9,6 +9,7 @@ use RuntimeException;
 use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Constant\LogLevel;
 use SmolCms\Exception\BadRequestException;
+use SmolCms\Exception\DuplicateImageException;
 use SmolCms\Service\Core\ExceptionResponseService;
 use SmolCms\Service\Core\LoggingService;
 use SmolCms\TestUtils\Attributes\Mock;
@@ -53,6 +54,20 @@ class ExceptionResponseServiceTest extends SimpleTestCase
         $response = $this->exceptionResponseService->createResponseFromException($exception);
 
         self::assertSame(HttpStatus::BAD_REQUEST, $response->getStatus());
+    }
+
+    public function testCreateResponseFromException_LogsDuplicateImageAsConflict(): void
+    {
+        $exception = new DuplicateImageException('Duplicate image');
+        $this->loggingService
+            ->expects(self::once())
+            ->method('log')
+            ->with(LogLevel::INFO, 'Duplicate image')
+            ->seal();
+
+        $response = $this->exceptionResponseService->createResponseFromException($exception);
+
+        self::assertSame(HttpStatus::CONFLICT, $response->getStatus());
     }
 
     public function testCreateResponseFromException_ReturnsStackTraceWhenDisplayErrorsIsEnabled(): void

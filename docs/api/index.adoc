@@ -247,6 +247,8 @@ all-or-nothing: if any single file fails, no file from the request is stored.
 | Content type | The image type is detected from the file content signature,
   never from the client-supplied `name` or `type`. Accepted types are PNG,
   JPEG, AVIF, and WebP; anything else is rejected. | `400`
+| Duplicate content | The SHA-256 checksum of the original bytes must not match
+  an existing image record, including another file in the same request. | `409`
 | Dimensions | `getimagesize()` must succeed. Width and height must both be
   positive, each at most 16,384 pixels, and `width * height` at most
   20,000,000 pixels. | `400`
@@ -360,6 +362,8 @@ files returns `401` rather than `400`.
   an unknown code; a non-SAPI upload path; `getimagesize()` failure or a
   dimension limit violation; or content not recognized as PNG, JPEG, AVIF, or
   WebP. | Empty
+| `409` | A file's SHA-256 checksum matches an existing image record, including
+  another file in the same request. No file from the request is stored. | Empty
 | `413` | A per-file `UPLOAD_ERR_INI_SIZE` or `UPLOAD_ERR_FORM_SIZE`. A web
   server may also return its own `413` for an oversized body. | Empty from the
   application; possibly HTML from nginx

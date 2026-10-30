@@ -28,7 +28,10 @@ feedback.
 === Upload and moderation behavior
 
 The upload view sends each selected file sequentially as multipart field
-`image[]`. The home view shows accepted-image thumbnails and any pending-review
+`image[]`. A failed file does not stop the remaining files; the view keeps a
+persistent list of every failed file name and mapped reason so later progress
+updates cannot hide earlier errors, and it only resets the form after a fully
+successful batch. The home view shows accepted-image thumbnails and any pending-review
 images visible to the viewer; pending-review tiles use distinct
 `tile-unapproved` styling. The image view loads metadata and a protected
 sample, with a download link labeled *Download*. The sample is scaled to fit

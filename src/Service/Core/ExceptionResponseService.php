@@ -9,6 +9,7 @@ use SmolCms\Data\Constant\HttpStatus;
 use SmolCms\Data\Constant\LogLevel;
 use SmolCms\Data\Response\Response;
 use SmolCms\Exception\BadRequestException;
+use SmolCms\Exception\DuplicateImageException;
 use Throwable;
 
 class ExceptionResponseService
@@ -21,6 +22,7 @@ class ExceptionResponseService
     {
         $status = match (true) {
             $e instanceof BadRequestException => HttpStatus::BAD_REQUEST,
+            $e instanceof DuplicateImageException => HttpStatus::CONFLICT,
             default => HttpStatus::INTERNAL_SERVER_ERROR,
         };
 
